@@ -50,6 +50,7 @@ export interface Solid3DProps {
   r?: number;
   through?: string;
   faceFill?: Record<string, string>;
+  edgeMeasures?: Record<string, boolean>;
   pointCoords?: Point2D[];
   vertexNames?: string[];
   azimuth?: number;
@@ -1760,16 +1761,17 @@ export interface FlattenedFaceResult {
 }
 
 export function computeFlattenedFace(
-  pointIds: [string, string, string],
+  pointIds: string[],
   scene: Solved3DScene,
   elements: CanvasElement[],
   targetOffset: Point2D = { x: 4.5, y: 0 }
 ): FlattenedFaceResult | null {
+  if (pointIds.length < 3) return null;
   const ownerId = scene.owner.get(pointIds[0]);
   if (!ownerId || pointIds.some((id) => scene.owner.get(id) !== ownerId)) {
     return null;
   }
-  const [pA, pB, pC] = pointIds.map((id) => scene.p3.get(id));
+  const [pA, pB, pC] = pointIds.slice(0, 3).map((id) => scene.p3.get(id));
   if (!pA || !pB || !pC) return null;
 
   const normal = cross3(sub3(pB, pA), sub3(pC, pA));
@@ -1778,13 +1780,16 @@ export function computeFlattenedFace(
 
   const solidEl = elements.find((e) => e.id === ownerId);
   const solidPts = Array.isArray(solidEl?.props.points) ? (solidEl.props.points as string[]) : [];
+  const solidNames = Array.isArray(solidEl?.props.vertexNames)
+    ? (solidEl.props.vertexNames as string[])
+    : [];
   const scaleRef = Math.max(
     ...solidPts.map((id) => scene.p3.get(id)).filter((p): p is Point3D => !!p).map((p) => dist3(p, pA)),
     1e-9
   );
   if (nLen < 1e-9 * scaleRef * scaleRef) return null;
 
-  // Collect all coplanar points belonging to this solid
+  // Collect all coplanar standalone points + explicit face vertex IDs belonging to this solid
   const coplanarIds = elements
     .filter((e) => {
       if (e.type !== "GeomPoint" || e.props.handle) return false;
@@ -1795,7 +1800,10 @@ export function computeFlattenedFace(
     })
     .map((e) => e.id);
 
-  const idsToUse = coplanarIds.length >= 3 ? coplanarIds : pointIds;
+  const idsToUse = [...pointIds];
+  for (const cid of coplanarIds) {
+    if (!idsToUse.includes(cid)) idsToUse.push(cid);
+  }
   const uvs = idsToUse
     .map((id) => {
       const pt3 = scene.p3.get(id);
@@ -1804,12 +1812,15 @@ export function computeFlattenedFace(
   if (uvs.some((uv) => uv === null)) return null;
   const validUVs = uvs as Array<{ u: number; v: number }>;
 
-  // Place beside the 3D solid
+  // Center UVs cleanly beside the 3D solid
+  const avgU = validUVs.reduce((s, uv) => s + uv.u, 0) / validUVs.length;
+  const avgV = validUVs.reduce((s, uv) => s + uv.v, 0) / validUVs.length;
   const pts2 = idsToUse.map((id) => scene.pts.get(id) ?? { x: 0, y: 0 });
   const maxX = Math.max(...pts2.map((p) => p.x));
   const avgY = pts2.reduce((s, p) => s + p.y, 0) / pts2.length;
+  const minU = Math.min(...validUVs.map((uv) => uv.u - avgU));
   const anchor: Point2D = {
-    x: maxX + targetOffset.x * 0.65,
+    x: maxX + targetOffset.x - minU,
     y: avgY + targetOffset.y,
   };
 
@@ -1817,11 +1828,17 @@ export function computeFlattenedFace(
   const byId = new Map(elements.map((el) => [el.id, el]));
   const vertices2D = idsToUse.map((id, idx) => {
     const el = byId.get(id);
-    const name = typeof el?.props.name === "string" ? el.props.name : "";
+    const sIdx = solidPts.indexOf(id);
+    const fallbackName = sIdx >= 0 ? solidNames[sIdx] ?? "" : "";
+    const name =
+      typeof el?.props.name === "string" && el.props.name.trim()
+        ? el.props.name
+        : fallbackName;
+    const centeredUV = { u: validUVs[idx].u - avgU, v: validUVs[idx].v - avgV };
     return {
       id,
       name,
-      pos: placeFlattenedUV(anchor, validUVs[idx], 0, false),
+      pos: placeFlattenedUV(anchor, centeredUV, 0, false),
     };
   });
 
@@ -1855,6 +1872,152 @@ export function computeFlattenedFace(
 
   const segments: Array<[number, number]> = ordered.map((_, idx) => [idx, (idx + 1) % ordered.length]);
   return { anchor, vertices2D: ordered, segments, polygonElement };
+}
+
+export type SolidSubSelection =
+  | {
+      kind: "face";
+      solidId: string;
+      faceIdx: number;
+      vertIndices: number[];
+      vertIds: string[];
+      faceKey: string;
+      faceLabel: string;
+    }
+  | {
+      kind: "edge";
+      solidId: string;
+      i: number;
+      j: number;
+      aId: string;
+      bId: string;
+      edgeKey: string;
+      edgeLabel: string;
+    };
+
+function distPointToSeg2D(p: Point2D, a: Point2D, b: Point2D): number {
+  const vx = b.x - a.x;
+  const vy = b.y - a.y;
+  const lenSq = vx * vx + vy * vy;
+  if (lenSq < 1e-12) return dist2D(p, a);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / lenSq));
+  return Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy));
+}
+
+function pointInPoly2D(poly: Point2D[], p: Point2D): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x;
+    const yi = poly[i].y;
+    const xj = poly[j].x;
+    const yj = poly[j].y;
+    const intersect =
+      yi > p.y !== yj > p.y &&
+      p.x < ((xj - xi) * (p.y - yi)) / (yj - yi || 1e-12) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Hit-tests a Solid3D element at worldPos and returns the closest edge (preferred)
+ * or front-most containing face so teachers can inspect and extract individual edges/faces.
+ */
+export function resolveSolidSubSelectionAtPoint(
+  el: CanvasElement,
+  worldPos: Point2D,
+  scene: Solved3DScene,
+  points2D: Map<string, Point2D>,
+  byId: Map<string, CanvasElement>,
+  edgeThresh: number
+): SolidSubSelection | null {
+  if (el.type !== "Solid3D") return null;
+  const lift = scene.lifts.get(el.id);
+  const ptIds = Array.isArray(el.props.points) ? (el.props.points as string[]) : [];
+  if (!lift || ptIds.length === 0) return null;
+
+  const vNames = Array.isArray(el.props.vertexNames) ? (el.props.vertexNames as string[]) : [];
+  const getVName = (idx: number): string => {
+    const id = ptIds[idx];
+    const ptEl = id ? byId.get(id) : undefined;
+    if (typeof ptEl?.props.name === "string" && ptEl.props.name.trim()) return ptEl.props.name.trim();
+    if (typeof vNames[idx] === "string" && vNames[idx].trim()) return vNames[idx].trim();
+    return `${idx + 1}`;
+  };
+  const getPt2 = (idx: number): Point2D | undefined => {
+    const id = ptIds[idx];
+    return id ? points2D.get(id) ?? scene.pts.get(id) : undefined;
+  };
+
+  // 1. Edge hit test (prefer closest edge within edgeThresh)
+  let bestEdge: { i: number; j: number; dist: number } | null = null;
+  for (const [i, j] of extractPolyhedronEdges(lift)) {
+    const pA = getPt2(i);
+    const pB = getPt2(j);
+    if (!pA || !pB) continue;
+    const d = distPointToSeg2D(worldPos, pA, pB);
+    if (d <= edgeThresh && (!bestEdge || d < bestEdge.dist)) {
+      bestEdge = { i, j, dist: d };
+    }
+  }
+  if (bestEdge) {
+    const { i, j } = bestEdge;
+    const aId = ptIds[i];
+    const bId = ptIds[j];
+    const lo = Math.min(i, j);
+    const hi = Math.max(i, j);
+    const edgeKey = `${lo}_${hi}`;
+    const nA = getVName(lo);
+    const nB = getVName(hi);
+    return {
+      kind: "edge",
+      solidId: el.id,
+      i: lo,
+      j: hi,
+      aId: i === lo ? aId : bId,
+      bId: i === lo ? bId : aId,
+      edgeKey,
+      edgeLabel: `${nA}${nB}`,
+    };
+  }
+
+  // 2. Face hit test (prefer visible front-most face)
+  let bestFace: { faceIdx: number; face: number[]; visible: boolean; depth: number } | null = null;
+  for (let fIdx = 0; fIdx < lift.faces.length; fIdx++) {
+    const face = lift.faces[fIdx];
+    const poly = face.map(getPt2).filter((p): p is Point2D => Boolean(p));
+    if (poly.length < 3 || !pointInPoly2D(poly, worldPos)) continue;
+    const visible = isFaceVisible(lift, face);
+    const depth =
+      face.reduce((acc, idx) => {
+        const p3 = lift.p3[idx];
+        return acc + (p3 ? dot3(p3, lift.view) : 0);
+      }, 0) / face.length;
+    if (
+      !bestFace ||
+      (visible && !bestFace.visible) ||
+      (visible === bestFace.visible && depth > bestFace.depth)
+    ) {
+      bestFace = { faceIdx: fIdx, face, visible, depth };
+    }
+  }
+  if (bestFace) {
+    const { faceIdx, face } = bestFace;
+    const vertIds = face.map((idx) => ptIds[idx]).filter(Boolean);
+    const faceKey = face.map((idx) => ptIds[idx] ?? String(idx)).join("|");
+    const faceLabel = face.map(getVName).join("");
+    return {
+      kind: "face",
+      solidId: el.id,
+      faceIdx,
+      vertIndices: face,
+      vertIds,
+      faceKey,
+      faceLabel,
+    };
+  }
+
+  return null;
 }
 
 // --- 19 Spatial Constructions & Measurements ---

@@ -18,6 +18,7 @@ import {
   type Solid3DKind,
   type Solid3DProps,
   type SolidLift,
+  type SolidSubSelection,
   type SpaceFigureProps,
   applyOrbitToPoints,
   azimuthElevationToCamera,
@@ -28,13 +29,14 @@ import {
   computeRoundCrossSection,
   computeSolidWireframe,
   computeSpaceFigureGeometry,
+  dist3,
   getRoundRims,
   isRoundPointOccluded,
   liftRoundSolidTo3D,
   liftSolidTo3D,
   project3DTo2D,
 } from "@/lib/geometry3d";
-import { renderArrowhead } from "./SegmentElement";
+import { formatMeasureNumber, renderArrowhead } from "./SegmentElement";
 
 export interface Solid3DElementProps {
   element: CanvasElement;
@@ -47,8 +49,10 @@ export interface Solid3DElementProps {
   dotScale?: number;
   orbitCam?: CameraMatrix3;
   isSelected?: boolean;
+  selectedSubPart?: SolidSubSelection | null;
   isHighlighted?: boolean;
   onPointerDown?: (e: React.PointerEvent, id: string) => void;
+  onDoubleClick?: (e: React.MouseEvent, id: string) => void;
   onVertexPointerDown?: (e: React.PointerEvent, solidId: string, vertexIndex: number) => void;
 }
 
@@ -73,13 +77,16 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
   dotScale = DEFAULT_DOT_SCALE,
   orbitCam,
   isSelected = false,
+  selectedSubPart = null,
   isHighlighted = false,
   onPointerDown,
+  onDoubleClick,
   onVertexPointerDown,
 }) => {
   const style = element.style ?? {};
-  const activeColor = isSelected || isHighlighted ? "#f59e0b" : undefined;
-  const strokeWidth = (style.width ?? 1.8) + (isSelected || isHighlighted ? 2 : 0);
+  const hasSubPart = selectedSubPart?.solidId === element.id;
+  const activeColor = !hasSubPart && (isSelected || isHighlighted) ? "#f59e0b" : undefined;
+  const strokeWidth = (style.width ?? 1.8) + (!hasSubPart && (isSelected || isHighlighted) ? 2 : 0);
 
   // --- 1. Solid3D ---
   if (element.type === "Solid3D") {
@@ -170,6 +177,19 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
 
     const roundRims = !effectiveCam ? getRoundRims(kind, vertexPositions, r) : [];
     const faceFill = props.faceFill ?? {};
+    const edgeMeasures = props.edgeMeasures ?? {};
+    const subFacePts =
+      hasSubPart && selectedSubPart?.kind === "face"
+        ? selectedSubPart.vertIndices.map((idx) => vertexPositions[idx]).filter(Boolean)
+        : null;
+    const subEdgeA =
+      hasSubPart && selectedSubPart?.kind === "edge"
+        ? vertexPositions[selectedSubPart.i]
+        : undefined;
+    const subEdgeB =
+      hasSubPart && selectedSubPart?.kind === "edge"
+        ? vertexPositions[selectedSubPart.j]
+        : undefined;
 
     return (
       <g
@@ -181,6 +201,7 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
         className="wb-solid3d"
         data-selected={isSelected ? "true" : undefined}
         onPointerDown={(e) => onPointerDown?.(e, element.id)}
+        onDoubleClick={(e) => onDoubleClick?.(e, element.id)}
         style={{ cursor: "pointer" }}
       >
         {/* Circumsphere gradient fill */}
@@ -312,6 +333,65 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
             />
           )
         )}
+
+        {/* Selected individual face highlight */}
+        {subFacePts && subFacePts.length >= 3 && (
+          <polygon
+            data-wb-selected-face={selectedSubPart?.kind === "face" ? selectedSubPart.faceIdx : undefined}
+            points={toPolygonPoints(subFacePts)}
+            fill="rgba(245, 158, 11, 0.24)"
+            stroke="#f59e0b"
+            strokeWidth={2.8}
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+            style={{ pointerEvents: "none" }}
+          />
+        )}
+
+        {/* Selected individual edge highlight */}
+        {subEdgeA && subEdgeB && (
+          <line
+            data-wb-selected-edge={selectedSubPart?.kind === "edge" ? selectedSubPart.edgeKey : undefined}
+            x1={subEdgeA.x}
+            y1={-subEdgeA.y}
+            x2={subEdgeB.x}
+            y2={-subEdgeB.y}
+            stroke="#f59e0b"
+            strokeWidth={3.8}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+            style={{ pointerEvents: "none" }}
+          />
+        )}
+
+        {/* Edge length measurements */}
+        {Object.entries(edgeMeasures).map(([key, enabled]) => {
+          if (!enabled) return null;
+          const parts = key.split("_").map(Number);
+          if (parts.length !== 2) return null;
+          const [i, j] = parts;
+          const pA2 = vertexPositions[i];
+          const pB2 = vertexPositions[j];
+          if (!pA2 || !pB2) return null;
+          const pA3 = points3D?.get(ptIds[i]) ?? polyLift?.p3[i];
+          const pB3 = points3D?.get(ptIds[j]) ?? polyLift?.p3[j];
+          const val = pA3 && pB3 ? dist3(pA3, pB3) : Math.hypot(pB2.x - pA2.x, pB2.y - pA2.y);
+          return (
+            <text
+              key={`em_${key}`}
+              data-wb-edge-measure={key}
+              x={(pA2.x + pB2.x) / 2}
+              y={-((pA2.y + pB2.y) / 2) - 0.14}
+              fontSize={0.32 * labelScale}
+              fontWeight={700}
+              fill="#b45309"
+              textAnchor="middle"
+              style={{ pointerEvents: "none", userSelect: "none" }}
+            >
+              {formatMeasureNumber(val)}
+            </text>
+          );
+        })}
 
         {/* Vertices and labels inside [data-wb-type="Solid3D"] */}
         {vertexPositions.map((pt, idx) => {

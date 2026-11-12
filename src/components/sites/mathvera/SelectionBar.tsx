@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import type { CanvasElement } from "@/types/whiteboard";
+import type { SolidSubSelection } from "@/lib/geometry3d";
 
 export interface SelectionBarProps {
   selectedCount: number;
@@ -9,6 +10,9 @@ export interface SelectionBarProps {
   selectedAxes2D?: CanvasElement | null;
   selectedPhysicsEl?: CanvasElement | null;
   selectedPoints?: CanvasElement[];
+  selectedSolidSubPart?: SolidSubSelection | null;
+  isSolidFaceFilled?: boolean;
+  isSolidEdgeMeasured?: boolean;
   labelScale?: number;
   dotScale?: number;
   onDelete: () => void;
@@ -39,6 +43,15 @@ export interface SelectionBarProps {
   onPhysicsRecordData?: () => void;
   onPhysicsRotateInstrument?: (deltaDeg: number) => void;
   onPhysicsPlotRegression?: () => void;
+  onSolidFaceFlatten?: () => void;
+  onSolidFaceFill?: () => void;
+  onSolidFaceExtendPlane?: () => void;
+  onSolidFaceCenter?: () => void;
+  onSolidEdgeMeasure?: () => void;
+  onSolidEdgeMidpoint?: () => void;
+  onSolidEdgePoint?: () => void;
+  onSolidEdgePerpBisector?: () => void;
+  onSolidSelectWhole?: () => void;
 }
 
 const actionBtnStyle: React.CSSProperties = {
@@ -49,7 +62,8 @@ const actionBtnStyle: React.CSSProperties = {
   color: "#1e293b",
   fontWeight: 600,
   cursor: "pointer",
-  font: "14px system-ui, -apple-system, sans-serif",
+  fontSize: 14,
+  fontFamily: "system-ui, -apple-system, sans-serif",
   boxShadow: "0 2px 8px rgba(15,23,42,0.12)",
   display: "inline-flex",
   alignItems: "center",
@@ -105,6 +119,9 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   selectedAxes2D = null,
   selectedPhysicsEl = null,
   selectedPoints = [],
+  selectedSolidSubPart = null,
+  isSolidFaceFilled = false,
+  isSolidEdgeMeasured = false,
   labelScale = 1,
   dotScale = 1.5,
   onDelete,
@@ -135,6 +152,15 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onPhysicsRecordData,
   onPhysicsRotateInstrument,
   onPhysicsPlotRegression,
+  onSolidFaceFlatten,
+  onSolidFaceFill,
+  onSolidFaceExtendPlane,
+  onSolidFaceCenter,
+  onSolidEdgeMeasure,
+  onSolidEdgeMidpoint,
+  onSolidEdgePoint,
+  onSolidEdgePerpBisector,
+  onSolidSelectWhole,
 }) => {
   const [moreAxesOpen, setMoreAxesOpen] = useState(false);
   const moreWrapRef = useRef<HTMLDivElement>(null);
@@ -158,6 +184,211 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   }, [moreAxesOpen]);
 
   if (selectedCount > 0) {
+    if (selectedCount === 1 && selectedSolidSubPart) {
+      const isFace = selectedSolidSubPart.kind === "face";
+      const badgeLabel = isFace
+        ? `Mặt ${selectedSolidSubPart.faceLabel}`
+        : `Cạnh ${selectedSolidSubPart.edgeLabel}`;
+      const subMenuItems = isFace
+        ? [
+            { action: "solid-select-whole", icon: "📦", label: "Chọn cả khối (Di chuyển / Đổi cỡ)", handler: onSolidSelectWhole },
+            { action: "solid-face-center", icon: "🎯", label: "Lấy tâm mặt", handler: onSolidFaceCenter },
+            { action: "duplicate", icon: "⧉", label: "Nhân bản khối", handler: onDuplicate },
+            { action: "hide", icon: "🙈", label: "Ẩn khối", handler: onHide },
+            { action: "delete", icon: "🗑", label: "Xoá khối", handler: onDelete },
+          ]
+        : [
+            { action: "solid-select-whole", icon: "📦", label: "Chọn cả khối (Di chuyển / Đổi cỡ)", handler: onSolidSelectWhole },
+            { action: "solid-edge-perpbis", icon: "⊥", label: "Đường trung trực cạnh", handler: onSolidEdgePerpBisector },
+            { action: "duplicate", icon: "⧉", label: "Nhân bản khối", handler: onDuplicate },
+            { action: "hide", icon: "🙈", label: "Ẩn khối", handler: onHide },
+            { action: "delete", icon: "🗑", label: "Xoá khối", handler: onDelete },
+          ];
+
+      return (
+        <div
+          data-export-skip="true"
+          data-wb-selection-bar="true"
+          style={{
+            position: "fixed",
+            left: 12,
+            bottom: 12,
+            zIndex: 10000,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 8,
+            maxWidth: "calc(100vw - 24px)",
+          }}
+        >
+          <span
+            data-wb-solid-badge="true"
+            style={{
+              padding: "8px 14px",
+              borderRadius: 10,
+              border: "1px solid #fcd34d",
+              background: "#fef3c7",
+              color: "#92400e",
+              fontWeight: 700,
+              font: "14px system-ui, -apple-system, sans-serif",
+              boxShadow: "0 2px 8px rgba(15,23,42,0.1)",
+            }}
+          >
+            {badgeLabel}
+          </span>
+
+          {isFace ? (
+            <>
+              <button
+                type="button"
+                data-action="solid-face-flatten"
+                onClick={onSolidFaceFlatten}
+                title="Tách mặt đang chọn thành hình phẳng 2D đúng kích thước thật"
+                style={{
+                  ...actionBtnStyle,
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  boxShadow: "0 3px 12px rgba(37, 99, 235, 0.35)",
+                }}
+              >
+                ◫ Tách ra hình thật
+              </button>
+              <button
+                type="button"
+                data-action="solid-face-fill"
+                onClick={onSolidFaceFill}
+                title="Tô màu hoặc bỏ tô màu mặt đang chọn"
+                style={{
+                  ...actionBtnStyle,
+                  border: isSolidFaceFilled ? "1px solid #2563eb" : "1px solid #cbd5e1",
+                  background: isSolidFaceFilled ? "#eff6ff" : "#ffffff",
+                  color: isSolidFaceFilled ? "#1d4ed8" : "#1e293b",
+                }}
+              >
+                🪣 {isSolidFaceFilled ? "Bỏ tô mặt" : "Tô mặt"}
+              </button>
+              <button
+                type="button"
+                data-action="solid-face-plane"
+                onClick={onSolidFaceExtendPlane}
+                title="Mở rộng mặt đang chọn thành hình bình hành mặt phẳng"
+                style={actionBtnStyle}
+              >
+                ▱ Mở rộng thành mặt phẳng
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                data-action="solid-edge-measure"
+                onClick={onSolidEdgeMeasure}
+                title="Hiện / ẩn độ dài cạnh đang chọn"
+                style={{
+                  ...actionBtnStyle,
+                  border: isSolidEdgeMeasured ? "1px solid #2563eb" : "1px solid #cbd5e1",
+                  background: isSolidEdgeMeasured ? "#eff6ff" : "#ffffff",
+                  color: isSolidEdgeMeasured ? "#1d4ed8" : "#1e293b",
+                }}
+              >
+                📏 Độ dài
+              </button>
+              <button
+                type="button"
+                data-action="solid-edge-midpoint"
+                onClick={onSolidEdgeMidpoint}
+                title="Đặt điểm trung điểm gắn chặt với cạnh"
+                style={actionBtnStyle}
+              >
+                • Trung điểm
+              </button>
+              <button
+                type="button"
+                data-action="solid-edge-point"
+                onClick={onSolidEdgePoint}
+                title="Đặt một điểm trượt được trên cạnh đang chọn"
+                style={actionBtnStyle}
+              >
+                • Điểm trên cạnh
+              </button>
+            </>
+          )}
+
+          <div ref={moreWrapRef} style={{ position: "relative", display: "inline-flex" }}>
+            <button
+              type="button"
+              data-action="solid-sub-more"
+              aria-haspopup="menu"
+              aria-expanded={moreAxesOpen}
+              onClick={() => setMoreAxesOpen((v) => !v)}
+              title="Thêm tuỳ chọn cho mặt / cạnh / khối không gian"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#16a34a",
+                color: "#ffffff",
+                fontWeight: 700,
+                boxShadow: "0 3px 12px rgba(22, 163, 74, 0.35)",
+              }}
+            >
+              + Thêm ▾
+            </button>
+
+            {moreAxesOpen && (
+              <div
+                role="menu"
+                data-wb-solid-sub-menu="true"
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  bottom: "calc(100% + 10px)",
+                  minWidth: 230,
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  boxShadow: "0 14px 36px rgba(15, 23, 42, 0.22)",
+                  padding: "6px",
+                  zIndex: 10020,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
+                {subMenuItems.map((item) => (
+                  <button
+                    key={item.action}
+                    type="button"
+                    role="menuitem"
+                    data-action={item.action}
+                    onClick={() => {
+                      setMoreAxesOpen(false);
+                      item.handler?.();
+                    }}
+                    style={{
+                      ...menuItemStyle,
+                      color: item.action === "delete" ? "#dc2626" : "#1e293b",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f1f5f9";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     const isAxesContext = selectedCount === 1 && Boolean(selectedAxes2D);
     const isPointsContext =
       selectedPoints.length > 0 && selectedPoints.length === selectedCount;

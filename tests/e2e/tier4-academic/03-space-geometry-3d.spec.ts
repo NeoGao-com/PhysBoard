@@ -170,9 +170,9 @@ test.describe('Tier 4: Academic Scenarios - 3D Space Geometry & Stereometry (Sce
     await expect(attachedPt).toBeVisible();
     const beforeCx = Number(await attachedPt.getAttribute('cx'));
 
-    // Resize the Solid3D via bottom-right handle
+    // Resize the Solid3D via double-click (whole-solid selection) + bottom-right handle
     await toolbar.selectTool('select');
-    await solid.click({ force: true });
+    await solid.dblclick({ force: true });
     const handleSe = page.locator('[data-handle="se"]');
     await expect(handleSe).toBeVisible();
     const hb = await handleSe.boundingBox();
@@ -184,5 +184,51 @@ test.describe('Tier 4: Academic Scenarios - 3D Space Geometry & Stereometry (Sce
 
     const afterCx = Number(await attachedPt.getAttribute('cx'));
     expect(Math.abs(afterCx - beforeCx)).toBeGreaterThan(0.2);
+  });
+
+  test('should select individual 3D face and edge with contextual bars and extract true 2D face', async ({
+    page,
+  }) => {
+    await toolbar.selectDropdownItem('Không gian', 'Lăng trụ tam giác');
+    const center = await canvas.getCanvasCenter();
+    await canvas.clickAt(center);
+
+    const solid = canvas.boardContent.locator('g[data-wb-type="Solid3D"]').first();
+    await expect(solid).toBeVisible();
+    const sBox = await solid.boundingBox();
+    expect(sBox).toBeTruthy();
+
+    // 1. Click interior of front face -> Face sub-selection bar
+    await toolbar.selectTool('select');
+    await canvas.clickAt({ x: sBox!.x + sBox!.width * 0.45, y: sBox!.y + sBox!.height * 0.58 });
+    const bar = page.locator('[data-wb-selection-bar="true"]');
+    await expect(bar.locator('[data-wb-solid-badge="true"]')).toContainText('Mặt');
+    await expect(solid.locator('[data-wb-selected-face]')).toBeVisible();
+
+    const beforeCount = await canvas.getObjectCount();
+    await bar.locator('[data-action="solid-face-flatten"]').click();
+    await expect.poll(async () => canvas.getObjectCount()).toBeGreaterThan(beforeCount);
+
+    await bar.locator('[data-action="solid-face-fill"]').click();
+    await expect(bar.locator('[data-action="solid-face-fill"]')).toContainText('Bỏ tô mặt');
+
+    await bar.locator('[data-action="solid-face-plane"]').click();
+    await expect.poll(async () => canvas.boardContent.locator('g[data-element-type="GeomPolygon"]').count()).toBeGreaterThanOrEqual(2);
+
+    // 2. Click bottom front edge -> Edge sub-selection bar
+    const edgePt = await solid.locator('line[data-wb-edge="solid"]').last().boundingBox();
+    expect(edgePt).toBeTruthy();
+    await canvas.clickAt({ x: edgePt!.x + edgePt!.width / 2, y: edgePt!.y + edgePt!.height / 2 });
+    await expect(bar.locator('[data-wb-solid-badge="true"]')).toContainText('Cạnh');
+    await expect(solid.locator('[data-wb-selected-edge]')).toBeAttached();
+
+    await bar.locator('[data-action="solid-edge-measure"]').click();
+    await expect(solid.locator('[data-wb-edge-measure]')).toBeVisible();
+
+    const ptsBefore = await canvas.boardContent.locator('g[data-element-type="Point"]').count();
+    await bar.locator('[data-action="solid-edge-midpoint"]').click();
+    await expect
+      .poll(async () => canvas.boardContent.locator('g[data-element-type="Point"]').count())
+      .toBeGreaterThan(ptsBefore);
   });
 });

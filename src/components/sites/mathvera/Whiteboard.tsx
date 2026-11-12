@@ -68,6 +68,7 @@ import {
   type CameraMatrix3,
   type Solid3DKind,
   type Solid3DProps,
+  type SolidSubSelection,
   azimuthElevationToCamera,
   buildSpatialConstructionElements,
   cameraToAzimuthElevation,
@@ -81,6 +82,7 @@ import {
   liftSolidTo3D,
   orbitCamera,
   project3DTo2D,
+  resolveSolidSubSelectionAtPoint,
   skewLineClosest,
   solveGeometry3D,
 } from "@/lib/geometry3d";
@@ -353,6 +355,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
   // 3. Selection & Clipboard State
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [solidSubSel, setSolidSubSel] = useState<SolidSubSelection | null>(null);
   const [clipboard, setClipboard] = useState<CanvasElement[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -563,6 +566,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       ),
     [selectedElements]
   );
+
+  const activeSolidSubPart = useMemo(() => {
+    if (
+      !solidSubSel ||
+      selectedElements.length !== 1 ||
+      selectedElements[0].type !== "Solid3D" ||
+      selectedElements[0].id !== solidSubSel.solidId
+    ) {
+      return null;
+    }
+    return solidSubSel;
+  }, [solidSubSel, selectedElements]);
 
   const selectionBBox: BoundingBox | null = useMemo(
     () =>
@@ -1059,6 +1074,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       setDraftPolygonPts([]);
       setPickedItems([]);
       setStatusHint(null);
+      setSolidSubSel(null);
       if (typeof next === "string" && tryApplyConstructionFromSelection(next)) {
         setActiveTool("select");
         return;
@@ -3968,6 +3984,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       ) {
         e.stopPropagation();
         let resolvedId = elementId;
+        let nextSubSel: SolidSubSelection | null = null;
         if (!e.shiftKey) {
           const rect = containerRef.current?.getBoundingClientRect();
           const worldPos = screenToWorld(
@@ -3993,15 +4010,30 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               resolvedId = el.id;
             }
           }
+          const hitEl = byId.get(resolvedId);
+          if (hitEl?.type === "Solid3D") {
+            nextSubSel = resolveSolidSubSelectionAtPoint(
+              hitEl,
+              worldPos,
+              solved3D,
+              hydratedPts,
+              byId,
+              10 / (viewport.scale || 45)
+            );
+          }
         }
         if (e.shiftKey) {
+          setSolidSubSel(null);
           setSelectedIds((prev) =>
             prev.includes(resolvedId)
               ? prev.filter((id) => id !== resolvedId)
               : [...prev, resolvedId]
           );
-        } else if (selectedIds.length !== 1 || selectedIds[0] !== resolvedId) {
-          setSelectedIds([resolvedId]);
+        } else {
+          setSolidSubSel(nextSubSel);
+          if (selectedIds.length !== 1 || selectedIds[0] !== resolvedId) {
+            setSelectedIds([resolvedId]);
+          }
         }
         const clickedEl = byId.get(resolvedId);
         if (
@@ -4024,6 +4056,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       viewport.scale,
       pageElements,
       hydratedPts,
+      solved3D,
     ]
   );
 
@@ -5487,7 +5520,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             dotScale={dotScale}
             orbitCam={orbitCamById[el.id]}
             isSelected={isSel}
+            selectedSubPart={activeSolidSubPart}
             onPointerDown={(e, id) => handleElementPointerDown(e, id)}
+            onDoubleClick={(e, id) => {
+              e.stopPropagation();
+              setSelectedIds([id]);
+              setSolidSubSel(null);
+            }}
           />
         );
 
@@ -5797,7 +5836,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         <>
           {(selectionBBox || marqueeRect) && (
             <SelectionOverlay
-              bbox={selectionBBox}
+              bbox={activeSolidSubPart ? null : selectionBBox}
               cameraScale={viewport.scale}
               marqueeRect={marqueeRect}
               interactive={
@@ -5808,7 +5847,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               boxInteriorPassthrough={
                 Boolean(selectedPhysicsEl) ||
                 (selectedElements.length === 1 &&
-                  selectedElements[0].type === "Slider")
+                  (selectedElements[0].type === "Slider" ||
+                    selectedElements[0].type === "Solid3D"))
               }
               onHandlePointerDown={handleHandlePointerDown}
               onBoxPointerDown={handleBoxPointerDown}
@@ -5861,7 +5901,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         />
       }
     >
-      {pageElements.map(renderBoardElement)}
+      {[...pageElements]
+        .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
+        .map(renderBoardElement)}
 
       {liveStroke && (
         <InkElement
@@ -6242,8 +6284,263 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           selectedAxes2D={selectedAxes2D}
           selectedPhysicsEl={selectedPhysicsEl}
           selectedPoints={selectedPoints}
+          selectedSolidSubPart={activeSolidSubPart}
+          isSolidFaceFilled={Boolean(
+            activeSolidSubPart?.kind === "face" &&
+              (byId.get(activeSolidSubPart.solidId)?.props.faceFill as
+                | Record<string, string>
+                | undefined)?.[activeSolidSubPart.faceKey]
+          )}
+          isSolidEdgeMeasured={Boolean(
+            activeSolidSubPart?.kind === "edge" &&
+              (byId.get(activeSolidSubPart.solidId)?.props.edgeMeasures as
+                | Record<string, boolean>
+                | undefined)?.[activeSolidSubPart.edgeKey]
+          )}
           labelScale={labelScale}
           dotScale={dotScale}
+          onSolidSelectWhole={() => setSolidSubSel(null)}
+          onSolidFaceFlatten={() => {
+            if (activeSolidSubPart?.kind !== "face") return;
+            const flat = computeFlattenedFace(
+              activeSolidSubPart.vertIds,
+              solved3D,
+              pageElements,
+              { x: 2.2, y: 0 }
+            );
+            if (!flat) return;
+            const polyEl = flat.polygonElement;
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: polyEl.id,
+                type: polyEl.type,
+                transform: polyEl.transform,
+                style: polyEl.style,
+                props: polyEl.props,
+              },
+            });
+          }}
+          onSolidFaceFill={() => {
+            if (activeSolidSubPart?.kind !== "face") return;
+            const solid = byId.get(activeSolidSubPart.solidId);
+            if (!solid) return;
+            const prevFill =
+              (solid.props.faceFill as Record<string, string> | undefined) ?? {};
+            const nextFill = { ...prevFill };
+            if (nextFill[activeSolidSubPart.faceKey]) {
+              delete nextFill[activeSolidSubPart.faceKey];
+            } else {
+              nextFill[activeSolidSubPart.faceKey] =
+                fillColor && fillColor !== "none"
+                  ? `${fillColor}38`
+                  : "rgba(37, 99, 235, 0.22)";
+            }
+            handleUpdateElementProps(solid.id, { faceFill: nextFill });
+          }}
+          onSolidFaceExtendPlane={() => {
+            if (activeSolidSubPart?.kind !== "face") return;
+            const pts2 = activeSolidSubPart.vertIds
+              .map((id) => hydratedPts.get(id))
+              .filter((p): p is Point2D => Boolean(p));
+            if (pts2.length < 3) return;
+            const cx = pts2.reduce((s, p) => s + p.x, 0) / pts2.length;
+            const cy = pts2.reduce((s, p) => s + p.y, 0) / pts2.length;
+            const expanded =
+              pts2.length === 3
+                ? [
+                    pts2[0],
+                    pts2[1],
+                    {
+                      x: pts2[1].x + (pts2[2].x - pts2[0].x),
+                      y: pts2[1].y + (pts2[2].y - pts2[0].y),
+                    },
+                    pts2[2],
+                  ].map((p) => ({
+                    x: cx + (p.x - cx) * 1.45,
+                    y: cy + (p.y - cy) * 1.45,
+                  }))
+                : pts2.map((p) => ({
+                    x: cx + (p.x - cx) * 1.45,
+                    y: cy + (p.y - cy) * 1.45,
+                  }));
+            const polyId = newElId("plane");
+            const embedded: EmbeddedVertex[] = expanded.map((p, idx) => ({
+              id: `${polyId}_v${idx}`,
+              name: "",
+              x: p.x,
+              y: p.y,
+            }));
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: polyId,
+                type: "GeomPolygon",
+                transform: { x: 0, y: 0, scale: 1, rotation: 0, z: -1 },
+                style: {
+                  stroke: "#64748b",
+                  fill: "rgba(148, 163, 184, 0.14)",
+                  width: 1.5,
+                  dash: true,
+                },
+                props: {
+                  vertices: embedded.map((v) => v.id),
+                  points: embedded,
+                  label: `(${activeSolidSubPart.faceLabel})`,
+                },
+              },
+            });
+          }}
+          onSolidFaceCenter={() => {
+            if (activeSolidSubPart?.kind !== "face") return;
+            const refs = activeSolidSubPart.vertIds;
+            const pts2 = refs
+              .map((id) => hydratedPts.get(id))
+              .filter((p): p is Point2D => Boolean(p));
+            if (refs.length < 3 || pts2.length === 0) return;
+            const cx = pts2.reduce((s, p) => s + p.x, 0) / pts2.length;
+            const cy = pts2.reduce((s, p) => s + p.y, 0) / pts2.length;
+            const name = getNextPointName(pageElements, ["O", "I", "G", "M"]);
+            const res = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "GeomPoint",
+                transform: { x: cx, y: cy, scale: 1, rotation: 0, z: 0 },
+                props: {
+                  name,
+                  constraint: {
+                    kind: "combo",
+                    refs,
+                    w: refs.map(() => 1 / refs.length),
+                  },
+                },
+              },
+            });
+            if (res.created?.[0]) {
+              setSolidSubSel(null);
+              setSelectedIds([res.created[0]]);
+            }
+          }}
+          onSolidEdgeMeasure={() => {
+            if (activeSolidSubPart?.kind !== "edge") return;
+            const solid = byId.get(activeSolidSubPart.solidId);
+            if (!solid) return;
+            const prevMeasures =
+              (solid.props.edgeMeasures as Record<string, boolean> | undefined) ??
+              {};
+            handleUpdateElementProps(solid.id, {
+              edgeMeasures: {
+                ...prevMeasures,
+                [activeSolidSubPart.edgeKey]: !prevMeasures[activeSolidSubPart.edgeKey],
+              },
+            });
+          }}
+          onSolidEdgeMidpoint={() => {
+            if (activeSolidSubPart?.kind !== "edge") return;
+            const pA = hydratedPts.get(activeSolidSubPart.aId);
+            const pB = hydratedPts.get(activeSolidSubPart.bId);
+            if (!pA || !pB) return;
+            const mid = midpoint2D(pA, pB);
+            const name = getNextPointName(pageElements, ["M", "N", "I", "K"]);
+            const res = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "GeomPoint",
+                transform: { x: mid.x, y: mid.y, scale: 1, rotation: 0, z: 0 },
+                props: {
+                  name,
+                  constraint: {
+                    kind: "midpointOf",
+                    a: activeSolidSubPart.aId,
+                    b: activeSolidSubPart.bId,
+                  },
+                },
+              },
+            });
+            if (res.created?.[0]) {
+              setSolidSubSel(null);
+              setSelectedIds([res.created[0]]);
+            }
+          }}
+          onSolidEdgePoint={() => {
+            if (activeSolidSubPart?.kind !== "edge") return;
+            const pA = hydratedPts.get(activeSolidSubPart.aId);
+            const pB = hydratedPts.get(activeSolidSubPart.bId);
+            if (!pA || !pB) return;
+            const usedTs = new Set(
+              pageElements
+                .filter(
+                  (el) =>
+                    el.type === "GeomPoint" &&
+                    (el.props?.constraint as { kind?: string; a?: string; b?: string } | undefined)
+                      ?.kind === "onLine" &&
+                    ((el.props?.constraint as { a?: string; b?: string }).a ===
+                      activeSolidSubPart.aId &&
+                      (el.props?.constraint as { a?: string; b?: string }).b ===
+                        activeSolidSubPart.bId)
+                )
+                .map((el) =>
+                  Number((el.props?.constraint as { t?: number }).t ?? 0.35).toFixed(2)
+                )
+            );
+            const t =
+              [0.35, 0.65, 0.25, 0.75, 0.5].find((cand) => !usedTs.has(cand.toFixed(2))) ??
+              0.35;
+            const pos = { x: pA.x + t * (pB.x - pA.x), y: pA.y + t * (pB.y - pA.y) };
+            const name = getNextPointName(pageElements, ["M", "N", "P", "Q"]);
+            const res = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "GeomPoint",
+                transform: { x: pos.x, y: pos.y, scale: 1, rotation: 0, z: 0 },
+                props: {
+                  name,
+                  constraint: {
+                    kind: "onLine",
+                    a: activeSolidSubPart.aId,
+                    b: activeSolidSubPart.bId,
+                    t,
+                  },
+                },
+              },
+            });
+            if (res.created?.[0]) {
+              setSolidSubSel(null);
+              setSelectedIds([res.created[0]]);
+            }
+          }}
+          onSolidEdgePerpBisector={() => {
+            if (activeSolidSubPart?.kind !== "edge") return;
+            const pA = hydratedPts.get(activeSolidSubPart.aId);
+            const pB = hydratedPts.get(activeSolidSubPart.bId);
+            if (!pA || !pB) return;
+            const mid = midpoint2D(pA, pB);
+            const dx = pB.x - pA.x;
+            const dy = pB.y - pA.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const span = Math.max(1.2, Math.min(len * 0.65, 5.5));
+            const nx = -dy / len;
+            const ny = dx / len;
+            const res = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "GeomConstruction",
+                props: {
+                  kind: "perpBisector",
+                  sideA: activeSolidSubPart.aId,
+                  sideB: activeSolidSubPart.bId,
+                  fromPt: { x: mid.x - nx * span, y: mid.y - ny * span },
+                  toPt: { x: mid.x + nx * span, y: mid.y + ny * span },
+                  sideAPt: pA,
+                  sideBPt: pB,
+                },
+              },
+            });
+            if (res.created?.[0]) {
+              setSolidSubSel(null);
+              setSelectedIds([res.created[0]]);
+            }
+          }}
           onDelete={handleDeleteSelected}
           onDuplicate={handleDuplicateSelected}
           onCopy={handleCopySelected}
