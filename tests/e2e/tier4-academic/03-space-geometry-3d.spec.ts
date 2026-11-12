@@ -163,7 +163,7 @@ test.describe('Tier 4: Academic Scenarios - 3D Space Geometry & Stereometry (Sce
     // Place a constrained point on a 3D edge via "Điểm trên cạnh / đường"
     const sBox = await solid.boundingBox();
     expect(sBox).toBeTruthy();
-    await toolbar.selectDropdownItem('Hình phẳng', 'Điểm trên cạnh');
+    await toolbar.selectDropdownItem('Không gian', 'Điểm trên cạnh / đường');
     await canvas.clickAt({ x: sBox!.x + sBox!.width * 0.35, y: sBox!.y + sBox!.height * 0.45 });
 
     const attachedPt = canvas.boardContent.locator('g[data-element-type="Point"] circle').first();
@@ -173,9 +173,9 @@ test.describe('Tier 4: Academic Scenarios - 3D Space Geometry & Stereometry (Sce
     // Resize the Solid3D via bottom-right handle
     await toolbar.selectTool('select');
     await solid.click({ force: true });
-    const handleBr = page.locator('[data-handle="br"]');
-    await expect(handleBr).toBeVisible();
-    const hb = await handleBr.boundingBox();
+    const handleSe = page.locator('[data-handle="se"]');
+    await expect(handleSe).toBeVisible();
+    const hb = await handleSe.boundingBox();
     expect(hb).toBeTruthy();
     await canvas.drag(
       { x: hb!.x + hb!.width / 2, y: hb!.y + hb!.height / 2 },

@@ -212,7 +212,7 @@ test.describe('Tier 4: Academic Scenarios - High School Plane Geometry (Scenario
     await canvas.clickAt({ x: center.x - 160, y: center.y });
     const tri = canvas.boardContent.locator('g[data-element-type="GeomPolygon"]').first();
     await expect(tri).toBeVisible();
-    await tri.click();
+    await tri.click({ force: true });
     await toolbar.selectDropdownItem('Hình phẳng', 'Đường cao');
 
     const altLine = canvas.boardContent
@@ -221,10 +221,10 @@ test.describe('Tier 4: Academic Scenarios - High School Plane Geometry (Scenario
     await expect(altLine).toBeVisible();
     const beforeAltX2 = Number(await altLine.getAttribute('x2'));
 
-    await tri.click();
-    const handleBr = page.locator('[data-handle="br"]');
-    await expect(handleBr).toBeVisible();
-    const hb = await handleBr.boundingBox();
+    await tri.click({ force: true });
+    const handleSe = page.locator('[data-handle="se"]');
+    await expect(handleSe).toBeVisible();
+    const hb = await handleSe.boundingBox();
     expect(hb).toBeTruthy();
     await canvas.drag(
       { x: hb!.x + hb!.width / 2, y: hb!.y + hb!.height / 2 },
