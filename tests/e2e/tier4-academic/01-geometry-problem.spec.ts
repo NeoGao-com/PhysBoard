@@ -157,4 +157,48 @@ test.describe('Tier 4: Academic Scenarios - High School Plane Geometry (Scenario
       await expect(labelSizeControl).toBeVisible();
     }
   });
+
+  test('should rename, hide/show name, adjust dot and label scale from Point SelectionBar', async ({
+    page,
+  }) => {
+    // Draw a point at canvas center
+    await page.locator('button[data-tool="point"], button:has-text("Điểm")').first().click();
+    const center = await canvas.getCanvasCenter();
+    await canvas.clickAt(center);
+
+    // Select the point
+    await toolbar.selectTool('select');
+    const pt = canvas.boardContent.locator('g[data-element-type="Point"]').first();
+    await expect(pt).toBeVisible();
+    await pt.click();
+
+    // Verify all Point SelectionBar controls match the layout
+    const bar = page.locator('[data-wb-selection-bar="true"]');
+    await expect(bar.locator('[data-action="delete"]')).toBeVisible();
+    await expect(bar.locator('[data-action="point-rename"]')).toBeVisible();
+    await expect(bar.locator('[data-action="point-toggle-name"]')).toBeVisible();
+    await expect(bar.locator('[data-wb-point-dot-control="true"]')).toBeVisible();
+    await expect(bar.locator('[data-wb-point-label-control="true"]')).toBeVisible();
+    await expect(bar.locator('[data-action="point-more"]')).toBeVisible();
+
+    // Rename point to J
+    await bar.locator('[data-action="point-rename"]').click();
+    const input = page.locator('[data-testid="point-rename-input"]');
+    await expect(input).toBeVisible();
+    await input.fill('J');
+    await page.locator('[data-action="point-rename-save"]').click();
+    await expect(pt.locator('text[data-label="J"]')).toBeVisible();
+
+    // Hide and restore point name
+    await bar.locator('[data-action="point-toggle-name"]').click();
+    await expect(pt.locator('text[data-label="J"]')).toHaveCount(0);
+    await bar.locator('[data-action="point-toggle-name"]').click();
+    await expect(pt.locator('text[data-label="J"]')).toBeVisible();
+
+    // Adjust dot scale and label scale
+    await bar.locator('[data-action="point-dot-up"]').click();
+    await expect(bar.locator('[data-action="point-dot-reset"]')).toContainText('175%');
+    await bar.locator('[data-action="point-label-up"]').click();
+    await expect(bar.locator('[data-action="point-label-reset"]')).toContainText('115%');
+  });
 });

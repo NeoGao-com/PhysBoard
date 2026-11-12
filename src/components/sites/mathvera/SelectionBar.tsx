@@ -8,12 +8,21 @@ export interface SelectionBarProps {
   hiddenCount?: number;
   selectedAxes2D?: CanvasElement | null;
   selectedPhysicsEl?: CanvasElement | null;
+  selectedPoints?: CanvasElement[];
+  labelScale?: number;
+  dotScale?: number;
   onDelete: () => void;
   onDuplicate: () => void;
   onCopy: () => void;
   onCut: () => void;
   onHide: () => void;
   onUnhideAll?: () => void;
+  onPointRename?: () => void;
+  onPointToggleHideName?: () => void;
+  onPointCycleDot?: () => void;
+  onPointChangeDotSize?: (delta: number) => void;
+  onPointResetDotSize?: () => void;
+  onChangeLabelScale?: (nextScale: number) => void;
   onAxesPlot?: () => void;
   onAxesAddPoint?: () => void;
   onAxesToggleGrid?: () => void;
@@ -65,17 +74,51 @@ const menuItemStyle: React.CSSProperties = {
   fontFamily: "system-ui, -apple-system, sans-serif",
 };
 
+const pillGroupStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 2,
+  padding: "4px 8px",
+  borderRadius: 10,
+  border: "1px solid #cbd5e1",
+  background: "#ffffff",
+  color: "#1e293b",
+  font: "13.5px system-ui, -apple-system, sans-serif",
+  boxShadow: "0 2px 8px rgba(15,23,42,0.12)",
+};
+
+const pillMiniBtnStyle: React.CSSProperties = {
+  border: "none",
+  background: "transparent",
+  color: "#1e293b",
+  fontWeight: 600,
+  cursor: "pointer",
+  padding: "3px 6px",
+  borderRadius: 6,
+  font: "13.5px system-ui, -apple-system, sans-serif",
+  lineHeight: 1.2,
+};
+
 export const SelectionBar: React.FC<SelectionBarProps> = ({
   selectedCount,
   hiddenCount = 0,
   selectedAxes2D = null,
   selectedPhysicsEl = null,
+  selectedPoints = [],
+  labelScale = 1,
+  dotScale = 1.5,
   onDelete,
   onDuplicate,
   onCopy,
   onCut,
   onHide,
   onUnhideAll,
+  onPointRename,
+  onPointToggleHideName,
+  onPointCycleDot,
+  onPointChangeDotSize,
+  onPointResetDotSize,
+  onChangeLabelScale,
   onAxesPlot,
   onAxesAddPoint,
   onAxesToggleGrid,
@@ -116,6 +159,25 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
 
   if (selectedCount > 0) {
     const isAxesContext = selectedCount === 1 && Boolean(selectedAxes2D);
+    const isPointsContext =
+      selectedPoints.length > 0 && selectedPoints.length === selectedCount;
+    const allPointNamesHidden =
+      isPointsContext &&
+      selectedPoints.every((pt) => pt.props?.hideName === true);
+    const primaryPoint = isPointsContext ? selectedPoints[0] : null;
+    const primaryDotMode =
+      primaryPoint?.props?.dot === "cross" || primaryPoint?.props?.dot === "none"
+        ? primaryPoint.props.dot
+        : "dot";
+    const primaryDotSymbol =
+      primaryDotMode === "cross" ? "×" : primaryDotMode === "none" ? "○" : "•";
+    const primaryDotSize =
+      typeof primaryPoint?.props?.dotSize === "number" &&
+      primaryPoint.props.dotSize > 0
+        ? primaryPoint.props.dotSize
+        : dotScale;
+    const dotSizePercent = Math.round(primaryDotSize * 100);
+    const labelScalePercent = Math.round(labelScale * 100);
     const gridEnabled = selectedAxes2D?.props?.grid !== false;
     const ticksMode = selectedAxes2D?.props?.ticks === "pi" ? "pi" : "int";
 
@@ -155,6 +217,112 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
         >
           🗑 Xoá{selectedCount > 1 ? ` (${selectedCount})` : ""}
         </button>
+
+        {/* Contextual Point Selection Actions */}
+        {isPointsContext && (
+          <>
+            <button
+              type="button"
+              data-action="point-rename"
+              onClick={onPointRename}
+              title="Đổi tên điểm đang chọn (hoặc nhấp đúp trực tiếp vào nhãn tên điểm)"
+              style={actionBtnStyle}
+            >
+              ✎ Đổi tên
+            </button>
+            <button
+              type="button"
+              data-action="point-toggle-name"
+              onClick={onPointToggleHideName}
+              title={allPointNamesHidden ? "Hiện lại tên điểm" : "Ẩn tên điểm khỏi bảng"}
+              style={{
+                ...actionBtnStyle,
+                borderColor: allPointNamesHidden ? "#2563eb" : "#cbd5e1",
+                background: allPointNamesHidden ? "#eff6ff" : "#ffffff",
+                color: allPointNamesHidden ? "#1d4ed8" : "#1e293b",
+              }}
+            >
+              {allPointNamesHidden ? "👁 Hiện tên" : "🙈 Ẩn tên"}
+            </button>
+
+            <div data-wb-point-dot-control="true" style={pillGroupStyle}>
+              <button
+                type="button"
+                data-action="point-dot-cycle"
+                onClick={onPointCycleDot}
+                title="Đổi kiểu chấm điểm (Chấm tròn / Dấu × / Không chấm)"
+                style={{ ...pillMiniBtnStyle, color: "#475569" }}
+              >
+                Chấm: <span style={{ color: "#1e293b", fontWeight: 700 }}>{primaryDotSymbol}</span>
+              </button>
+              <span style={{ width: 1, height: 16, background: "#e2e8f0", margin: "0 2px" }} />
+              <button
+                type="button"
+                data-action="point-dot-down"
+                onClick={() => onPointChangeDotSize?.(-0.25)}
+                title="Thu nhỏ dấu chấm điểm"
+                style={pillMiniBtnStyle}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                data-action="point-dot-reset"
+                onClick={onPointResetDotSize}
+                title="Đặt lại cỡ chấm mặc định (150%)"
+                style={{ ...pillMiniBtnStyle, minWidth: 44, textAlign: "center", fontWeight: 700 }}
+              >
+                {dotSizePercent}%
+              </button>
+              <button
+                type="button"
+                data-action="point-dot-up"
+                onClick={() => onPointChangeDotSize?.(0.25)}
+                title="Phóng to dấu chấm điểm"
+                style={pillMiniBtnStyle}
+              >
+                +
+              </button>
+            </div>
+
+            <div data-wb-point-label-control="true" style={pillGroupStyle}>
+              <span style={{ color: "#64748b", fontSize: 13, marginRight: 2 }}>
+                Cỡ tên mọi điểm:
+              </span>
+              <button
+                type="button"
+                data-action="point-label-down"
+                onClick={() =>
+                  onChangeLabelScale?.(Math.max(0.5, Number((labelScale - 0.15).toFixed(2))))
+                }
+                title="Thu nhỏ cỡ tên mọi điểm"
+                style={pillMiniBtnStyle}
+              >
+                A-
+              </button>
+              <button
+                type="button"
+                data-action="point-label-reset"
+                onClick={() => onChangeLabelScale?.(1)}
+                title="Đặt lại cỡ tên mọi điểm 100%"
+                style={{ ...pillMiniBtnStyle, minWidth: 44, textAlign: "center", fontWeight: 700 }}
+              >
+                {labelScalePercent}%
+              </button>
+              <button
+                type="button"
+                data-action="point-label-up"
+                onClick={() =>
+                  onChangeLabelScale?.(Math.min(2.5, Number((labelScale + 0.15).toFixed(2))))
+                }
+                title="Phóng to cỡ tên mọi điểm"
+                style={pillMiniBtnStyle}
+              >
+                A+
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Contextual Axes2D Primary Actions */}
         {isAxesContext && (
@@ -277,27 +445,31 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
           </button>
         )}
 
-        {/* Duplicate */}
-        <button
-          type="button"
-          data-action="duplicate"
-          onClick={onDuplicate}
-          title="Tạo một bản sao ngay bên cạnh (giữ nguyên cách dựng)"
-          style={actionBtnStyle}
-        >
-          ⧉ Nhân bản
-        </button>
+        {!isPointsContext && (
+          <>
+            {/* Duplicate */}
+            <button
+              type="button"
+              data-action="duplicate"
+              onClick={onDuplicate}
+              title="Tạo một bản sao ngay bên cạnh (giữ nguyên cách dựng)"
+              style={actionBtnStyle}
+            >
+              ⧉ Nhân bản
+            </button>
 
-        {/* Copy */}
-        <button
-          type="button"
-          data-action="copy"
-          onClick={onCopy}
-          title="Chép vào bộ nhớ — Ctrl+V để dán chỗ con trỏ"
-          style={actionBtnStyle}
-        >
-          ⎘ Sao chép
-        </button>
+            {/* Copy */}
+            <button
+              type="button"
+              data-action="copy"
+              onClick={onCopy}
+              title="Chép vào bộ nhớ — Ctrl+V để dán chỗ con trỏ"
+              style={actionBtnStyle}
+            >
+              ⎘ Sao chép
+            </button>
+          </>
+        )}
 
         {isAxesContext ? (
           <div ref={moreWrapRef} style={{ position: "relative", display: "inline-flex" }}>
@@ -543,6 +715,78 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
                   <span>⋯</span>
                   <span>Dãy số (uₙ)</span>
                 </button>
+              </div>
+            )}
+          </div>
+        ) : isPointsContext ? (
+          <div ref={moreWrapRef} style={{ position: "relative", display: "inline-flex" }}>
+            <button
+              type="button"
+              data-action="point-more"
+              aria-haspopup="menu"
+              aria-expanded={moreAxesOpen}
+              onClick={() => setMoreAxesOpen((v) => !v)}
+              title="Thêm thao tác (Nhân bản, Sao chép, Cắt, Ẩn)"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#16a34a",
+                color: "#ffffff",
+                fontWeight: 700,
+                boxShadow: "0 3px 12px rgba(22, 163, 74, 0.35)",
+              }}
+            >
+              + Thêm ▾
+            </button>
+
+            {moreAxesOpen && (
+              <div
+                role="menu"
+                data-wb-point-menu="true"
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  bottom: "calc(100% + 10px)",
+                  minWidth: 190,
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  boxShadow: "0 14px 36px rgba(15, 23, 42, 0.22)",
+                  padding: "6px",
+                  zIndex: 10020,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
+                {[
+                  { action: "duplicate", icon: "⧉", label: "Nhân bản", handler: onDuplicate },
+                  { action: "copy", icon: "⎘", label: "Sao chép", handler: onCopy },
+                  { action: "cut", icon: "✂", label: "Cắt", handler: onCut },
+                  { action: "hide", icon: "🙈", label: "Ẩn", handler: onHide },
+                ].map((item) => (
+                  <button
+                    key={item.action}
+                    type="button"
+                    role="menuitem"
+                    data-action={item.action}
+                    onClick={() => {
+                      setMoreAxesOpen(false);
+                      item.handler();
+                    }}
+                    style={menuItemStyle}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f1f5f9";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>

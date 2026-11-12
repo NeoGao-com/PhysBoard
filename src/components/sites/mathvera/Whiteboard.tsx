@@ -363,6 +363,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     initialLatex: string;
   } | null>(null);
   const [plotDialogOpen, setPlotDialogOpen] = useState(false);
+  const [pointRenameSession, setPointRenameSession] = useState<{
+    items: Array<{ id: string; originalName: string; draftName: string }>;
+  } | null>(null);
   const [axesPointDialogOpen, setAxesPointDialogOpen] = useState(false);
   const [axesVectorDialogOpen, setAxesVectorDialogOpen] = useState(false);
   const [curve2dDialogMode, setCurve2dDialogMode] =
@@ -440,6 +443,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const axesResizeRef = useRef<{
     id: string;
     side: AxesResizeSide;
+    element: CanvasElement;
+  } | null>(null);
+
+  const labelDragRef = useRef<{
+    id: string;
+    startWorld: Point2D;
+    initDx: number;
+    initDy: number;
     element: CanvasElement;
   } | null>(null);
 
@@ -542,6 +553,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         selectedElements[0].type === "PhysicsLabTable")
         ? selectedElements[0]
         : null,
+    [selectedElements]
+  );
+
+  const selectedPoints = useMemo(
+    () =>
+      selectedElements.filter(
+        (el) => el.type === "Point" || el.type === "GeomPoint"
+      ),
     [selectedElements]
   );
 
@@ -2480,6 +2499,49 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         type: "object.update",
         params: { id, props: { ...el.props, ...patch } },
       });
+    },
+    [byId, dispatcher]
+  );
+
+  const openPointRename = useCallback(
+    (ids: string[]) => {
+      const items = ids
+        .map((id) => byId.get(id))
+        .filter(
+          (el): el is CanvasElement =>
+            Boolean(el && (el.type === "Point" || el.type === "GeomPoint"))
+        )
+        .map((el) => {
+          const nm = typeof el.props?.name === "string" ? el.props.name : "";
+          return { id: el.id, originalName: nm, draftName: nm };
+        });
+      if (items.length === 0) return;
+      setPointRenameSession({ items });
+    },
+    [byId]
+  );
+
+  const handleSubmitPointRename = useCallback(
+    (items: Array<{ id: string; draftName: string }>) => {
+      dispatcher.batch(() => {
+        for (const item of items) {
+          const el = byId.get(item.id);
+          if (!el) continue;
+          const nextName = item.draftName.trim();
+          dispatcher.dispatch({
+            type: "object.update",
+            params: {
+              id: el.id,
+              props: {
+                ...el.props,
+                name: nextName,
+                ...(nextName ? { hideName: false } : {}),
+              },
+            },
+          });
+        }
+      });
+      setPointRenameSession(null);
     },
     [byId, dispatcher]
   );
@@ -4476,6 +4538,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         rect
       );
 
+      // 0. Label Drag (Point name offset)
+      if (labelDragRef.current) {
+        const { id, startWorld, initDx, initDy, element } = labelDragRef.current;
+        const dx = Number((initDx + (worldPos.x - startWorld.x)).toFixed(3));
+        const dy = Number((initDy + (worldPos.y - startWorld.y)).toFixed(3));
+        dispatcher.dispatch({
+          type: "object.update",
+          params: { id, props: { ...element.props, labelDx: dx, labelDy: dy } },
+        });
+        return;
+      }
+
       // 0. Axes2D 4-Tip Extension Handles
       if (axesResizeRef.current) {
         const { id, side, element } = axesResizeRef.current;
@@ -4786,6 +4860,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     (e: React.PointerEvent<SVGSVGElement>) => {
       navPointerUp(e);
 
+      if (labelDragRef.current) {
+        labelDragRef.current = null;
+        dispatcher.gesture(false);
+        return;
+      }
       if (axesResizeRef.current) {
         axesResizeRef.current = null;
         dispatcher.gesture(false);
@@ -4884,6 +4963,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const handleCanvasPointerCancel = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       navPointerCancel(e);
+      if (labelDragRef.current) {
+        labelDragRef.current = null;
+        dispatcher.gesture(false);
+      }
       if (axesResizeRef.current) {
         axesResizeRef.current = null;
         dispatcher.gesture(false);
@@ -4988,6 +5071,44 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             dotScale={dotScale}
             isSelected={isSel}
             onPointerDown={(e, id) => handleElementPointerDown(e, id)}
+            onLabelPointerDown={(e, id) => {
+              e.stopPropagation();
+              setSelectedIds([id]);
+              const rect = containerRef.current?.getBoundingClientRect();
+              const startWorld = screenToWorld(
+                e.clientX,
+                e.clientY,
+                viewport.tx,
+                viewport.ty,
+                viewport.scale,
+                rect
+              );
+              const effScale =
+                typeof el.props?.labelScale === "number" && el.props.labelScale > 0
+                  ? el.props.labelScale
+                  : labelScale;
+              const initDx =
+                typeof el.props?.labelDx === "number"
+                  ? el.props.labelDx
+                  : 0.18 * effScale;
+              const initDy =
+                typeof el.props?.labelDy === "number"
+                  ? el.props.labelDy
+                  : 0.12 * effScale;
+              labelDragRef.current = {
+                id,
+                startWorld,
+                initDx,
+                initDy,
+                element: el,
+              };
+              dispatcher.gesture(true);
+            }}
+            onLabelDoubleClick={(e, id) => {
+              e.stopPropagation();
+              setSelectedIds([id]);
+              openPointRename([id]);
+            }}
           />
         );
 
@@ -5849,12 +5970,62 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           hiddenCount={hiddenCount}
           selectedAxes2D={selectedAxes2D}
           selectedPhysicsEl={selectedPhysicsEl}
+          selectedPoints={selectedPoints}
+          labelScale={labelScale}
+          dotScale={dotScale}
           onDelete={handleDeleteSelected}
           onDuplicate={handleDuplicateSelected}
           onCopy={handleCopySelected}
           onCut={handleCutSelected}
           onHide={handleHideSelected}
           onUnhideAll={handleUnhideAll}
+          onPointRename={() => openPointRename(selectedPoints.map((pt) => pt.id))}
+          onPointToggleHideName={() => {
+            if (selectedPoints.length === 0) return;
+            const allHidden = selectedPoints.every((pt) => pt.props?.hideName === true);
+            dispatcher.batch(() => {
+              for (const pt of selectedPoints) {
+                handleUpdateElementProps(pt.id, { hideName: !allHidden });
+              }
+            });
+          }}
+          onPointCycleDot={() => {
+            if (selectedPoints.length === 0) return;
+            const cur =
+              selectedPoints[0].props?.dot === "cross"
+                ? "cross"
+                : selectedPoints[0].props?.dot === "none"
+                ? "none"
+                : "dot";
+            const next = cur === "dot" ? "cross" : cur === "cross" ? "none" : "dot";
+            dispatcher.batch(() => {
+              for (const pt of selectedPoints) {
+                handleUpdateElementProps(pt.id, { dot: next });
+              }
+            });
+          }}
+          onPointChangeDotSize={(delta) => {
+            if (selectedPoints.length === 0) return;
+            dispatcher.batch(() => {
+              for (const pt of selectedPoints) {
+                const cur =
+                  typeof pt.props?.dotSize === "number" && pt.props.dotSize > 0
+                    ? pt.props.dotSize
+                    : dotScale;
+                const next = Math.max(0.5, Math.min(3.0, Number((cur + delta).toFixed(2))));
+                handleUpdateElementProps(pt.id, { dotSize: next });
+              }
+            });
+          }}
+          onPointResetDotSize={() => {
+            if (selectedPoints.length === 0) return;
+            dispatcher.batch(() => {
+              for (const pt of selectedPoints) {
+                handleUpdateElementProps(pt.id, { dotSize: DEFAULT_DOT_SCALE });
+              }
+            });
+          }}
+          onChangeLabelScale={setLabelScale}
           onAxesPlot={() => setPlotDialogOpen(true)}
           onAxesAddPoint={() => setAxesPointDialogOpen(true)}
           onAxesToggleGrid={() => {
@@ -6043,6 +6214,151 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }}
         onCancel={() => setAxesPointDialogOpen(false)}
       />
+
+      {pointRenameSession && (
+        <div
+          data-export-skip="true"
+          data-testid="point-rename-dialog"
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) setPointRenameSession(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 10050,
+            background: "rgba(15, 23, 42, 0.28)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSubmitPointRename(pointRenameSession.items);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setPointRenameSession(null);
+              }
+            }}
+            style={{
+              width: "100%",
+              maxWidth: 360,
+              background: "#ffffff",
+              borderRadius: 14,
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
+              padding: 18,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              fontFamily: "system-ui, -apple-system, sans-serif",
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+              {pointRenameSession.items.length === 1
+                ? "Đổi tên điểm"
+                : `Đổi tên ${pointRenameSession.items.length} điểm`}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                maxHeight: 280,
+                overflowY: "auto",
+              }}
+            >
+              {pointRenameSession.items.map((item, idx) => (
+                <label
+                  key={item.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    fontSize: 13.5,
+                    color: "#334155",
+                    fontWeight: 600,
+                  }}
+                >
+                  {pointRenameSession.items.length > 1 && (
+                    <span style={{ minWidth: 68, color: "#64748b" }}>
+                      {item.originalName ? `Điểm ${item.originalName}:` : `Điểm #${idx + 1}:`}
+                    </span>
+                  )}
+                  <input
+                    data-testid={
+                      idx === 0 ? "point-rename-input" : `point-rename-input-${idx}`
+                    }
+                    type="text"
+                    autoFocus={idx === 0}
+                    onFocus={(e) => e.currentTarget.select()}
+                    value={item.draftName}
+                    placeholder="Nhập tên điểm (vd: A, M, A')"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPointRenameSession((prev) =>
+                        prev
+                          ? {
+                              items: prev.items.map((it) =>
+                                it.id === item.id ? { ...it, draftName: val } : it
+                              ),
+                            }
+                          : null
+                      );
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #cbd5e1",
+                      fontSize: 14,
+                      color: "#0f172a",
+                      outline: "none",
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                data-action="point-rename-cancel"
+                onClick={() => setPointRenameSession(null)}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  color: "#475569",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Huỷ
+              </button>
+              <button
+                type="submit"
+                data-action="point-rename-save"
+                style={{
+                  padding: "7px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Lưu tên
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <AxesVectorDialog
         open={axesVectorDialogOpen}
