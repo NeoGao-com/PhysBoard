@@ -1,0 +1,9 @@
+{
+  "appId": "com.physboard.app",
+  "appName": "PhysBoard",
+  "webDir": "out",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "name": "physboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PhysBoard — Bảng trắng tương tác dạy Toán & Vật lý Offline (Desktop & Android)",
+  "author": "PhysBoard",
+  "license": "MIT",
+  "main": "electron/main.js",
+  "keywords": [
+    "physboard",
+    "physics",
+    "mathematics",
+    "whiteboard",
+    "offline",
+    "electron",
+    "capacitor"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm run build",
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "electron:dev": "npm run build && electron .",
+    "build:exe": "npm run build && electron-builder --win portable",
+    "build:android": "npm run build && npx cap sync android",
+    "test:e2e": "playwright test",
+    "test:tier1": "playwright test tests/e2e/tier1-core",
+    "test:tier2": "playwright test tests/e2e/tier2-boundary",
+    "test:tier3": "playwright test tests/e2e/tier3-collab",
+    "test:tier4": "playwright test tests/e2e/tier4-academic",
+    "test:report": "playwright show-report playwright-report"
+  },
+  "build": {
+    "appId": "com.physboard.app",
+    "productName": "PhysBoard",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "electron/**/*",
+      "build/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "build/icon.ico"
+    }
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.3.0",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.2",
+    "katex": "^0.19.1",
+    "lib0": "^0.2.120",
+    "lucide-react": "^1.6.0",
+    "mathlive": "^0.111.4",
+    "next": "16.3.5",
+    "pdfjs-dist": "^6.5.438",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "roughjs": "^4.6.6",
+    "shadcn": "^4.1.0",
+    "tailwind-merge": "^3.5.0",
+    "tw-animate-css": "^1.4.0",
+    "ws": "^8.22.2",
+    "y-indexeddb": "^9.0.12",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "^3.1.0",
+    "yjs": "^13.6.33",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.0",
+    "@playwright/test": "^1.65.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/ws": "^8.18.2",
+    "electron": "^45.3.1",
+    "electron-builder": "^26.18.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.5",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

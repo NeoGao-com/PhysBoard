@@ -1,0 +1,240 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-be-vietnam-pro), var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-source-code-pro), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body {
+    overscroll-behavior: none;
+    -webkit-touch-callout: none;
+  }
+  body {
+    @apply bg-background text-foreground;
+    margin: 0;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Offline Touch & Stylus ergonomics */
+.wb-toolbar,
+.wb-selection-bar,
+.wb-canvas {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
+input,
+textarea,
+math-field,
+.wb-rte {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* KaTeX renders at 1.21em by default; keep at 1em to match container typography */
+.katex {
+  font-size: 1em !important;
+}
+
+/* MathLive inline math-field integration */
+math-field {
+  --caret-color: #2563eb;
+  --selection-background-color: rgba(37, 99, 235, 0.18);
+  --contains-highlight-background-color: rgba(37, 99, 235, 0.08);
+}
+
+/* Exam Authoring Rich-Text Sheet Styles */
+.wb-rte p {
+  margin: 0.35em 0;
+}
+.wb-rte .x-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0;
+}
+.wb-rte .x-cell {
+  min-width: 0;
+}
+.wb-rte .x-a {
+  font-weight: 700;
+  color: #16a34a;
+}
+.wb-rte .x-s {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-left: 3px solid #93c5fd;
+  background: #f8fafc;
+}
+.wb-rte .wb-exam-fig img {
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* Print view helper for exam authoring */
+@media print {
+  [data-export-skip="true"],
+  [data-wb-doc-toolbar="true"],
+  [data-wb-exam-bar="true"],
+  [data-wb-btn="matrix"],
+  [data-wb-exam-start="true"],
+  [data-wb-shot-dock="true"] {
+    display: none !important;
+  }
+}
+
+/* Single-row desktop toolbar pill (>= 1360px) with wrapping below 1360px */
+.wb-toolbar:not([data-embedded="true"]) {
+  flex-wrap: wrap;
+}
+.wb-toolbar .wb-scroll {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0px;
+  min-width: 0;
+  overflow: visible;
+}
+.wb-toolbar:not([data-embedded="true"]) .wb-pagebar {
+  gap: 1px !important;
+  font-size: 11px !important;
+}
+.wb-toolbar:not([data-embedded="true"]) .wb-pagebar button {
+  height: 24px !important;
+  min-width: 20px !important;
+  padding: 0 3px !important;
+  font-size: 11px !important;
+}
+.wb-toolbar:not([data-embedded="true"]) .wb-pagebar .wb-page-indicator {
+  min-width: 26px !important;
+  font-size: 11px !important;
+}
+@media (min-width: 1360px) {
+  .wb-toolbar:not([data-embedded="true"]) {
+    flex-wrap: nowrap;
+  }
+  .wb-toolbar:not([data-embedded="true"]) .wb-scroll {
+    flex-wrap: nowrap;
+  }
+}
