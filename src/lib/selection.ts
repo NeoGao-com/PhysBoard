@@ -6,9 +6,8 @@ import {
 import {
   type EmbeddedVertex,
   type Point2D,
-  footOfPerpendicular,
   getGeometryBoundingBox,
-  midpoint2D,
+  resolveGeomConstructionGeometry,
   resolveLineEndpoints,
 } from "@/lib/geometry";
 import {
@@ -257,40 +256,17 @@ export function getElementBoundingBox(
   }
 
   if (el.type === "GeomConstruction") {
-    const p = el.props as Record<string, unknown>;
-    const ptOrInline = (
-      ref: unknown,
-      inline: unknown
-    ): Point2D | undefined => {
-      if (typeof ref === "string" && solved.pts.has(ref)) {
-        return solved.pts.get(ref);
-      }
-      if (
-        inline &&
-        typeof inline === "object" &&
-        typeof (inline as Point2D).x === "number" &&
-        typeof (inline as Point2D).y === "number"
-      ) {
-        return inline as Point2D;
-      }
-      return undefined;
-    };
-    const pFrom = ptOrInline(p.from ?? p.vertex, p.fromPt);
-    const pSideA = ptOrInline(p.sideA, p.sideAPt);
-    const pSideB = ptOrInline(p.sideB, p.sideBPt);
-    let pTo = ptOrInline(p.to ?? p.foot, p.toPt);
-    if (!pTo && pFrom && pSideA && pSideB) {
-      if (p.kind === "median") {
-        pTo = midpoint2D(pSideA, pSideB);
-      } else {
-        pTo = footOfPerpendicular(pFrom, pSideA, pSideB) ?? undefined;
-      }
+    const resolved = resolveGeomConstructionGeometry(el, solved.pts, byId);
+    if (resolved) {
+      const pts = [
+        resolved.pFrom,
+        resolved.pTo,
+        resolved.pSideA,
+        resolved.pSideB,
+      ].filter((pt): pt is Point2D => pt !== undefined);
+      const b = boxFromPoints(pts);
+      if (b) return b;
     }
-    const pts = [pFrom, pTo, pSideA, pSideB].filter(
-      (pt): pt is Point2D => pt !== undefined
-    );
-    const b = boxFromPoints(pts);
-    if (b) return b;
   }
 
   if (el.type === "Solid3D") {

@@ -9,9 +9,8 @@ import {
   type Point2D,
   computeAngleArcPoints,
   dist2D,
-  footOfPerpendicular,
   getConstructMarksEnabled,
-  midpoint2D,
+  resolveGeomConstructionGeometry,
 } from "@/lib/geometry";
 import { RightAngleSymbol } from "./PolygonElement";
 import { formatMeasureNumber, renderCongruenceTicks } from "./SegmentElement";
@@ -19,6 +18,7 @@ import { formatMeasureNumber, renderCongruenceTicks } from "./SegmentElement";
 export interface GeometryConstructionElementProps {
   element: CanvasElement;
   points: Map<string, Point2D>;
+  byId?: Map<string, CanvasElement>;
   scale?: number;
   labelScale?: number;
   dotScale?: number;
@@ -27,18 +27,12 @@ export interface GeometryConstructionElementProps {
   onPointerDown?: (e: React.PointerEvent, id: string) => void;
 }
 
-function getPtOrInline(
-  ref: string | undefined,
-  points: Map<string, Point2D>,
-  fallback?: Point2D
-): Point2D | undefined {
-  if (ref && points.has(ref)) return points.get(ref);
-  return fallback;
-}
+const EMPTY_BY_ID = new Map<string, CanvasElement>();
 
 export const GeometryConstructionElement: React.FC<GeometryConstructionElementProps> = ({
   element,
   points,
+  byId = EMPTY_BY_ID,
   scale = 45,
   labelScale = DEFAULT_LABEL_SCALE,
   dotScale = DEFAULT_DOT_SCALE,
@@ -67,51 +61,37 @@ export const GeometryConstructionElement: React.FC<GeometryConstructionElementPr
       ? "#2563eb"
       : kind === "perpBisector"
       ? "#7c3aed"
+      : kind === "tangent"
+      ? "#0891b2"
       : "#334155");
   const strokeWidth = (style.width ?? 1.8) + (isSelected || isHighlighted ? 2 : 0);
   const marksEnabled = getConstructMarksEnabled();
 
-  let pFrom = getPtOrInline(props.from ?? props.vertex, points, props.fromPt);
-  const pSideA = getPtOrInline(props.sideA, points, props.sideAPt);
-  const pSideB = getPtOrInline(props.sideB, points, props.sideBPt);
-  let pTo = getPtOrInline(props.to ?? props.foot, points, props.toPt);
-
-  // Dynamically recompute parallel/perp line endpoints when bound to point IDs
-  if (
-    (kind === "parallel" || kind === "perp") &&
-    !props.to &&
-    !props.foot &&
-    typeof props.from === "string" &&
-    typeof props.sideA === "string" &&
-    typeof props.sideB === "string"
-  ) {
-    const dynFrom = points.get(props.from);
-    const dynA = points.get(props.sideA);
-    const dynB = points.get(props.sideB);
-    if (dynFrom && dynA && dynB) {
-      const dx = dynB.x - dynA.x;
-      const dy = dynB.y - dynA.y;
-      const vx = kind === "perp" ? -dy : dx;
-      const vy = kind === "perp" ? dx : dy;
-      pFrom = { x: dynFrom.x - vx * 0.7, y: dynFrom.y - vy * 0.7 };
-      pTo = { x: dynFrom.x + vx * 0.7, y: dynFrom.y + vy * 0.7 };
-    }
-  }
-
-  // If altitude/median/foot target not resolved via ID, compute directly from sideA/sideB
-  if (!pTo && pFrom && pSideA && pSideB) {
-    if (kind === "altitude") {
-      pTo = footOfPerpendicular(pFrom, pSideA, pSideB) ?? undefined;
-    } else if (kind === "median") {
-      pTo = midpoint2D(pSideA, pSideB);
-    }
-  }
-
-  if (!pFrom || !pTo) return null;
+  const resolved = resolveGeomConstructionGeometry(element, points, byId);
+  if (!resolved) return null;
+  const {
+    pFrom,
+    pTo,
+    pSideA,
+    pSideB,
+    midpoint,
+    rightAngleVertex,
+    rightAngleArmA,
+    rightAngleArmB,
+  } = resolved;
 
   const isDashed = props.dashed === true || style.dash === true || kind === "perpBisector";
   const dotRadius = (scale > 0 ? 1.8 / scale : 0.04) * dotScale;
   const labelText = typeof props.label === "string" ? props.label : undefined;
+  const footDisplayPt = kind === "tangent" && pSideB ? pSideB : pTo;
+  const showEndpointDot =
+    !props.to &&
+    !props.foot &&
+    (kind === "altitude" ||
+      kind === "median" ||
+      kind === "bisector" ||
+      kind === "footPlane" ||
+      kind === "tangent");
 
   return (
     <g
@@ -152,29 +132,38 @@ export const GeometryConstructionElement: React.FC<GeometryConstructionElementPr
 
       {/* Auto right-angle square for altitudes, perpendiculars, footPlane, tangents */}
       {marksEnabled &&
-        (kind === "altitude" ||
-          kind === "perp" ||
-          kind === "perpBisector" ||
-          kind === "footPlane" ||
-          kind === "tangent") &&
-        pSideA &&
-        pSideB && (
+        rightAngleVertex &&
+        rightAngleArmA &&
+        rightAngleArmB && (
           <RightAngleSymbol
-            vertex={pTo}
-            armA={pFrom}
-            armB={dist2D(pTo, pSideA) > 1e-6 ? pSideA : pSideB}
+            vertex={rightAngleVertex}
+            armA={rightAngleArmA}
+            armB={rightAngleArmB}
             color="#16a34a"
             strokeWidth={1.6}
           />
         )}
 
-      {/* Median congruence ticks on divided base side */}
-      {marksEnabled && kind === "median" && pSideA && pSideB && (
-        <>
-          {renderCongruenceTicks(pSideA, pTo, props.ticks ?? 1, strokeColor, 1.5)}
-          {renderCongruenceTicks(pTo, pSideB, props.ticks ?? 1, strokeColor, 1.5)}
-        </>
-      )}
+      {/* Congruence ticks on divided base side for median and perpBisector */}
+      {marksEnabled &&
+        kind === "median" &&
+        pSideA &&
+        pSideB && (
+          <>
+            {renderCongruenceTicks(pSideA, pTo, props.ticks ?? 1, strokeColor, 1.5)}
+            {renderCongruenceTicks(pTo, pSideB, props.ticks ?? 1, strokeColor, 1.5)}
+          </>
+        )}
+      {marksEnabled &&
+        kind === "perpBisector" &&
+        midpoint &&
+        pSideA &&
+        pSideB && (
+          <>
+            {renderCongruenceTicks(pSideA, midpoint, props.ticks ?? 1, strokeColor, 1.5)}
+            {renderCongruenceTicks(midpoint, pSideB, props.ticks ?? 1, strokeColor, 1.5)}
+          </>
+        )}
 
       {/* Bisector equal angle arcs */}
       {marksEnabled && kind === "bisector" && pSideA && pSideB && (
@@ -200,13 +189,13 @@ export const GeometryConstructionElement: React.FC<GeometryConstructionElementPr
         </>
       )}
 
-      {/* Foot point dot & label if inline */}
-      {!props.to && !props.foot && (
+      {/* Foot / tangency point dot & label if inline */}
+      {showEndpointDot && (
         <>
           <circle
             data-wb-vertex="true"
-            cx={pTo.x}
-            cy={-pTo.y}
+            cx={footDisplayPt.x}
+            cy={-footDisplayPt.y}
             r={dotRadius}
             fill={strokeColor}
             stroke="#ffffff"
@@ -217,8 +206,8 @@ export const GeometryConstructionElement: React.FC<GeometryConstructionElementPr
             <text
               data-label={labelText}
               data-wb-label="true"
-              x={pTo.x + 0.18 * labelScale}
-              y={-(pTo.y - 0.18 * labelScale)}
+              x={footDisplayPt.x + 0.18 * labelScale}
+              y={-(footDisplayPt.y - 0.18 * labelScale)}
               fontSize={0.34 * labelScale}
               fontWeight={600}
               fill={strokeColor}

@@ -201,4 +201,59 @@ test.describe('Tier 4: Academic Scenarios - High School Plane Geometry (Scenario
     await bar.locator('[data-action="point-label-up"]').click();
     await expect(bar.locator('[data-action="point-label-reset"]')).toContainText('115%');
   });
+
+  test('should construct dynamic perpBisector, altitude that tracks triangle resize, and circle tangents', async ({
+    page,
+  }) => {
+    const center = await canvas.getCanvasCenter();
+
+    // 1. Triangle + Altitude -> Resize triangle and verify altitude endpoints shift with it
+    await toolbar.selectDropdownItem('Hình phẳng', 'Tam giác vuông');
+    await canvas.clickAt({ x: center.x - 160, y: center.y });
+    const tri = canvas.boardContent.locator('g[data-element-type="GeomPolygon"]').first();
+    await expect(tri).toBeVisible();
+    await tri.click();
+    await toolbar.selectDropdownItem('Hình phẳng', 'Đường cao');
+
+    const altLine = canvas.boardContent
+      .locator('g[data-wb-construction="altitude"] line')
+      .nth(1);
+    await expect(altLine).toBeVisible();
+    const beforeAltX2 = Number(await altLine.getAttribute('x2'));
+
+    await tri.click();
+    const handleBr = page.locator('[data-handle="br"]');
+    await expect(handleBr).toBeVisible();
+    const hb = await handleBr.boundingBox();
+    expect(hb).toBeTruthy();
+    await canvas.drag(
+      { x: hb!.x + hb!.width / 2, y: hb!.y + hb!.height / 2 },
+      { x: hb!.x + hb!.width / 2 + 70, y: hb!.y + hb!.height / 2 + 50 }
+    );
+    const afterAltX2 = Number(await altLine.getAttribute('x2'));
+    expect(Math.abs(afterAltX2 - beforeAltX2)).toBeGreaterThan(0.1);
+
+    // 2. Segment + Perpendicular Bisector -> Verify perpBisector created
+    await page.locator('button[data-tool="segment"], button[data-tool="c:seg"], button:has-text("Đoạn")').first().click();
+    await canvas.drag({ x: center.x + 80, y: center.y - 60 }, { x: center.x + 220, y: center.y - 60 });
+    const seg = canvas.boardContent.locator('g[data-element-type="GeomSegment"]').first();
+    await expect(seg).toBeVisible();
+    await toolbar.selectTool('select');
+    await seg.click({ force: true });
+    await toolbar.selectDropdownItem('Hình phẳng', 'Trung trực');
+    const perpBis = canvas.boardContent.locator('g[data-wb-construction="perpBisector"]').first();
+    await expect(perpBis).toBeVisible();
+
+    // 3. Circle + Outside Point -> Tangent constructs 2 dynamic tangent lines
+    await page.locator('button[data-tool="circle"]').click();
+    await canvas.drag({ x: center.x + 150, y: center.y + 80 }, { x: center.x + 205, y: center.y + 80 });
+    const circle = canvas.boardContent.locator('g[data-element-type="GeomCircle"]').first();
+    await expect(circle).toBeVisible();
+
+    await toolbar.selectDropdownItem('Hình phẳng', 'Tiếp tuyến');
+    await canvas.clickAt({ x: center.x + 205, y: center.y + 80 });
+    await canvas.clickAt({ x: center.x + 20, y: center.y + 80 });
+    const tangents = canvas.boardContent.locator('g[data-wb-construction="tangent"]');
+    await expect(tangents).toHaveCount(2);
+  });
 });

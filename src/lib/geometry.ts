@@ -183,6 +183,8 @@ export interface GeomConstructionProps {
   vertex?: string;
   sideA?: string;
   sideB?: string;
+  circle?: string;
+  tangentSide?: 0 | 1;
   rightAngleAt?: string;
   ticks?: 1 | 2 | 3;
   dashed?: boolean;
@@ -683,6 +685,204 @@ export function resolveLineGeometry(
     }
   }
   return null;
+}
+
+export interface ResolvedGeomConstruction {
+  pFrom: Point2D;
+  pTo: Point2D;
+  pSideA?: Point2D;
+  pSideB?: Point2D;
+  midpoint?: Point2D;
+  rightAngleVertex?: Point2D;
+  rightAngleArmA?: Point2D;
+  rightAngleArmB?: Point2D;
+}
+
+/**
+ * Resolve endpoints, midpoints, and right-angle landmarks for a GeomConstruction
+ * dynamically from its referenced points/circle IDs (falling back to inline coords).
+ */
+export function resolveGeomConstructionGeometry(
+  element: CanvasElement,
+  points: Map<string, Point2D>,
+  byId: Map<string, CanvasElement>
+): ResolvedGeomConstruction | null {
+  const props = element.props as Partial<GeomConstructionProps> & {
+    fromPt?: Point2D;
+    toPt?: Point2D;
+    sideAPt?: Point2D;
+    sideBPt?: Point2D;
+  };
+  const kind = props.kind ?? "altitude";
+  const pickPt = (ref: string | undefined, inline?: Point2D): Point2D | undefined => {
+    if (ref && points.has(ref)) return points.get(ref);
+    return inline;
+  };
+
+  const fromRef = props.from ?? props.vertex;
+  const toRef = props.to ?? props.foot;
+  const dynFrom = fromRef ? points.get(fromRef) : undefined;
+  const dynSideA = props.sideA ? points.get(props.sideA) : undefined;
+  const dynSideB = props.sideB ? points.get(props.sideB) : undefined;
+
+  let pFrom = pickPt(fromRef, props.fromPt);
+  let pSideA = pickPt(props.sideA, props.sideAPt);
+  let pSideB = pickPt(props.sideB, props.sideBPt);
+  let pTo = pickPt(toRef, props.toPt);
+  let midpoint: Point2D | undefined;
+  let rightAngleVertex: Point2D | undefined;
+  let rightAngleArmA: Point2D | undefined;
+  let rightAngleArmB: Point2D | undefined;
+
+  if ((kind === "parallel" || kind === "perp") && !toRef && dynFrom && dynSideA && dynSideB) {
+    const dx = dynSideB.x - dynSideA.x;
+    const dy = dynSideB.y - dynSideA.y;
+    const len = Math.hypot(dx, dy);
+    if (len > GEOM_EPS) {
+      const span = Math.max(1.5, Math.min(len * 0.75, 6));
+      const ux = (kind === "perp" ? -dy : dx) / len;
+      const uy = (kind === "perp" ? dx : dy) / len;
+      let minT = -span;
+      let maxT = span;
+      if (kind === "perp") {
+        const foot = footOfPerpendicular(dynFrom, dynSideA, dynSideB);
+        if (foot) {
+          const ft = (foot.x - dynFrom.x) * ux + (foot.y - dynFrom.y) * uy;
+          if (Math.abs(ft) <= 12) {
+            minT = Math.min(minT, ft - 0.8);
+            maxT = Math.max(maxT, ft + 0.8);
+            rightAngleVertex = foot;
+            rightAngleArmA =
+              dist2D(foot, dynFrom) > 1e-5
+                ? dynFrom
+                : { x: dynFrom.x + ux * span, y: dynFrom.y + uy * span };
+            rightAngleArmB = dist2D(foot, dynSideA) > 1e-5 ? dynSideA : dynSideB;
+          }
+        }
+      }
+      pFrom = { x: dynFrom.x + ux * minT, y: dynFrom.y + uy * minT };
+      pTo = { x: dynFrom.x + ux * maxT, y: dynFrom.y + uy * maxT };
+      pSideA = dynSideA;
+      pSideB = dynSideB;
+    }
+  } else if (kind === "perpBisector" && pSideA && pSideB) {
+    const dx = pSideB.x - pSideA.x;
+    const dy = pSideB.y - pSideA.y;
+    const len = Math.hypot(dx, dy);
+    if (len > GEOM_EPS) {
+      const mid = midpoint2D(pSideA, pSideB);
+      const nx = -dy / len;
+      const ny = dx / len;
+      const span = Math.max(1.2, Math.min(len * 0.65, 5.5));
+      pFrom = { x: mid.x - nx * span, y: mid.y - ny * span };
+      pTo = { x: mid.x + nx * span, y: mid.y + ny * span };
+      midpoint = mid;
+      rightAngleVertex = mid;
+      rightAngleArmA = pTo;
+      rightAngleArmB = pSideB;
+    }
+  } else if (kind === "tangent") {
+    const circleEl = typeof props.circle === "string" ? byId.get(props.circle) : undefined;
+    const circCenter =
+      circleEl ? points.get(String(circleEl.props.center ?? "")) : pSideA;
+    const circR =
+      circleEl && circCenter
+        ? resolveCircleRadius(
+            circleEl.props.radius as CircleRadiusSpec | undefined,
+            circCenter,
+            (id) => points.get(id)
+          )
+        : circCenter && pSideB
+        ? dist2D(circCenter, pSideB)
+        : null;
+    if (pFrom && circCenter && typeof circR === "number" && circR > GEOM_EPS) {
+      const d = dist2D(pFrom, circCenter);
+      if (Math.abs(d - circR) <= 0.08) {
+        const ux = (pFrom.x - circCenter.x) / (d || 1);
+        const uy = (pFrom.y - circCenter.y) / (d || 1);
+        const touch = { x: circCenter.x + ux * circR, y: circCenter.y + uy * circR };
+        const nx = -uy;
+        const ny = ux;
+        const span = Math.max(1.8, circR * 1.35);
+        pFrom = { x: touch.x - nx * span, y: touch.y - ny * span };
+        pTo = { x: touch.x + nx * span, y: touch.y + ny * span };
+        pSideA = circCenter;
+        pSideB = touch;
+        rightAngleVertex = touch;
+        rightAngleArmA = circCenter;
+        rightAngleArmB = pTo;
+      } else if (d > circR + 0.08) {
+        const touch = tangentPointToCircle(
+          pFrom,
+          { cx: circCenter.x, cy: circCenter.y, r: circR },
+          props.tangentSide ?? 0
+        );
+        if (touch) {
+          pTo = {
+            x: touch.x + (touch.x - pFrom.x) * 0.25,
+            y: touch.y + (touch.y - pFrom.y) * 0.25,
+          };
+          pSideA = circCenter;
+          pSideB = touch;
+          rightAngleVertex = touch;
+          rightAngleArmA = pFrom;
+          rightAngleArmB = circCenter;
+        }
+      }
+    } else if (pFrom && pTo && pSideA && pSideB) {
+      rightAngleVertex = pSideB;
+      rightAngleArmA = pFrom;
+      rightAngleArmB = pSideA;
+    }
+  } else if (
+    (kind === "altitude" || kind === "median" || kind === "bisector") &&
+    !toRef &&
+    ((dynFrom && dynSideA && dynSideB) || (!pTo && pFrom && pSideA && pSideB))
+  ) {
+    const f = dynFrom ?? pFrom!;
+    const a = dynSideA ?? pSideA!;
+    const b = dynSideB ?? pSideB!;
+    pFrom = f;
+    pSideA = a;
+    pSideB = b;
+    if (kind === "altitude") {
+      pTo = footOfPerpendicular(f, a, b) ?? pTo;
+      if (pTo) {
+        rightAngleVertex = pTo;
+        rightAngleArmA = f;
+        rightAngleArmB = dist2D(pTo, a) > 1e-6 ? a : b;
+      }
+    } else if (kind === "median") {
+      pTo = midpoint2D(a, b);
+    } else {
+      pTo = bisectorFoot2D(f, a, b) ?? pTo;
+    }
+  } else if (pFrom && pTo && pSideA && pSideB) {
+    if (kind === "altitude" || kind === "footPlane") {
+      rightAngleVertex = pTo;
+      rightAngleArmA = pFrom;
+      rightAngleArmB = dist2D(pTo, pSideA) > 1e-6 ? pSideA : pSideB;
+    } else if (kind === "perp") {
+      const foot = footOfPerpendicular(pFrom, pSideA, pSideB);
+      if (foot) {
+        rightAngleVertex = foot;
+        rightAngleArmA = pTo;
+        rightAngleArmB = dist2D(foot, pSideA) > 1e-6 ? pSideA : pSideB;
+      }
+    }
+  }
+
+  if (!pFrom || !pTo) return null;
+  return {
+    pFrom,
+    pTo,
+    pSideA,
+    pSideB,
+    midpoint,
+    rightAngleVertex,
+    rightAngleArmA,
+    rightAngleArmB,
+  };
 }
 
 export function resolveLineEndpoints(

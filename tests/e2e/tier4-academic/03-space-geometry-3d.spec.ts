@@ -149,4 +149,40 @@ test.describe('Tier 4: Academic Scenarios - 3D Space Geometry & Stereometry (Sce
       expect(axisTexts.some((t) => t.includes('z') || t.includes('y') || t.includes('x'))).toBe(true);
     }
   });
+
+  test('should move attached 3D edge point and segment when resizing a 3D pyramid', async ({
+    page,
+  }) => {
+    await toolbar.selectDropdownItem('Không gian', 'Chóp tứ giác');
+    const center = await canvas.getCanvasCenter();
+    await canvas.clickAt(center);
+
+    const solid = canvas.boardContent.locator('g[data-wb-type="Solid3D"]').first();
+    await expect(solid).toBeVisible();
+
+    // Place a constrained point on a 3D edge via "Điểm trên cạnh / đường"
+    const sBox = await solid.boundingBox();
+    expect(sBox).toBeTruthy();
+    await toolbar.selectDropdownItem('Hình phẳng', 'Điểm trên cạnh');
+    await canvas.clickAt({ x: sBox!.x + sBox!.width * 0.35, y: sBox!.y + sBox!.height * 0.45 });
+
+    const attachedPt = canvas.boardContent.locator('g[data-element-type="Point"] circle').first();
+    await expect(attachedPt).toBeVisible();
+    const beforeCx = Number(await attachedPt.getAttribute('cx'));
+
+    // Resize the Solid3D via bottom-right handle
+    await toolbar.selectTool('select');
+    await solid.click({ force: true });
+    const handleBr = page.locator('[data-handle="br"]');
+    await expect(handleBr).toBeVisible();
+    const hb = await handleBr.boundingBox();
+    expect(hb).toBeTruthy();
+    await canvas.drag(
+      { x: hb!.x + hb!.width / 2, y: hb!.y + hb!.height / 2 },
+      { x: hb!.x + hb!.width / 2 + 80, y: hb!.y + hb!.height / 2 + 60 }
+    );
+
+    const afterCx = Number(await attachedPt.getAttribute('cx'));
+    expect(Math.abs(afterCx - beforeCx)).toBeGreaterThan(0.2);
+  });
 });

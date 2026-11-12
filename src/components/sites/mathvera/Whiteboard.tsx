@@ -832,15 +832,21 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             });
             if (res.created?.[0]) setSelectedIds([res.created[0]]);
           } else {
-            const dir = { x: -(pB.y - pA.y), y: pB.x - pA.x };
+            const dx = pB.x - pA.x;
+            const dy = pB.y - pA.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const span = Math.max(1.2, Math.min(len * 0.65, 5.5));
+            const nx = -dy / len;
+            const ny = dx / len;
             const res = dispatcher.dispatch({
               type: "object.create",
               params: {
                 type: "GeomConstruction",
                 props: {
                   kind: "perpBisector",
-                  fromPt: { x: mid.x - dir.x * 0.8, y: mid.y - dir.y * 0.8 },
-                  toPt: { x: mid.x + dir.x * 0.8, y: mid.y + dir.y * 0.8 },
+                  ...(aId && bId ? { sideA: aId, sideB: bId } : {}),
+                  fromPt: { x: mid.x - nx * span, y: mid.y - ny * span },
+                  toPt: { x: mid.x + nx * span, y: mid.y + ny * span },
                   sideAPt: pA,
                   sideBPt: pB,
                 },
@@ -937,12 +943,16 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       // 5. Intersection of 2 selected lines / 1 line + 1 circle
       if (tool === "c:intersect") {
         let inter: Point2D | null = null;
+        let constraint: PointConstraint = { kind: "free" };
         if (selGeom.segments.length === 2) {
           const [s1, s2] = selGeom.segments;
           inter = intersectLines2D(
             { px: s1.a.x, py: s1.a.y, dx: s1.b.x - s1.a.x, dy: s1.b.y - s1.a.y },
             { px: s2.a.x, py: s2.a.y, dx: s2.b.x - s2.a.x, dy: s2.b.y - s2.a.y }
           );
+          if (byId.has(s1.elementId) && byId.has(s2.elementId)) {
+            constraint = { kind: "intersection", a: s1.elementId, b: s2.elementId, which: 0 };
+          }
         } else if (selGeom.segments.length === 1 && selGeom.circles.length === 1) {
           const s = selGeom.segments[0];
           const c = selGeom.circles[0];
@@ -951,6 +961,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             { cx: c.center.x, cy: c.center.y, r: c.r },
             0
           );
+          if (byId.has(s.elementId) && byId.has(c.elementId)) {
+            constraint = { kind: "intersection", a: s.elementId, b: c.elementId, which: 0 };
+          }
         }
         if (inter) {
           const name = getNextPointName(pageElements, ["I", "K", "M", "N"]);
@@ -959,10 +972,74 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             params: {
               type: "GeomPoint",
               transform: { x: inter.x, y: inter.y, scale: 1, rotation: 0, z: 0 },
-              props: { name, constraint: { kind: "free" } },
+              props: { name, constraint },
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          return true;
+        }
+        return false;
+      }
+
+      // 6. Tangent from selected Point + Circle
+      if (tool === "c:tangent") {
+        if (selGeom.circle && selGeom.point) {
+          const pt = selGeom.point.pos;
+          const ptId = selGeom.point.elementId;
+          const circ = selGeom.circle;
+          const d = dist2D(pt, circ.center);
+          if (d < circ.r - 0.08) {
+            setStatusHint("Điểm nằm trong đường tròn — không kẻ được tiếp tuyến.");
+            return true;
+          }
+          const createdIds: string[] = [];
+          dispatcher.batch(() => {
+            if (Math.abs(d - circ.r) <= 0.08) {
+              const ux = (pt.x - circ.center.x) / (d || 1);
+              const uy = (pt.y - circ.center.y) / (d || 1);
+              const touch = { x: circ.center.x + ux * circ.r, y: circ.center.y + uy * circ.r };
+              const span = Math.max(1.8, circ.r * 1.35);
+              const r1 = dispatcher.dispatch({
+                type: "object.create",
+                params: {
+                  type: "GeomConstruction",
+                  props: {
+                    kind: "tangent",
+                    from: ptId,
+                    circle: circ.elementId,
+                    fromPt: { x: touch.x + uy * span, y: touch.y - ux * span },
+                    toPt: { x: touch.x - uy * span, y: touch.y + ux * span },
+                    sideAPt: circ.center,
+                    sideBPt: touch,
+                  },
+                },
+              });
+              if (r1.created?.[0]) createdIds.push(r1.created[0]);
+            } else {
+              for (const side of [0, 1] as const) {
+                const tPt = tangentPointToCircle(pt, { cx: circ.center.x, cy: circ.center.y, r: circ.r }, side);
+                if (!tPt) continue;
+                const rTan = dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    type: "GeomConstruction",
+                    props: {
+                      kind: "tangent",
+                      from: ptId,
+                      circle: circ.elementId,
+                      tangentSide: side,
+                      fromPt: pt,
+                      toPt: tPt,
+                      sideAPt: circ.center,
+                      sideBPt: tPt,
+                    },
+                  },
+                });
+                if (rTan.created?.[0]) createdIds.push(rTan.created[0]);
+              }
+            }
+          });
+          if (createdIds.length > 0) setSelectedIds(createdIds);
           return true;
         }
         return false;
@@ -2141,104 +2218,152 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       const dist = dist2D(p1, p2);
       if (dist < 4 / (viewport.scale || 45)) return;
 
-      if (tool === "circle") {
-        const id = newElId("circ");
-        const centerId = startSnapId ?? `${id}_c`;
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            id,
-            type: "GeomCircle",
-            style: {
-              stroke: currentStyle.stroke ?? "#0891b2",
-              width: currentStyle.width ?? 2,
-              dash: currentStyle.dash ?? false,
-            },
-            props: {
-              center: centerId,
-              ...(startSnapId ? {} : { centerPt: p1 }),
-              radius: endSnapId
-                ? { kind: "through", point: endSnapId }
-                : { kind: "value", v: dist },
-            },
-          },
-        });
-        return;
-      }
+      const startSnap = startSnapId ? null : snapPointAtCursor(p1, 20);
+      const endSnap = endSnapId ? null : snapPointAtCursor(p2, 20);
+      const resolvedP1 = startSnap && startSnap.constraint.kind !== "free" ? startSnap.point : p1;
+      const resolvedP2 = endSnap && endSnap.constraint.kind !== "free" ? endSnap.point : p2;
 
-      const id = newElId("seg");
-      const fromId = startSnapId ?? `${id}_a`;
-      const toId = endSnapId ?? `${id}_b`;
-      const commonEndpoints = {
-        from: fromId,
-        to: toId,
-        ...(startSnapId ? {} : { fromPt: p1 }),
-        ...(endSnapId ? {} : { toPt: p2 }),
+      const createSnappedEndpoints = (needStart: boolean, needEnd: boolean) => {
+        let sId = startSnapId;
+        let eId = endSnapId;
+        const usedNames: string[] = [];
+        if (needStart && !sId && startSnap && startSnap.constraint.kind !== "free") {
+          sId = newElId("pt");
+          const sName = getNextPointName(pageElements);
+          usedNames.push(sName);
+          dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              id: sId,
+              type: "GeomPoint",
+              transform: { x: resolvedP1.x, y: resolvedP1.y, scale: 1, rotation: 0, z: 0 },
+              style: { stroke: currentStyle.stroke ?? "#2563eb", width: 2 },
+              props: { name: sName, constraint: startSnap.constraint },
+            },
+          });
+        }
+        if (needEnd && !eId && endSnap && endSnap.constraint.kind !== "free") {
+          eId = newElId("pt");
+          let eName = getNextPointName(pageElements);
+          if (usedNames.includes(eName)) {
+            eName = getNextPointName(pageElements, ["N", "P", "Q", "M", "K"]);
+          }
+          dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              id: eId,
+              type: "GeomPoint",
+              transform: { x: resolvedP2.x, y: resolvedP2.y, scale: 1, rotation: 0, z: 0 },
+              style: { stroke: currentStyle.stroke ?? "#2563eb", width: 2 },
+              props: { name: eName, constraint: endSnap.constraint },
+            },
+          });
+        }
+        return { sId, eId };
       };
 
-      if (tool === "c:vector") {
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            id,
-            type: "GeomVector",
-            style: {
-              stroke: currentStyle.stroke ?? "#334155",
-              width: currentStyle.width ?? 2,
-              dash: currentStyle.dash ?? false,
+      dispatcher.batch(() => {
+        if (tool === "circle") {
+          const id = newElId("circ");
+          const { sId, eId } = createSnappedEndpoints(true, true);
+          const centerId = sId ?? `${id}_c`;
+          dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              id,
+              type: "GeomCircle",
+              style: {
+                stroke: currentStyle.stroke ?? "#0891b2",
+                width: currentStyle.width ?? 2,
+                dash: currentStyle.dash ?? false,
+              },
+              props: {
+                center: centerId,
+                ...(sId ? {} : { centerPt: resolvedP1 }),
+                radius: eId
+                  ? { kind: "through", point: eId }
+                  : { kind: "value", v: dist2D(resolvedP1, resolvedP2) },
+              },
             },
-            props: commonEndpoints,
-          },
-        });
-      } else if (tool === "c:line") {
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            id,
-            type: "GeomLine",
-            style: {
-              stroke: currentStyle.stroke ?? "#334155",
-              width: currentStyle.width ?? 2,
-              dash: currentStyle.dash ?? false,
+          });
+          return;
+        }
+
+        const id = newElId("seg");
+        const { sId, eId } = createSnappedEndpoints(true, true);
+        const fromId = sId ?? `${id}_a`;
+        const toId = eId ?? `${id}_b`;
+        const commonEndpoints = {
+          from: fromId,
+          to: toId,
+          ...(sId ? {} : { fromPt: resolvedP1 }),
+          ...(eId ? {} : { toPt: resolvedP2 }),
+        };
+
+        if (tool === "c:vector") {
+          dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              id,
+              type: "GeomVector",
+              style: {
+                stroke: currentStyle.stroke ?? "#334155",
+                width: currentStyle.width ?? 2,
+                dash: currentStyle.dash ?? false,
+              },
+              props: commonEndpoints,
             },
-            props: { def: "through", ...commonEndpoints },
-          },
-        });
-      } else if (tool === "c:ray") {
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            id,
-            type: "GeomRay",
-            style: {
-              stroke: currentStyle.stroke ?? "#334155",
-              width: currentStyle.width ?? 2,
-              dash: currentStyle.dash ?? false,
+          });
+        } else if (tool === "c:line") {
+          dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              id,
+              type: "GeomLine",
+              style: {
+                stroke: currentStyle.stroke ?? "#334155",
+                width: currentStyle.width ?? 2,
+                dash: currentStyle.dash ?? false,
+              },
+              props: { def: "through", ...commonEndpoints },
             },
-            props: commonEndpoints,
-          },
-        });
-      } else {
-        const isDashed = tool === "c:dseg" || currentStyle.dash === true;
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            id,
-            type: "GeomSegment",
-            style: {
-              stroke: currentStyle.stroke ?? "#334155",
-              width: currentStyle.width ?? 2,
-              dash: isDashed,
+          });
+        } else if (tool === "c:ray") {
+          dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              id,
+              type: "GeomRay",
+              style: {
+                stroke: currentStyle.stroke ?? "#334155",
+                width: currentStyle.width ?? 2,
+                dash: currentStyle.dash ?? false,
+              },
+              props: commonEndpoints,
             },
-            props: {
-              ...commonEndpoints,
-              ...(isDashed ? { dashed: true } : {}),
+          });
+        } else {
+          const isDashed = tool === "c:dseg" || currentStyle.dash === true;
+          dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              id,
+              type: "GeomSegment",
+              style: {
+                stroke: currentStyle.stroke ?? "#334155",
+                width: currentStyle.width ?? 2,
+                dash: isDashed,
+              },
+              props: {
+                ...commonEndpoints,
+                ...(isDashed ? { dashed: true } : {}),
+              },
             },
-          },
-        });
-      }
+          });
+        }
+      });
     },
-    [dispatcher, currentStyle, viewport.scale]
+    [dispatcher, currentStyle, viewport.scale, snapPointAtCursor, pageElements]
   );
 
   // --- Insert / M3 / Exam / RealWorld Handlers ---
@@ -2710,6 +2835,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
         const second = pickedItems[1];
         const thirdPos = nearPt?.pos ?? worldPos;
+        const thirdId = nearPt?.id;
         const foot =
           kind === "altitude"
             ? footOfPerpendicular(first.pos, second.pos, thirdPos)
@@ -2743,6 +2869,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 toPt: foot,
                 sideAPt: second.pos,
                 sideBPt: thirdPos,
+                ...(first.id ? { from: first.id } : {}),
+                ...(second.id ? { sideA: second.id } : {}),
+                ...(thirdId ? { sideB: thirdId } : {}),
                 label,
               },
             },
@@ -2950,18 +3079,23 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               },
             });
           } else {
-            const dir = {
-              x: -(nearEdge.b.y - nearEdge.a.y),
-              y: nearEdge.b.x - nearEdge.a.x,
-            };
+            const dx = nearEdge.b.x - nearEdge.a.x;
+            const dy = nearEdge.b.y - nearEdge.a.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const span = Math.max(1.2, Math.min(len * 0.65, 5.5));
+            const nx = -dy / len;
+            const ny = dx / len;
             dispatcher.dispatch({
               type: "object.create",
               params: {
                 type: "GeomConstruction",
                 props: {
                   kind: "perpBisector",
-                  fromPt: { x: mid.x - dir.x * 0.8, y: mid.y - dir.y * 0.8 },
-                  toPt: { x: mid.x + dir.x * 0.8, y: mid.y + dir.y * 0.8 },
+                  ...(nearEdge.aId && nearEdge.bId
+                    ? { sideA: nearEdge.aId, sideB: nearEdge.bId }
+                    : {}),
+                  fromPt: { x: mid.x - nx * span, y: mid.y - ny * span },
+                  toPt: { x: mid.x + nx * span, y: mid.y + ny * span },
                   sideAPt: nearEdge.a,
                   sideBPt: nearEdge.b,
                 },
@@ -3003,15 +3137,21 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
         } else {
-          const dir = { x: -(p2.pos.y - p1.pos.y), y: p2.pos.x - p1.pos.x };
+          const dx = p2.pos.x - p1.pos.x;
+          const dy = p2.pos.y - p1.pos.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const span = Math.max(1.2, Math.min(len * 0.65, 5.5));
+          const nx = -dy / len;
+          const ny = dx / len;
           dispatcher.dispatch({
             type: "object.create",
             params: {
               type: "GeomConstruction",
               props: {
                 kind: "perpBisector",
-                fromPt: { x: mid.x - dir.x * 0.8, y: mid.y - dir.y * 0.8 },
-                toPt: { x: mid.x + dir.x * 0.8, y: mid.y + dir.y * 0.8 },
+                ...(p1.id && p2.id ? { sideA: p1.id, sideB: p2.id } : {}),
+                fromPt: { x: mid.x - nx * span, y: mid.y - ny * span },
+                toPt: { x: mid.x + nx * span, y: mid.y + ny * span },
                 sideAPt: p1.pos,
                 sideBPt: p2.pos,
               },
@@ -3289,7 +3429,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       // 7. Tangent (`c:tangent`)
       if (tool === "c:tangent") {
         if (pickedItems.length === 0) {
-          if (nearCirc) {
+          if (nearCirc && (!nearPt || dist2D(nearPt.pos, nearCirc.center) < nearCirc.r * 0.6)) {
             setPickedItems([
               { kind: "circle", id: nearCirc.el.id, pos: nearCirc.center },
             ]);
@@ -3297,6 +3437,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           } else if (nearPt) {
             setPickedItems([{ kind: "point", id: nearPt.id, pos: nearPt.pos }]);
             setStatusHint("Chọn đường tròn");
+          } else if (nearCirc) {
+            setPickedItems([
+              { kind: "circle", id: nearCirc.el.id, pos: nearCirc.center },
+            ]);
+            setStatusHint("Chọn điểm nằm ngoài hoặc trên đường tròn");
           }
           return true;
         }
@@ -3307,31 +3452,90 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           const r = cEl && cPt ? resolveCircleRadius(cEl.props.radius as Parameters<typeof resolveCircleRadius>[0], cPt, (id) => hydratedPts.get(id)) : null;
           return cEl && cPt && r !== null ? { el: cEl, center: cPt, centerId: String(cEl.props.center), r } : null;
         })() : null);
-        const pt = first.kind === "point" ? first.pos : (nearPt?.pos ?? worldPos);
+
+        let ptId = first.kind === "point" ? first.id : nearPt?.id;
+        let pt = first.kind === "point" ? first.pos : (nearPt?.pos ?? worldPos);
         if (circ) {
-          if (dist2D(pt, circ.center) < circ.r - 0.05) {
+          if (first.kind === "circle" && !nearPt) {
+            const onRim = snapPointAtCursor(worldPos, 24);
+            pt = onRim.constraint.kind !== "free" ? onRim.point : worldPos;
+          }
+          const d = dist2D(pt, circ.center);
+          if (d < circ.r - 0.08) {
             setStatusHint(
               "Điểm nằm trong đường tròn — không kẻ được tiếp tuyến."
             );
             setPickedItems([]);
             return true;
           }
-          const tPt = tangentPointToCircle(pt, { cx: circ.center.x, cy: circ.center.y, r: circ.r }, 0);
-          if (tPt) {
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "GeomConstruction",
-                props: {
-                  kind: "tangent",
-                  fromPt: pt,
-                  toPt: tPt,
-                  sideAPt: circ.center,
-                  sideBPt: tPt,
+          dispatcher.batch(() => {
+            if (!ptId) {
+              ptId = newElId("pt");
+              const pName = getNextPointName(pageElements, ["M", "N", "P", "A"]);
+              const onRim = Math.abs(d - circ.r) <= 0.08;
+              const angle = Math.atan2(pt.y - circ.center.y, pt.x - circ.center.x);
+              dispatcher.dispatch({
+                type: "object.create",
+                params: {
+                  id: ptId,
+                  type: "GeomPoint",
+                  transform: { x: pt.x, y: pt.y, scale: 1, rotation: 0, z: 0 },
+                  props: {
+                    name: pName,
+                    constraint: onRim
+                      ? { kind: "onObject", target: circ.el.id, t: angle }
+                      : { kind: "free" },
+                  },
                 },
-              },
-            });
-          }
+              });
+            }
+            if (Math.abs(d - circ.r) <= 0.08) {
+              const ux = (pt.x - circ.center.x) / (d || 1);
+              const uy = (pt.y - circ.center.y) / (d || 1);
+              const touch = { x: circ.center.x + ux * circ.r, y: circ.center.y + uy * circ.r };
+              const span = Math.max(1.8, circ.r * 1.35);
+              dispatcher.dispatch({
+                type: "object.create",
+                params: {
+                  type: "GeomConstruction",
+                  props: {
+                    kind: "tangent",
+                    from: ptId,
+                    circle: circ.el.id,
+                    fromPt: { x: touch.x + uy * span, y: touch.y - ux * span },
+                    toPt: { x: touch.x - uy * span, y: touch.y + ux * span },
+                    sideAPt: circ.center,
+                    sideBPt: touch,
+                  },
+                },
+              });
+            } else {
+              for (const side of [0, 1] as const) {
+                const tPt = tangentPointToCircle(
+                  pt,
+                  { cx: circ.center.x, cy: circ.center.y, r: circ.r },
+                  side
+                );
+                if (!tPt) continue;
+                dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    type: "GeomConstruction",
+                    props: {
+                      kind: "tangent",
+                      from: ptId,
+                      circle: circ.el.id,
+                      tangentSide: side,
+                      fromPt: pt,
+                      toPt: tPt,
+                      sideAPt: circ.center,
+                      sideBPt: tPt,
+                    },
+                  },
+                });
+              }
+            }
+          });
         }
         setPickedItems([]);
         setStatusHint(null);
@@ -4579,10 +4783,38 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           worldPos
         );
         const avgScale = (scaleX + scaleY) / 2;
+        const initById = new Map<string, CanvasElement>();
+        for (const el of pageElements) initById.set(el.id, el);
+        for (const el of initialElements) initById.set(el.id, el);
+        const scaledPointIds = new Set<string>();
+        const scalePointCoord = (p: Point2D, sx = scaleX, sy = scaleY): Point2D => ({
+          x: handle.anchorX + (p.x - handle.anchorX) * sx,
+          y: handle.anchorY + (p.y - handle.anchorY) * sy,
+        });
+        const scaleFreePointById = (ptId: unknown, sx = scaleX, sy = scaleY) => {
+          if (typeof ptId !== "string" || scaledPointIds.has(ptId)) return;
+          const ptEl = initById.get(ptId);
+          if (!ptEl || (ptEl.type !== "GeomPoint" && ptEl.type !== "Point")) return;
+          const kind = (ptEl.props?.constraint as { kind?: string } | undefined)?.kind ?? "free";
+          if (kind !== "free") return;
+          scaledPointIds.add(ptId);
+          dispatcher.dispatch({
+            type: "object.update",
+            params: {
+              id: ptEl.id,
+              transform: {
+                x: handle.anchorX + (ptEl.transform.x - handle.anchorX) * sx,
+                y: handle.anchorY + (ptEl.transform.y - handle.anchorY) * sy,
+              },
+            },
+          });
+        };
 
         dispatcher.batch(() => {
           for (const initEl of initialElements) {
-            if (initEl.type === "Ink") {
+            if (initEl.type === "GeomPoint" || initEl.type === "Point") {
+              scaleFreePointById(initEl.id);
+            } else if (initEl.type === "Ink") {
               const pts = (initEl.props.points as number[]) || [];
               const scaledPoints: number[] = [];
               for (let i = 0; i + 1 < pts.length; i += 2) {
@@ -4646,58 +4878,96 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   },
                 },
               });
-            } else if (
-              initEl.type === "GeomPolygon" &&
-              Array.isArray(initEl.props.points)
-            ) {
-              const scaledPts = (initEl.props.points as EmbeddedVertex[]).map(
-                (v) => {
-                  const wx = v.x + initEl.transform.x;
-                  const wy = v.y + initEl.transform.y;
-                  return {
-                    ...v,
-                    x:
-                      handle.anchorX +
-                      (wx - handle.anchorX) * scaleX -
-                      initEl.transform.x,
-                    y:
-                      handle.anchorY +
-                      (wy - handle.anchorY) * scaleY -
-                      initEl.transform.y,
-                  };
-                }
-              );
-              dispatcher.dispatch({
-                type: "object.update",
-                params: {
-                  id: initEl.id,
-                  props: { ...initEl.props, points: scaledPts },
-                },
-              });
-            } else if (
-              initEl.type === "GeomCircle" &&
-              typeof (initEl.props.radius as Record<string, unknown>)?.v ===
-                "number"
-            ) {
-              const rad = initEl.props.radius as { kind: "value"; v: number };
-              dispatcher.dispatch({
-                type: "object.update",
-                params: {
-                  id: initEl.id,
-                  props: {
-                    ...initEl.props,
-                    radius: {
-                      kind: "value",
-                      v: Math.max(0.2, rad.v * Math.abs(avgScale)),
-                    },
+            } else if (initEl.type === "GeomPolygon") {
+              if (Array.isArray(initEl.props.points)) {
+                const scaledPts = (initEl.props.points as EmbeddedVertex[]).map(
+                  (v) => {
+                    const wx = v.x + initEl.transform.x;
+                    const wy = v.y + initEl.transform.y;
+                    return {
+                      ...v,
+                      x:
+                        handle.anchorX +
+                        (wx - handle.anchorX) * scaleX -
+                        initEl.transform.x,
+                      y:
+                        handle.anchorY +
+                        (wy - handle.anchorY) * scaleY -
+                        initEl.transform.y,
+                    };
+                  }
+                );
+                dispatcher.dispatch({
+                  type: "object.update",
+                  params: {
+                    id: initEl.id,
+                    props: { ...initEl.props, points: scaledPts },
                   },
-                },
+                });
+              } else if (Array.isArray(initEl.props.vertices)) {
+                for (const vid of initEl.props.vertices) {
+                  scaleFreePointById(vid);
+                }
+              }
+            } else if (initEl.type === "GeomCircle") {
+              const rad = initEl.props.radius as Record<string, unknown> | undefined;
+              scaleFreePointById(initEl.props.center, scaleX, scaleY);
+              if (rad?.kind === "through") {
+                scaleFreePointById(rad.point, scaleX, scaleY);
+              }
+              const nextProps: Record<string, unknown> = { ...initEl.props };
+              if (
+                initEl.props.centerPt &&
+                typeof initEl.props.centerPt === "object"
+              ) {
+                nextProps.centerPt = scalePointCoord(
+                  initEl.props.centerPt as Point2D
+                );
+              }
+              if (rad?.kind === "value" && typeof rad.v === "number") {
+                nextProps.radius = {
+                  kind: "value",
+                  v: Math.max(0.2, rad.v * Math.abs(avgScale)),
+                };
+              }
+              dispatcher.dispatch({
+                type: "object.update",
+                params: { id: initEl.id, props: nextProps },
               });
+            } else if (
+              initEl.type === "GeomSegment" ||
+              initEl.type === "GeomVector" ||
+              initEl.type === "GeomRay" ||
+              (initEl.type === "GeomLine" && initEl.props.def === "through")
+            ) {
+              scaleFreePointById(initEl.props.from);
+              scaleFreePointById(initEl.props.to);
+              const nextProps: Record<string, unknown> = { ...initEl.props };
+              let changed = false;
+              if (initEl.props.fromPt && typeof initEl.props.fromPt === "object") {
+                nextProps.fromPt = scalePointCoord(initEl.props.fromPt as Point2D);
+                changed = true;
+              }
+              if (initEl.props.toPt && typeof initEl.props.toPt === "object") {
+                nextProps.toPt = scalePointCoord(initEl.props.toPt as Point2D);
+                changed = true;
+              }
+              if (changed) {
+                dispatcher.dispatch({
+                  type: "object.update",
+                  params: { id: initEl.id, props: nextProps },
+                });
+              }
             } else if (initEl.type === "Solid3D") {
               const kind = initEl.props.kind as Solid3DKind | undefined;
               const isSphere = kind === "sphere";
               const sx = isSphere ? Math.abs(avgScale) : scaleX;
               const sy = isSphere ? Math.abs(avgScale) : scaleY;
+              if (Array.isArray(initEl.props.points)) {
+                for (const ptId of initEl.props.points) {
+                  scaleFreePointById(ptId, sx, sy);
+                }
+              }
               const nextProps: Record<string, unknown> = { ...initEl.props };
               if (Array.isArray(initEl.props.pointCoords)) {
                 nextProps.pointCoords = (
@@ -5189,6 +5459,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             key={el.id}
             element={el}
             points={hydratedPts}
+            byId={byId}
             scale={viewport.scale}
             labelScale={labelScale}
             dotScale={dotScale}
