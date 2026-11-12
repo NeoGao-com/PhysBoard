@@ -3,6 +3,11 @@
   <h1>PhysBoard</h1>
   <p><strong>Bảng trắng tương tác dạy Toán &amp; Vật lý THPT — Hoạt động 100% Offline trên Windows &amp; Android</strong></p>
   <p>
+    <a href="https://github.com/NeoGao-com/PhysBoard/releases/latest">
+      <img src="https://img.shields.io/badge/Download-PhysBoard%20Windows%20(.exe)-2563eb?style=for-the-badge&logo=windows" alt="Download Windows EXE" />
+    </a>
+  </p>
+  <p>
     <em>Next.js 16 (Static Export) · React 19 · Tailwind CSS v4 · Electron · Capacitor Android</em>
   </p>
 </div>
@@ -19,7 +24,7 @@
 
 ### 1. Bảng vẽ Vector & Bút cảm ứng (Stylus-ready)
 - **Hệ tọa độ Descartes vô hạn (`Oxy`):** Kéo pan, phóng to/thu nhỏ mượt mà (`Zoom 8–600`), lưới chấm (`#wb-dot-grid`), tối ưu cảm ứng & bút vẽ (`touch-action: none`, `overscroll-behavior: none`).
-- **Công cụ vẽ:** Bút thường, Bút máy thư pháp (`ink:fountain`), Tẩy tiếp xúc, bảng màu & độ dày nét linh hoạt, tô màu vùng/đỉnh đa giác.
+- **Công cụ vẽ & Quản lý điểm:** Bút thường, Bút máy thư pháp (`ink:fountain`), Tẩy tiếp xúc, bảng màu & độ dày nét linh hoạt, tô màu vùng/đỉnh đa giác; thanh chọn điểm trực quan (`Đổi tên`, `Ẩn/Hiện tên`, kiểu/cỡ chấm, cỡ tên mọi điểm, kéo di chuyển & nhấp đúp đổi tên nhãn).
 - **Nhiều trang & Lưu trữ Offline:** Tạo nhiều trang bảng trong một phiên làm việc, tự động lưu cục bộ bằng IndexedDB (`y-indexeddb`), Lưu file `.phys.json` (`💾`) và Mở file (`📂`) 1 chạm.
 - **Cửa sổ lệnh (`Ctrl+K`):** Tìm kiếm nhanh mọi công cụ, thí nghiệm và tùy chỉnh phím tắt cá nhân.
 
