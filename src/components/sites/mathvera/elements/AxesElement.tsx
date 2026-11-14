@@ -2,6 +2,12 @@
 
 import React, { useMemo } from "react";
 import { CanvasElement } from "@/types/whiteboard";
+import type { PhysicsSimProps } from "@/types/physics";
+import {
+  evaluatePhysicsSim,
+  getEffectiveSimTime,
+  getPhysicsSimMeta,
+} from "@/lib/physics-sim";
 
 export interface AxesBounds {
   originX: number;
@@ -41,6 +47,7 @@ export type AxesResizeSide = "xNeg" | "xPos" | "yPos" | "yNeg";
 
 export interface AxesElementProps {
   element: CanvasElement;
+  allElements?: CanvasElement[];
   isSelected?: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
   onResizeHandlePointerDown?: (
@@ -55,6 +62,7 @@ export interface AxesElementProps {
  */
 export const AxesElement: React.FC<AxesElementProps> = ({
   element,
+  allElements = [],
   isSelected = false,
   onPointerDown,
   onResizeHandlePointerDown,
@@ -126,6 +134,74 @@ export const AxesElement: React.FC<AxesElementProps> = ({
     }
     return { vertical, horizontal };
   }, [showGrid, tickMode, bounds]);
+
+  // Find linked PhysicsSim element if any (via element.props.linkedSimId or sim's linkedAxesId or proximity)
+  const linkedSim = useMemo(() => {
+    const directId = typeof p.linkedSimId === "string" ? p.linkedSimId : undefined;
+    if (directId) {
+      const match = allElements.find((e) => e.id === directId && e.type === "PhysicsSim");
+      if (match) return match;
+    }
+    return allElements.find(
+      (e) => e.type === "PhysicsSim" && e.props && (e.props as unknown as PhysicsSimProps).linkedAxesId === element.id
+    );
+  }, [p.linkedSimId, element.id, allElements]);
+
+  // Compute realtime oscilloscope curves from the linked simulation
+  const oscilloscopePaths = useMemo(() => {
+    if (!linkedSim) return { d1: "", d2: "", title: "" };
+    const simProps = linkedSim.props as unknown as PhysicsSimProps;
+    if (!simProps?.kind) return { d1: "", d2: "", title: "" };
+
+    const meta = getPhysicsSimMeta(simProps.kind);
+    const t = getEffectiveSimTime(simProps);
+    const ev = evaluatePhysicsSim(simProps.kind, t, simProps.params ?? {}, simProps.mode);
+    if (!ev.series || ev.series.length < 2) return { d1: "", d2: "", title: meta.graphAxesLabel.title };
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const pt of ev.series) {
+      if (pt.x < minX) minX = pt.x;
+      if (pt.x > maxX) maxX = pt.x;
+      if (pt.y < minY) minY = pt.y;
+      if (pt.y > maxY) maxY = pt.y;
+      if (typeof pt.y2 === "number") {
+        if (pt.y2 < minY) minY = pt.y2;
+        if (pt.y2 > maxY) maxY = pt.y2;
+      }
+    }
+    const spanX = Math.max(1e-6, maxX - minX);
+    const spanY = Math.max(1e-6, maxY - minY);
+
+    // Map series directly into the Oxy coordinates
+    const toOxy = (x: number, y: number) => {
+      const nx = -bounds.xNeg * 0.85 + ((x - minX) / spanX) * (bounds.xNeg + bounds.xPos) * 0.85;
+      const ny = -bounds.yNeg * 0.85 + ((y - minY) / spanY) * (bounds.yNeg + bounds.yPos) * 0.85;
+      // In SVG under our coordinate transform: x is horizontal, -y is vertical upward
+      return { px: nx, py: -ny };
+    };
+
+    const d1 = ev.series
+      .map((pt, idx) => {
+        const { px, py } = toOxy(pt.x, pt.y);
+        return `${idx === 0 ? "M" : "L"} ${px.toFixed(3)} ${py.toFixed(3)}`;
+      })
+      .join(" ");
+
+    const hasSecond = ev.series.some((pt) => typeof pt.y2 === "number");
+    const d2 = hasSecond
+      ? ev.series
+          .map((pt, idx) => {
+            const { px, py } = toOxy(pt.x, pt.y2 ?? pt.y);
+            return `${idx === 0 ? "M" : "L"} ${px.toFixed(3)} ${py.toFixed(3)}`;
+          })
+          .join(" ")
+      : "";
+
+    return { d1, d2, title: meta.graphAxesLabel.title };
+  }, [linkedSim, bounds]);
 
   return (
     <g
@@ -262,6 +338,61 @@ export const AxesElement: React.FC<AxesElementProps> = ({
 
       {/* Origin dot */}
       <circle cx={0} cy={0} r={0.06} fill="#2563eb" />
+
+      {/* Realtime Oscilloscope Curves (when linked to a PhysicsSim) */}
+      {linkedSim && (
+        <g data-linked-sim={linkedSim.id} className="wb-oscilloscope-curves">
+          {oscilloscopePaths.d1 && (
+            <path
+              d={oscilloscopePaths.d1}
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth={2.4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {oscilloscopePaths.d2 && (
+            <path
+              d={oscilloscopePaths.d2}
+              fill="none"
+              stroke="#ea580c"
+              strokeWidth={2.0}
+              strokeDasharray="4 3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {oscilloscopePaths.title && (
+            <g transform={`translate(${-bounds.xNeg + 0.3}, ${-bounds.yPos + 0.5})`}>
+              <rect
+                x={0}
+                y={-0.32}
+                width={Math.min(bounds.xPos + bounds.xNeg - 0.6, 3.8)}
+                height={0.46}
+                rx={0.08}
+                fill="rgba(255, 255, 255, 0.88)"
+                stroke="#cbd5e1"
+                strokeWidth={0.8}
+                vectorEffect="non-scaling-stroke"
+              />
+              <text
+                x={0.15}
+                y={0}
+                fontSize={0.24}
+                fontWeight={700}
+                fill="#1e3a8a"
+                fontFamily="system-ui, -apple-system, sans-serif"
+                style={{ pointerEvents: "none" }}
+              >
+                📡 {oscilloscopePaths.title}
+              </text>
+            </g>
+          )}
+        </g>
+      )}
 
       {/* Axis & Origin labels */}
       {showLegend && (

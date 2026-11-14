@@ -74,6 +74,7 @@ import {
   cameraToAzimuthElevation,
   computeFlattenedFace,
   computePolyhedronSection,
+  computeUnfoldedPolyhedronNet,
   createOxyzElement,
   createPlaneParallelogramElements,
   createSolid3DElement,
@@ -1465,7 +1466,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             type: "Axes2D",
             transform: { x: axX, y: axY, scale: 1, rotation: 0, z: 0 },
             style: { stroke: "#475569", width: 1.5 },
-            props: { size: 5, grid: true, ticks: "int", legend: true },
+            props: { size: 5, grid: true, ticks: "int", legend: true, linkedSimId: simId },
+          },
+        });
+        dispatcher.dispatch({
+          type: "object.update",
+          params: {
+            id: simId,
+            props: { ...simEl.props, linkedAxesId: axesId },
           },
         });
         dispatcher.dispatch({
@@ -1586,6 +1594,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       const axX = tableEl.transform.x + 8.8;
       const axY = tableEl.transform.y;
       const reg = computeLinearRegression(rows);
+      const linkedSimId = tProps.linkedSimId;
+      const simEl = linkedSimId ? byId.get(linkedSimId) : undefined;
 
       dispatcher.batch(() => {
         dispatcher.dispatch({
@@ -1595,9 +1605,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             type: "Axes2D",
             transform: { x: axX, y: axY, scale: 1, rotation: 0, z: 0 },
             style: { stroke: "#475569", width: 1.5 },
-            props: { size: 5, grid: true, ticks: "int", legend: true },
+            props: { size: 5, grid: true, ticks: "int", legend: true, ...(linkedSimId ? { linkedSimId } : {}) },
           },
         });
+        if (linkedSimId && simEl) {
+          dispatcher.dispatch({
+            type: "object.update",
+            params: {
+              id: linkedSimId,
+              props: { ...simEl.props, linkedAxesId: axesId },
+            },
+          });
+        }
         rows.forEach((r, idx) => {
           const sx = Number((r.x * scaleFactor).toFixed(3));
           const sy = Number((r.y * scaleFactor).toFixed(3));
@@ -3750,6 +3769,61 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return true;
       }
 
+      // 11b. 3D Net Unfolding (`c:unfold`: Click any Solid3D to unfold all faces into 2D printable net)
+      if (tool === "c:unfold") {
+        let hitSolid: CanvasElement | undefined;
+        if (nearPt?.id) {
+          const ownerId = solved3D.owner.get(nearPt.id);
+          if (ownerId) hitSolid = byId.get(ownerId);
+        }
+        if (!hitSolid) {
+          for (const el of pageElements) {
+            if (el.type !== "Solid3D") continue;
+            const ptIds = Array.isArray(el.props.points) ? (el.props.points as string[]) : [];
+            const kind = (el.props.kind ?? "pyramid") as Solid3DKind;
+            const pts2d = ptIds.map((id) => hydratedPts.get(id)).filter((p): p is Point2D => Boolean(p));
+            const lift = pts2d.length === ptIds.length ? liftSolidTo3D(kind, pts2d) : null;
+            if (lift) {
+              const inside = lift.faces.some((face) => {
+                const poly = face.map((idx) => pts2d[idx]).filter(Boolean);
+                return poly.length >= 3 && pointInPolygon2D(poly, worldPos);
+              });
+              if (inside) {
+                hitSolid = el;
+                break;
+              }
+            }
+          }
+        }
+
+        if (hitSolid) {
+          const netRes = computeUnfoldedPolyhedronNet(hitSolid.id, solved3D, pageElements);
+          if (netRes && netRes.polygons.length > 0) {
+            dispatcher.batch(() => {
+              netRes.polygons.forEach((polyEl) => {
+                dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    id: polyEl.id,
+                    type: polyEl.type,
+                    transform: polyEl.transform,
+                    style: polyEl.style,
+                    props: polyEl.props,
+                  },
+                });
+              });
+            });
+            setStatusHint(`✓ Đã trải phẳng ${netRes.polygons.length} mặt của khối thành hình 2D`);
+          } else {
+            setStatusHint("Không thể trải phẳng khối này (chỉ hỗ trợ hình chóp, lăng trụ, hộp chữ nhật, lập phương)");
+          }
+        } else {
+          setStatusHint("Vui lòng bấm vào một khối 3D để trải phẳng");
+        }
+        setActiveTool("select");
+        return true;
+      }
+
       // 12. 3D Cross-Section (`c:section`), Circumsphere (`c:circumsphere`), & Spatial Measurements
       if (tool === "plane") {
         const createdEls = createPlaneParallelogramElements(worldPos, pageElements);
@@ -5569,6 +5643,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           <AxesElement
             key={el.id}
             element={el}
+            allElements={pageElements}
             isSelected={isSel}
             onPointerDown={(e) => handleElementPointerDown(e, el.id)}
             onResizeHandlePointerDown={(e, side) => {
@@ -6746,6 +6821,51 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             setMathSession(null);
           }}
           onCancel={() => setMathSession(null)}
+          onPlotFunction={(latex) => {
+            const clean = latex.replace(/^[yY]\s*=\s*/, "").replace(/^f\(x\)\s*=\s*/, "").trim();
+            handleSubmitPlot(clean || latex, []);
+            setStatusHint("Đã vẽ đồ thị hàm số sang hệ trục Oxy");
+          }}
+          onBuildVarTable={(latex) => {
+            const clean = latex.replace(/^[yY]\s*=\s*/, "").replace(/^f\(x\)\s*=\s*/, "").trim();
+            const res = buildVarTableFromExpr(clean || latex);
+            if ("error" in res) {
+              setStatusHint(res.error);
+              return;
+            }
+            const center = getViewCenter();
+            const vtRes = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "VarTable",
+                transform: { x: center.x, y: center.y - 1, scale: 1, rotation: 0, z: 0 },
+                style: { stroke: "#0f172a", width: 1.5 },
+                props: { table: res, formulaLatex: clean || latex },
+              },
+            });
+            if (vtRes.created?.[0]) setSelectedIds([vtRes.created[0]]);
+            setStatusHint("Đã tạo bảng biến thiên tự động");
+          }}
+          onShadeIntegral={(latex) => {
+            const clean = latex.replace(/^[yY]\s*=\s*/, "").replace(/^f\(x\)\s*=\s*/, "").trim();
+            handleSubmitPlot(clean || latex, [], [-2, 2]);
+            // Find created plot and set shade domain
+            setTimeout(() => {
+              const created = pageElements.find(
+                (el) => el.type === "Plot" && (el.props.exprLatex === clean || el.props.exprLatex === latex)
+              );
+              if (created) {
+                dispatcher.dispatch({
+                  type: "object.update",
+                  params: {
+                    id: created.id,
+                    props: { ...created.props, shade: [0, 2] },
+                  },
+                });
+              }
+            }, 50);
+            setStatusHint("Đã vẽ hàm số và tô miền tích phân [0, 2]");
+          }}
         />
       )}
 

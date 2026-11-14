@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { IconCube3D } from "./ToolbarIcons";
 
 export interface SpaceGeometryVariant {
   tool: string;
@@ -100,6 +102,11 @@ export const SPACE_GEOMETRY_SECTIONS: SpaceGeometrySection[] = [
         label: "⧉ Tách mặt phẳng (hình thật)",
         title: "Bấm 3 điểm của một mặt (vd S, A, B) → hình thật hiện ngay bên cạnh khối",
       },
+      {
+        tool: "c:unfold",
+        label: "◫ Trải phẳng đa diện (Net 2D)",
+        title: "Bấm vào khối 3D chóp/lăng trụ/hộp → trải phẳng toàn bộ các mặt thành bản vẽ 2D",
+      },
       { tool: "c:footplane", label: "⊥ Hình chiếu của điểm lên mặt phẳng" },
       { tool: "c:distplane", label: "📏 Khoảng cách từ điểm đến mặt phẳng" },
       { tool: "c:commonperp", label: "⟂ Đoạn vuông góc chung" },
@@ -138,20 +145,47 @@ export const SpaceGeometryMenu: React.FC<SpaceGeometryMenuProps> = ({
   activeTriggerStyle,
 }) => {
   const [internalOpen, setInternalOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const isOpen = controlledOpen ?? internalOpen;
-  const setOpen = (next: boolean) => {
-    if (controlledOpen === undefined) setInternalOpen(next);
-    onOpenChange?.(next);
-  };
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (next && rootRef.current) {
+        const rect = rootRef.current.getBoundingClientRect();
+        const menuHeight = 440;
+        const opensUpward =
+          typeof window !== "undefined" &&
+          rect.bottom + menuHeight > window.innerHeight &&
+          rect.top > menuHeight;
+        setPos({
+          top: opensUpward
+            ? Math.max(8, rect.top - menuHeight - 6)
+            : rect.bottom + 6,
+          left: Math.max(
+            8,
+            Math.min(
+              rect.left,
+              (typeof window !== "undefined" ? window.innerWidth : 1280) - 360
+            )
+          ),
+        });
+      }
+      if (controlledOpen === undefined) setInternalOpen(next);
+      onOpenChange?.(next);
+    },
+    [controlledOpen, onOpenChange]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
     const handlePointerDown = (e: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -164,7 +198,7 @@ export const SpaceGeometryMenu: React.FC<SpaceGeometryMenuProps> = ({
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  });
+  }, [isOpen, setOpen]);
 
   const isToolActive = Boolean(activeTool && SPACE_TOOL_SET.has(activeTool));
 
@@ -200,30 +234,34 @@ export const SpaceGeometryMenu: React.FC<SpaceGeometryMenuProps> = ({
         style={defaultTriggerStyle}
         title="Hình hộp, lập phương, lăng trụ, chóp, chóp cụt, trụ, nón, cầu, hệ trục Oxyz, thiết diện…"
       >
-        🧊 Không gian ▾
+        <IconCube3D size={14} />
+        <span>Không gian</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
       </button>
 
-      {isOpen && (
-        <div
-          role="menu"
-          data-wb-space-menu="true"
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            marginTop: 4,
-            width: 348,
-            maxHeight: "calc(100vh - 64px)",
-            overflowY: "auto",
-            background: "#ffffff",
-            border: "1px solid #e2e8f0",
-            borderRadius: 8,
-            boxShadow: "0 10px 28px rgba(15, 23, 42, 0.14)",
-            padding: "6px 0",
-            zIndex: 100,
-            fontFamily: "system-ui, -apple-system, sans-serif",
-          }}
-        >
+      {isOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            data-wb-space-menu="true"
+            style={{
+              position: "fixed",
+              top: pos?.top ?? 50,
+              left: pos?.left ?? 100,
+              width: 348,
+              maxHeight: "calc(100vh - 64px)",
+              overflowY: "auto",
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              boxShadow: "0 10px 28px rgba(15, 23, 42, 0.14)",
+              padding: "6px 0",
+              zIndex: 5200,
+              fontFamily: "system-ui, -apple-system, sans-serif",
+            }}
+          >
           {SPACE_GEOMETRY_SECTIONS.map((section, sIdx) => (
             <div key={section.title} style={{ paddingTop: sIdx > 0 ? 4 : 0 }}>
               <div
@@ -333,7 +371,8 @@ export const SpaceGeometryMenu: React.FC<SpaceGeometryMenuProps> = ({
               })}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -45,7 +45,7 @@ export const InkPropsSchema = z.object({
   points: z.array(z.number()), // Flat [x0, y0, x1, y1, ...] in math world coordinates
   pressures: z.array(z.number()).optional(), // Pointer pressures [p0, p1, ...] in [0..1]
   closed: z.boolean().optional(),
-  nib: z.enum(["fountain"]).optional(),
+  nib: z.enum(["fountain", "pencil", "highlighter", "brush", "dashed"]).optional(),
 });
 export type InkProps = z.infer<typeof InkPropsSchema>;
 
@@ -162,6 +162,7 @@ export interface Axes2DElementData extends CanvasElement {
     grid?: boolean;
     ticks?: "int" | "pi";
     legend?: boolean;
+    linkedSimId?: string;
   };
 }
 
@@ -266,7 +267,7 @@ export type WhiteboardAction =
         points: number[];
         pressures?: number[];
         closed?: boolean;
-        nib?: "fountain";
+        nib?: InkProps["nib"];
         style?: Partial<Style>;
         at?: { x: number; y: number };
         page?: number;
@@ -320,6 +321,10 @@ export type WhiteboardTool =
   | "select:marquee"
   | "ink"
   | "ink:fountain"
+  | "ink:pencil"
+  | "ink:highlighter"
+  | "ink:brush"
+  | "ink:dashed"
   | "erase"
   | "pan"
   | "formula"

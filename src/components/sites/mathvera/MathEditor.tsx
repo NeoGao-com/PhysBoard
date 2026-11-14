@@ -173,6 +173,9 @@ export interface MathEditorProps {
   onCommit: (latex: string) => void;
   onCancel: () => void;
   onChange?: (latex: string) => void;
+  onPlotFunction?: (latex: string) => void;
+  onBuildVarTable?: (latex: string) => void;
+  onShadeIntegral?: (latex: string) => void;
 }
 
 /**
@@ -189,6 +192,9 @@ export const MathEditor: React.FC<MathEditorProps> = ({
   onCommit,
   onCancel,
   onChange,
+  onPlotFunction,
+  onBuildVarTable,
+  onShadeIntegral,
 }) => {
   const mfRef = useRef<MathfieldElementInstance | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -675,6 +681,102 @@ export const MathEditor: React.FC<MathEditorProps> = ({
             ✕
           </button>
         </div>
+
+        {/* 1-Click Quick Actions: Đồ thị hàm, Bảng biến thiên, Tô miền tích phân */}
+        {(onPlotFunction || onBuildVarTable || onShadeIntegral) && (
+          <div
+            style={{
+              display: "flex",
+              gap: 4,
+              alignItems: "center",
+              flexWrap: "wrap",
+              borderTop: "1px solid #f1f5f9",
+              paddingTop: 6,
+            }}
+          >
+            {onPlotFunction && (
+              <button
+                type="button"
+                data-action="formula-quick-plot"
+                title="Vẽ đồ thị hàm số này trên hệ trục Oxy"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const val = readFieldValue();
+                  if (val.trim()) onPlotFunction(val);
+                }}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #bfdbfe",
+                  background: "#eff6ff",
+                  color: "#1d4ed8",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                📈 Vẽ đồ thị hàm này
+              </button>
+            )}
+            {onBuildVarTable && (
+              <button
+                type="button"
+                data-action="formula-quick-vartable"
+                title="Tạo bảng biến thiên tự động theo chuẩn SGK Việt Nam"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const val = readFieldValue();
+                  if (val.trim()) onBuildVarTable(val);
+                }}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #fed7aa",
+                  background: "#fff7ed",
+                  color: "#c2410c",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                📋 Tạo bảng biến thiên
+              </button>
+            )}
+            {onShadeIntegral && (
+              <button
+                type="button"
+                data-action="formula-quick-shade"
+                title="Tô miền tích phân và tính diện tích hình phẳng"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const val = readFieldValue();
+                  if (val.trim()) onShadeIntegral(val);
+                }}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #bbf7d0",
+                  background: "#f0fdf4",
+                  color: "#15803d",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                ∫ Tô miền tích phân
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 6-Category Virtual Math Keyboard */}

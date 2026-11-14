@@ -61,6 +61,8 @@ export interface PhysicsSimProps {
   showGraph?: boolean;
   width?: number;
   height?: number;
+  /** Optional linked Axes2D element id for realtime oscilloscope curve streaming. */
+  linkedAxesId?: string;
 }
 
 export type CircuitComponentKind =
@@ -158,6 +160,8 @@ export interface PhysicsInstrumentProps {
   linkedSimId?: string;
   width?: number;
   height?: number;
+  /** Optional linked Axes2D element id for realtime oscilloscope curve streaming. */
+  linkedAxesId?: string;
 }
 
 export interface LabTableRow {
@@ -174,6 +178,8 @@ export interface PhysicsLabTableProps {
   linkedSimId?: string;
   width?: number;
   height?: number;
+  /** Optional linked Axes2D element id for realtime oscilloscope curve streaming. */
+  linkedAxesId?: string;
 }
 
 export interface PhysicsFormulaItem {
