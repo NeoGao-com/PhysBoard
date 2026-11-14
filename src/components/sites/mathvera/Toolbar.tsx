@@ -261,7 +261,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const [fillHexDraft, setFillHexDraft] = useState<string | null>(null);
   const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null);
   const [toolbarScale, setToolbarScale] = useState<number>(1);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("physboard_toolbar_collapsed") === "true";
+  });
   const headerRef = useRef<HTMLElement>(null);
+
+  const toggleCollapsed = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("physboard_toolbar_collapsed", String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (embedded || typeof window === "undefined") return;
@@ -312,8 +326,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const resetToolbarLayout = () => {
     setToolbarPos(null);
     setToolbarScale(1);
+    setIsCollapsed(false);
     try {
       window.localStorage.removeItem(TOOLBAR_LAYOUT_KEY);
+      window.localStorage.removeItem("physboard_toolbar_collapsed");
     } catch {
       // ignore
     }
@@ -538,6 +554,161 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     fontSize: 13,
   };
 
+  if (isCollapsed && !embedded) {
+    return (
+      <header
+        ref={headerRef}
+        data-wb-toolbar="true"
+        data-wb-toolbar-collapsed="true"
+        data-export-skip="true"
+        className="wb-toolbar wb-toolbar-compact"
+        style={{
+          position: "fixed",
+          top: toolbarPos ? toolbarPos.y : 10,
+          left: toolbarPos ? toolbarPos.x : "50%",
+          transform: toolbarPos ? undefined : "translateX(-50%)",
+          zIndex: 65,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "4px 8px",
+          background: "rgba(255, 255, 255, 0.95)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid #cbd5e1",
+          borderRadius: 20,
+          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
+          fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+          userSelect: "none",
+        }}
+      >
+        {/* Drag handle */}
+        <div
+          data-wb-toolbar-drag="true"
+          onPointerDown={handleStartToolbarDrag}
+          onDoubleClick={resetToolbarLayout}
+          title="Kéo di chuyển · Nhấp đúp để đặt lại vị trí giữa"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 14,
+            height: 24,
+            cursor: "grab",
+            borderRadius: 4,
+            color: "#94a3b8",
+            marginRight: 2,
+          }}
+        >
+          <IconGrip size={13} />
+        </div>
+
+        {/* Quick Select */}
+        <button
+          type="button"
+          data-tool="select"
+          onClick={() => onSelectTool("select")}
+          style={activeTool === "select" || activeTool === null ? activeStyle : btnBaseStyle}
+          title="Chọn đối tượng (V)"
+        >
+          <IconCursor size={14} />
+        </button>
+
+        {/* Quick Pen */}
+        <button
+          type="button"
+          data-tool="ink"
+          onClick={() => onSelectTool((lastPenTool as WhiteboardTool) || "ink")}
+          style={isPenActive ? activeStyle : btnBaseStyle}
+          title="Bút vẽ (P)"
+        >
+          {renderPenIcon(lastPenTool || "ink", 14)}
+        </button>
+
+        {/* Quick Eraser */}
+        <button
+          type="button"
+          data-tool="erase"
+          onClick={() => onSelectTool("erase")}
+          style={isEraserActive ? activeStyle : btnBaseStyle}
+          title="Tẩy xoá (E)"
+        >
+          <IconEraser size={14} />
+        </button>
+
+        {/* Quick Style Picker */}
+        <div style={{ position: "relative", display: "inline-flex" }}>
+          <StylePicker
+            current={styleState.current}
+            selection={styleState.selection}
+            onPick={onPickStyle}
+            iconOnly={true}
+            buttonStyle={{
+              height: 24,
+              padding: "0 4px",
+              border: "1px solid #e2e8f0",
+              borderRadius: 5,
+            }}
+          />
+        </div>
+
+        {/* Undo */}
+        <button
+          type="button"
+          onClick={onUndo}
+          disabled={!canUndo}
+          title="Hoàn tác (Ctrl+Z)"
+          style={{ ...btnBaseStyle, padding: "0 4px", color: canUndo ? "#334155" : "#cbd5e1" }}
+        >
+          <IconUndo size={14} />
+        </button>
+
+        {/* Redo */}
+        <button
+          type="button"
+          onClick={onRedo}
+          disabled={!canRedo}
+          title="Làm lại (Ctrl+Y)"
+          style={{ ...btnBaseStyle, padding: "0 4px", color: canRedo ? "#334155" : "#cbd5e1" }}
+        >
+          <IconRedo size={14} />
+        </button>
+
+        {/* Quick Calculator */}
+        {onOpenCalculator && (
+          <button
+            type="button"
+            data-tool="calculator"
+            onClick={onOpenCalculator}
+            style={isCalculatorOpen ? activeStyle : btnBaseStyle}
+            title="Máy tính Casio fx-580VN X"
+          >
+            <IconCalculator size={14} />
+          </button>
+        )}
+
+        {/* Expand Toolbar Button */}
+        <button
+          type="button"
+          data-wb-toolbar-expand="true"
+          onClick={toggleCollapsed}
+          title="Mở rộng đầy đủ thanh công cụ"
+          style={{
+            ...btnBaseStyle,
+            background: "#0284c7",
+            color: "#ffffff",
+            fontWeight: 600,
+            padding: "0 8px",
+            borderRadius: 14,
+            gap: 4,
+          }}
+        >
+          <span>⤢</span>
+          <span style={{ fontSize: 11 }}>Mở rộng</span>
+        </button>
+      </header>
+    );
+  }
+
   return (
     <header
       ref={headerRef}
@@ -548,8 +719,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       style={{
         position: embedded ? "relative" : "fixed",
         top: embedded ? undefined : toolbarPos ? toolbarPos.y : 8,
-        left: embedded ? undefined : toolbarPos ? toolbarPos.x : 6,
-        right: embedded || toolbarPos ? undefined : 6,
+        left: embedded ? undefined : toolbarPos ? toolbarPos.x : "50%",
+        transform: embedded ? undefined : toolbarPos ? undefined : "translateX(-50%)",
+        width: "max-content",
         maxWidth: embedded
           ? undefined
           : `calc((100vw - 16px) / ${toolbarScale || 1})`,
@@ -563,10 +735,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         gap: 4,
         padding: "4px 8px",
         background: "rgba(255, 255, 255, 0.97)",
-        backdropFilter: "blur(8px)",
-        border: "1px solid #e2e8f0",
+        backdropFilter: "blur(10px)",
+        border: "1px solid #cbd5e1",
         borderRadius: embedded ? 10 : 16,
-        boxShadow: "0 6px 24px rgba(15, 23, 42, 0.09)",
+        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
         fontFamily:
           'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
         overflow: "visible",
@@ -789,6 +961,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             ▾
           </button>
         </div>
+
+        {/* Laser Quick Tool Button */}
+        <button
+          type="button"
+          data-tool="ink:laser"
+          data-active={activeTool === "ink:laser" ? "true" : undefined}
+          aria-pressed={activeTool === "ink:laser"}
+          onClick={() => onSelectTool("ink:laser")}
+          style={
+            activeTool === "ink:laser"
+              ? { ...activeStyle, background: "#fee2e2", color: "#b91c1c" }
+              : btnBaseStyle
+          }
+          title="Bút chỉ Laser (Tự động tan biến sau 1.5s)"
+        >
+          <IconLaser size={14} color={activeTool === "ink:laser" ? "#b91c1c" : "#ef4444"} />
+          <span>Laser</span>
+        </button>
 
         {/* Eraser */}
         <button
@@ -1512,6 +1702,31 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           onTogglePenOnly={onTogglePenOnly}
           buttonStyle={{ height: 26, padding: "0 4px" }}
         />
+
+        {/* Minimize / Collapse Toolbar Button */}
+        {!embedded && (
+          <button
+            type="button"
+            data-wb-toolbar-collapse="true"
+            onClick={toggleCollapsed}
+            title="Thu gọn thanh công cụ (Tối giản để vẽ)"
+            aria-label="Thu gọn thanh công cụ"
+            style={{
+              ...btnBaseStyle,
+              padding: "0 6px",
+              background: "#f1f5f9",
+              color: "#475569",
+              borderRadius: 6,
+              fontWeight: 600,
+              gap: 3,
+              fontSize: 11,
+              marginLeft: 2,
+            }}
+          >
+            <span>▲</span>
+            <span>Thu gọn</span>
+          </button>
+        )}
       </div>
 
       {/* Portal Dropdowns: Select, Pen, Segment, Fill */}

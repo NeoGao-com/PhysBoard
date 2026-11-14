@@ -112,6 +112,7 @@ import {
   serializeState,
 } from "@/lib/export";
 import {
+  BOARD_FORMAT_OPTIONS,
   BOARD_PAGES_YMAP,
   type PageBoardConfig,
   adaptElementForBoard,
@@ -607,6 +608,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   >([]);
 
   // Navigation Hook
+  const isA4Format =
+    currentBoardConfig?.format === "a4_portrait" ||
+    currentBoardConfig?.format === "a4_landscape";
+
   const {
     viewport,
     containerRef,
@@ -621,8 +626,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     zoomIn,
     zoomOut,
     resetView,
+    scrollToPage,
   } = useCanvasNavigation({
     currentTool: activeTool,
+    isA4: isA4Format,
     onCursorMove: updateLocalCursor,
   });
 
@@ -6252,6 +6259,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       isSpacePressed={isSpacePressed}
       contained={contained}
       boardConfig={currentBoardConfig}
+      totalPages={pageCount}
+      currentPage={currentPage}
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
@@ -6351,28 +6360,77 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         />
       }
     >
-      {[...pageElements]
-        .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
-        .map(renderBoardElement)}
+      {isA4Format ? (
+        Array.from({ length: Math.max(1, pageCount) }, (_, idx) => {
+          const p = idx + 1;
+          const a4Opt = BOARD_FORMAT_OPTIONS.find(
+            (f) => f.id === currentBoardConfig?.format
+          );
+          const pageStep = (a4Opt?.heightWorld ?? 24.04) + 1.0;
+          const pageEls = elements.filter(
+            (el) =>
+              (el.meta.page ?? 1) === p &&
+              el.type !== "ExamPaper" &&
+              el.type !== "ExamItem"
+          );
+          return (
+            <g
+              key={`page-content-${p}`}
+              data-page-content={p}
+              transform={`translate(0, ${(p - 1) * pageStep})`}
+            >
+              {[...pageEls]
+                .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
+                .map(renderBoardElement)}
 
-      {liveStroke && (
-        <InkElement
-          id="live-in-progress-stroke"
-          transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
-          style={{
-            ...liveStroke.style,
-            stroke: adaptStrokeForBoard(
-              liveStroke.style?.stroke,
-              currentBoardTheme.isDark
-            ),
-          }}
-          props={{
-            points: liveStroke.points,
-            pressures: liveStroke.pressures,
-            nib: liveStroke.nib,
-          }}
-          scale={viewport.scale}
-        />
+              {liveStroke && currentPage === p && (
+                <InkElement
+                  id="live-in-progress-stroke"
+                  transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
+                  style={{
+                    ...liveStroke.style,
+                    stroke: adaptStrokeForBoard(
+                      liveStroke.style?.stroke,
+                      currentBoardTheme.isDark
+                    ),
+                  }}
+                  props={{
+                    points: liveStroke.points,
+                    pressures: liveStroke.pressures,
+                    nib: liveStroke.nib,
+                  }}
+                  scale={viewport.scale}
+                />
+              )}
+            </g>
+          );
+        })
+      ) : (
+        <>
+          {[...pageElements]
+            .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
+            .map(renderBoardElement)}
+
+          {liveStroke && (
+            <InkElement
+              id="live-in-progress-stroke"
+              transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
+              style={{
+                ...liveStroke.style,
+                stroke: adaptStrokeForBoard(
+                  liveStroke.style?.stroke,
+                  currentBoardTheme.isDark
+                ),
+              }}
+              props={{
+                points: liveStroke.points,
+                pressures: liveStroke.pressures,
+                nib: liveStroke.nib,
+              }}
+              scale={viewport.scale}
+            />
+          )}
+        </>
       )}
     </SvgCanvas>
   );
@@ -6533,8 +6591,26 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             totalPages={pageCount}
             isOpen={pageSidebarOpen}
             onToggleOpen={() => setPageSidebarOpen((v) => !v)}
-            onSelectPage={(p) => setYjsCurrentPage(doc, p)}
-            onAddPage={() => addYjsPage(doc)}
+            onSelectPage={(p) => {
+              setYjsCurrentPage(doc, p);
+              if (isA4Format) {
+                const a4Opt = BOARD_FORMAT_OPTIONS.find(
+                  (f) => f.id === currentBoardConfig?.format
+                );
+                scrollToPage(p, a4Opt?.heightWorld ?? 24.04, 1.0);
+              }
+            }}
+            onAddPage={() => {
+              addYjsPage(doc);
+              if (isA4Format) {
+                const a4Opt = BOARD_FORMAT_OPTIONS.find(
+                  (f) => f.id === currentBoardConfig?.format
+                );
+                setTimeout(() => {
+                  scrollToPage(pageCount + 1, a4Opt?.heightWorld ?? 24.04, 1.0);
+                }, 40);
+              }
+            }}
             onDeletePage={(p) => {
               if (doc && pageCount > 1) {
                 const map = doc.getMap<number>("pages");

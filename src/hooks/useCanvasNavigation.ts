@@ -21,6 +21,7 @@ export interface UseCanvasNavigationOptions {
   minScale?: number;
   maxScale?: number;
   currentTool?: string | null;
+  isA4?: boolean;
   onViewportChange?: (viewport: ViewportTransform) => void;
   onCursorMove?: (worldPos: Point) => void;
 }
@@ -41,6 +42,7 @@ export interface UseCanvasNavigationReturn {
   zoomIn: () => void;
   zoomOut: () => void;
   panBy: (dx: number, dy: number) => void;
+  scrollToPage: (p: number, pageHeightWorld?: number, pageGapWorld?: number) => void;
 }
 
 export function useCanvasNavigation(
@@ -53,6 +55,7 @@ export function useCanvasNavigation(
     minScale = MIN_SCALE,
     maxScale = MAX_SCALE,
     currentTool = null,
+    isA4 = false,
     onViewportChange,
     onCursorMove,
   } = options;
@@ -127,27 +130,38 @@ export function useCanvasNavigation(
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = svgEl.getBoundingClientRect();
-      setViewport((prev) =>
-        calculateZoomAtPoint(
-          e.clientX,
-          e.clientY,
-          e.deltaY,
-          prev.tx,
-          prev.ty,
-          prev.scale,
-          rect,
-          0.0015,
-          minScale,
-          maxScale
-        )
-      );
+
+      // In A4 document mode, wheel without Ctrl/Meta smoothly scrolls vertically!
+      // Ctrl+Wheel or Meta+Wheel zooms in/out.
+      if (isA4 && !e.ctrlKey && !e.metaKey) {
+        setViewport((prev) => ({
+          ...prev,
+          ty: prev.ty - e.deltaY,
+          tx: e.shiftKey ? prev.tx - e.deltaY : prev.tx - (e.deltaX || 0),
+        }));
+      } else {
+        setViewport((prev) =>
+          calculateZoomAtPoint(
+            e.clientX,
+            e.clientY,
+            e.deltaY,
+            prev.tx,
+            prev.ty,
+            prev.scale,
+            rect,
+            0.0015,
+            minScale,
+            maxScale
+          )
+        );
+      }
     };
 
     svgEl.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       svgEl.removeEventListener("wheel", onWheel);
     };
-  }, [minScale, maxScale]);
+  }, [minScale, maxScale, isA4]);
 
   // Pointer Down
   const handlePointerDown = useCallback(
@@ -342,6 +356,22 @@ export function useCanvasNavigation(
     }));
   }, []);
 
+  const scrollToPage = useCallback(
+    (p: number, pageHeightWorld = 24.04, pageGapWorld = 1.0) => {
+      const svgEl = containerRef.current;
+      const rect = svgEl?.getBoundingClientRect();
+      const viewH = rect?.height ?? 800;
+      const viewW = rect?.width ?? 1200;
+      const step = pageHeightWorld + pageGapWorld;
+      setViewport((prev) => ({
+        ...prev,
+        tx: viewW / 2,
+        ty: viewH / 2 - (p - 1) * step * prev.scale,
+      }));
+    },
+    []
+  );
+
   return {
     viewport,
     setViewport,
@@ -358,5 +388,6 @@ export function useCanvasNavigation(
     zoomIn,
     zoomOut,
     panBy,
+    scrollToPage,
   };
 }
