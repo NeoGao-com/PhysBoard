@@ -225,6 +225,7 @@ export const SpaceGeometryMenu: React.FC<SpaceGeometryMenuProps> = ({
       <button
         type="button"
         data-dropdown="spaceGeometry"
+        data-dropdown-alias="space"
         data-tool="spaceGeometry"
         data-active={isToolActive ? "true" : undefined}
         aria-haspopup="menu"

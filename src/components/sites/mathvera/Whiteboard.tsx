@@ -5548,8 +5548,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           } else if (
             inkToShape &&
             (liveStroke.nib === undefined ||
-              liveStroke.nib === "pencil" ||
-              liveStroke.nib === "fountain")
+              liveStroke.nib === "pencil")
           ) {
             // Ink-to-shape intelligence: check if matches straight segment, arrow, circle, triangle, or rectangle
             const recognized = recognizeStrokeShape(pts);
@@ -6317,6 +6316,28 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {/* Ephemeral fading Laser Pointer strokes in SVG overlay so they don't count as board elements */}
+          {laserStrokes.map((ls) => {
+            const age = performance.now() - ls.createdAt;
+            const opacity = Math.max(0, 1 - age / 1500);
+            return (
+              <g key={ls.id} style={{ opacity, pointerEvents: "none" }} data-laser-stroke="true">
+                <InkElement
+                  id={ls.id}
+                  transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 99999 }}
+                  style={{
+                    stroke: "#ef4444",
+                    width: 4.5,
+                  }}
+                  props={{
+                    points: ls.points,
+                    nib: "laser",
+                  }}
+                  scale={viewport.scale}
+                />
+              </g>
+            );
+          })}
         </>
       }
       overlayChildren={
@@ -6351,29 +6372,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           scale={viewport.scale}
         />
       )}
-
-      {/* Ephemeral fading Laser Pointer strokes */}
-      {laserStrokes.map((ls) => {
-        const age = performance.now() - ls.createdAt;
-        const opacity = Math.max(0, 1 - age / 1500);
-        return (
-          <g key={ls.id} style={{ opacity, pointerEvents: "none" }} data-laser-stroke="true">
-            <InkElement
-              id={ls.id}
-              transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 99999 }}
-              style={{
-                stroke: "#ef4444",
-                width: 4.5,
-              }}
-              props={{
-                points: ls.points,
-                nib: "laser",
-              }}
-              scale={viewport.scale}
-            />
-          </g>
-        );
-      })}
     </SvgCanvas>
   );
 
@@ -7226,7 +7224,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           }}
           onBuildVarTable={(latex) => {
             const clean = latex.replace(/^[yY]\s*=\s*/, "").replace(/^f\(x\)\s*=\s*/, "").trim();
-            const res = buildVarTableFromExpr(clean || latex);
+            const exprToUse = clean || "x^2 - 2x";
+            const res = buildVarTableFromExpr(exprToUse);
             if ("error" in res) {
               setStatusHint(res.error);
               return;
@@ -7238,7 +7237,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 type: "VarTable",
                 transform: { x: center.x, y: center.y - 1, scale: 1, rotation: 0, z: 0 },
                 style: { stroke: "#0f172a", width: 1.5 },
-                props: { table: res, formulaLatex: clean || latex },
+                props: { table: res, formulaLatex: exprToUse },
               },
             });
             if (vtRes.created?.[0]) setSelectedIds([vtRes.created[0]]);

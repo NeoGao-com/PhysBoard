@@ -166,7 +166,7 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
   }
 
   // 2. Check Polygon (Triangle or Rectangle) when closed or nearly closed
-  if (isClosedRoughly && pts.length >= 8) {
+  if (isClosedRoughly && pts.length >= 6) {
     // Simplify using RDP with epsilon scaled by bounding box
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const p of pts) {
@@ -177,37 +177,37 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
     }
     const diag = Math.hypot(maxX - minX, maxY - minY);
     if (diag > 0.3) {
-      const eps = diag * 0.12;
-      const simplified = simplifyRDP(pts, eps);
-      // Since it's closed, first and last point are essentially the same vertex
-      let cornerCandidates = simplified.slice();
-      if (cornerCandidates.length > 2 && dist2D(cornerCandidates[0], cornerCandidates[cornerCandidates.length - 1]) < diag * 0.25) {
-        cornerCandidates = cornerCandidates.slice(0, -1);
-      }
+      // Test candidate epsilons to find clear corners
+      for (const epsFactor of [0.15, 0.12, 0.08, 0.18]) {
+        const eps = diag * epsFactor;
+        const simplified = simplifyRDP(pts, eps);
+        // Since it's closed, first and last point are essentially the same vertex
+        let cornerCandidates = simplified.slice();
+        if (cornerCandidates.length > 2 && dist2D(cornerCandidates[0], cornerCandidates[cornerCandidates.length - 1]) < diag * 0.35) {
+          cornerCandidates = cornerCandidates.slice(0, -1);
+        }
 
-      // Triangle: 3 vertices
-      if (cornerCandidates.length === 3) {
-        return {
-          type: "triangle",
-          vertices: [cornerCandidates[0], cornerCandidates[1], cornerCandidates[2]],
-        };
-      }
-
-      // Quadrilateral / Rectangle: 4 vertices
-      if (cornerCandidates.length === 4) {
-        const [A, B, C, D] = cornerCandidates;
-        // Check if opposite sides are somewhat parallel or angles ~90 deg
-        const ab = dist2D(A, B);
-        const bc = dist2D(B, C);
-        const cd = dist2D(C, D);
-        const da = dist2D(D, A);
-        if (ab > 0.1 && bc > 0.1 && cd > 0.1 && da > 0.1) {
-          // Snap to clean rectangle with average width/height aligned with dominant orientation or axis
-          // For clean math geometry, provide clean 4 vertices
+        // Triangle: 3 vertices
+        if (cornerCandidates.length === 3) {
           return {
-            type: "rectangle",
-            vertices: [A, B, C, D],
+            type: "triangle",
+            vertices: [cornerCandidates[0], cornerCandidates[1], cornerCandidates[2]],
           };
+        }
+
+        // Quadrilateral / Rectangle: 4 vertices
+        if (cornerCandidates.length === 4) {
+          const [A, B, C, D] = cornerCandidates;
+          const ab = dist2D(A, B);
+          const bc = dist2D(B, C);
+          const cd = dist2D(C, D);
+          const da = dist2D(D, A);
+          if (ab > 0.1 && bc > 0.1 && cd > 0.1 && da > 0.1) {
+            return {
+              type: "rectangle",
+              vertices: [A, B, C, D],
+            };
+          }
         }
       }
     }

@@ -1,11 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { CanvasDriver } from '../helpers/canvas-driver';
+import { ToolbarDriver } from '../helpers/toolbar-driver';
 
 test.describe('Tier 4: Math & Physics Deep Integrations', () => {
   let canvas: CanvasDriver;
+  let toolbar: ToolbarDriver;
 
   test.beforeEach(async ({ page }) => {
     canvas = new CanvasDriver(page);
+    toolbar = new ToolbarDriver(page);
     const roomId = `deep-integrations-${Date.now()}`;
     await page.goto(`/?room=${roomId}`);
     await canvas.svgCanvas.waitFor({ state: 'attached', timeout: 15_000 });
@@ -59,8 +62,7 @@ test.describe('Tier 4: Math & Physics Deep Integrations', () => {
 
   test('3D Net Unfolding: Unfold 3D solid into 2D printable net', async ({ page }) => {
     // Insert 3D Pyramid
-    await page.locator('[data-dropdown="space"]').click();
-    await page.locator('button:has-text("Chóp tam giác")').click();
+    await toolbar.selectDropdownItem('Không gian', 'Chóp tam giác');
     const center = await canvas.getCanvasCenter();
     await canvas.clickAt(center);
 
@@ -68,14 +70,13 @@ test.describe('Tier 4: Math & Physics Deep Integrations', () => {
     await expect(solid).toBeVisible();
 
     // Choose Unfold tool from 3D space menu
-    await page.locator('[data-dropdown="space"]').click();
-    await page.locator('button:has-text("Trải phẳng đa diện")').click();
+    await toolbar.selectDropdownItem('Không gian', 'Trải phẳng đa diện');
 
     // Click on the pyramid to unfold it
     await canvas.clickAt(center);
 
     // Verify 2D unfolded polygons were created
     const netPolygons = page.locator('g[data-element-type="GeomPolygon"]');
-    expect(await netPolygons.count()).toBeGreaterThanOrEqual(2);
+    await expect.poll(async () => netPolygons.count(), { timeout: 7000 }).toBeGreaterThanOrEqual(2);
   });
 });

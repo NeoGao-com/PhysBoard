@@ -107,7 +107,7 @@ test.describe('Tier 4: Teaching Instruments Suite - Ruler, Set Square, Protracto
       await page.mouse.up();
     }
 
-    // A smooth ink element is created
-    await expect(page.locator('g[data-element-type="Ink"]').first()).toBeVisible();
+    // A smooth drawn element (either Ink or snapped GeomSegment) is created
+    await expect(page.locator('g[data-element-type="Ink"], g[data-element-type="GeomSegment"]').first()).toBeVisible();
   });
 });

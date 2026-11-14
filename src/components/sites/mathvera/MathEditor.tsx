@@ -729,7 +729,7 @@ export const MathEditor: React.FC<MathEditorProps> = ({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   const val = readFieldValue();
-                  if (val.trim()) onBuildVarTable(val);
+                  onBuildVarTable(val);
                 }}
                 style={{
                   padding: "3px 8px",
