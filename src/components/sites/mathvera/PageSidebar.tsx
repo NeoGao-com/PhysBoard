@@ -73,12 +73,12 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
         left: 0,
         bottom: 0,
         width: 140,
-        background: "#0f172a",
-        borderRight: "1px solid #1e293b",
+        background: "#f1f5f9",
+        borderRight: "1px solid #cbd5e1",
         zIndex: 50,
         display: "flex",
         flexDirection: "column",
-        boxShadow: "4px 0 24px rgba(0,0,0,0.25)",
+        boxShadow: "2px 0 12px rgba(15,23,42,0.06)",
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
@@ -90,11 +90,12 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 10px",
-          borderBottom: "1px solid #1e293b",
-          color: "#94a3b8",
+          borderBottom: "1px solid #e2e8f0",
+          background: "#ffffff",
+          color: "#475569",
         }}
       >
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: "#f8fafc" }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: "#0f172a" }}>
           SỔ TAY ({totalPages})
         </span>
         <button
@@ -104,7 +105,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           style={{
             background: "transparent",
             border: "none",
-            color: "#94a3b8",
+            color: "#64748b",
             fontSize: 15,
             cursor: "pointer",
             padding: 2,
@@ -147,7 +148,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
                   alignSelf: "flex-start",
                   fontSize: 11,
                   fontWeight: 700,
-                  color: isCur ? "#38bdf8" : "#94a3b8",
+                  color: isCur ? "#0284c7" : "#64748b",
                   marginBottom: 3,
                   marginLeft: 4,
                 }}
@@ -162,10 +163,10 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
                   height: 136,
                   borderRadius: 4,
                   background: "#ffffff",
-                  border: isCur ? "2.5px solid #0284c7" : "1px solid #475569",
+                  border: isCur ? "2.5px solid #0284c7" : "1px solid #cbd5e1",
                   boxShadow: isCur
-                    ? "0 0 0 2px rgba(14,165,233,0.3), 0 8px 18px rgba(0,0,0,0.3)"
-                    : "0 2px 6px rgba(0,0,0,0.2)",
+                    ? "0 0 0 2px rgba(14,165,233,0.25), 0 4px 12px rgba(15,23,42,0.12)"
+                    : "0 1px 4px rgba(15,23,42,0.06)",
                   position: "relative",
                   overflow: "hidden",
                   display: "flex",
@@ -266,8 +267,8 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
       <div
         style={{
           padding: 10,
-          borderTop: "1px solid #1e293b",
-          background: "#0b1120",
+          borderTop: "1px solid #e2e8f0",
+          background: "#ffffff",
         }}
       >
         <button

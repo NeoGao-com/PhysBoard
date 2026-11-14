@@ -166,6 +166,7 @@ import {
   setYjsCurrentPage,
   useYjsPages,
 } from "./PageBar";
+import { PageSidebar } from "./PageSidebar";
 import {
   AxesPointDialog,
   AxesVectorDialog,
@@ -506,6 +507,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     null
   );
   const [examOpen, setExamOpen] = useState(false);
+  const [pageSidebarOpen, setPageSidebarOpen] = useState(true);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [fillNamesInput, setFillNamesInput] = useState("");
@@ -6526,6 +6528,25 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         />
       ) : (
         <>
+          <PageSidebar
+            currentPage={currentPage}
+            totalPages={pageCount}
+            isOpen={pageSidebarOpen}
+            onToggleOpen={() => setPageSidebarOpen((v) => !v)}
+            onSelectPage={(p) => setYjsCurrentPage(doc, p)}
+            onAddPage={() => addYjsPage(doc)}
+            onDeletePage={(p) => {
+              if (doc && pageCount > 1) {
+                const map = doc.getMap<number>("pages");
+                doc.transact(() => {
+                  map.set("count", Math.max(1, pageCount - 1));
+                  if (currentPage >= p && currentPage > 1) {
+                    map.set("cur", currentPage - 1);
+                  }
+                });
+              }
+            }}
+          />
           {renderToolbar(false)}
           {renderCanvas(false)}
         </>
