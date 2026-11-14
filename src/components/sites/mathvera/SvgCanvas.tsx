@@ -142,6 +142,13 @@ export function SvgCanvas({
         }}
       >
         <defs>
+          <filter id="laser-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
           <pattern
             id="wb-dot-grid"
             data-wb-grid="true"

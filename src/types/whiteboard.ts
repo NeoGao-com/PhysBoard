@@ -45,7 +45,7 @@ export const InkPropsSchema = z.object({
   points: z.array(z.number()), // Flat [x0, y0, x1, y1, ...] in math world coordinates
   pressures: z.array(z.number()).optional(), // Pointer pressures [p0, p1, ...] in [0..1]
   closed: z.boolean().optional(),
-  nib: z.enum(["fountain", "pencil", "highlighter", "brush", "dashed"]).optional(),
+  nib: z.enum(["fountain", "pencil", "highlighter", "brush", "dashed", "laser"]).optional(),
 });
 export type InkProps = z.infer<typeof InkPropsSchema>;
 
@@ -324,6 +324,7 @@ export type WhiteboardTool =
   | "ink:highlighter"
   | "ink:brush"
   | "ink:dashed"
+  | "ink:laser"
   | "erase"
   | "pan"
   | "formula"

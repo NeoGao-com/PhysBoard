@@ -77,6 +77,23 @@ export const IconBrush: React.FC<IconProps> = ({ size = 15, color }) => (
   </svg>
 );
 
+export const IconLaser: React.FC<IconProps> = ({ size = 15, color = "#ef4444" }) => (
+  <svg {...base(size, color)}>
+    <path d="m14 4 6 6-8 8H6v-6l8-8z" />
+    <path d="m17 7 3-3" strokeWidth={2.2} stroke="#ef4444" />
+    <circle cx="20.5" cy="3.5" r="1.5" fill="#ef4444" stroke="none" />
+    <path d="M9 15l2 2" />
+  </svg>
+);
+
+export const IconShapeSnap: React.FC<IconProps> = ({ size = 15, color = "currentColor" }) => (
+  <svg {...base(size, color)}>
+    <path d="M4 4h6v6H4z" />
+    <circle cx="16" cy="16" r="4" />
+    <path d="M14 7h6M17 4v6" strokeWidth={1.5} />
+  </svg>
+);
+
 export const IconDashedPen: React.FC<IconProps> = ({ size = 15, color }) => (
   <svg {...base(size, color)}>
     <path d="M4 18c2-4 5-4 7 0s5 4 9-2" strokeDasharray="3 3" />

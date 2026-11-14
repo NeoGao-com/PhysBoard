@@ -64,6 +64,7 @@ import {
   DEFAULT_DOT_SCALE,
   DEFAULT_LABEL_SCALE,
 } from "@/lib/geometry";
+import { recognizeStrokeShape } from "@/lib/ink-recognizer";
 import {
   type CameraMatrix3,
   type Solid3DKind,
@@ -294,12 +295,15 @@ function resolvePenNib(tool: WhiteboardTool): InkProps["nib"] | null {
       return "brush";
     case "ink:dashed":
       return "dashed";
+    case "ink:laser":
+      return "laser";
     default:
       return null;
   }
 }
 
 const PEN_ONLY_MODE_STORAGE_KEY = "physboard_pen_only_mode";
+const INK_TO_SHAPE_STORAGE_KEY = "physboard_ink_to_shape";
 
 function isPenTool(tool: WhiteboardTool): boolean {
   return resolvePenNib(tool) !== null;
@@ -403,16 +407,46 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [, setConstructMarksTick] = useState<number>(0);
   const [gridEnabled, setGridEnabled] = useState<boolean>(true);
   const [penOnlyMode, setPenOnlyMode] = useState<boolean>(false);
+  const [inkToShape, setInkToShape] = useState<boolean>(true);
+
+  // Dedicated laser pointer ephemeral strokes (not in Yjs, decaying over time)
+  const [laserStrokes, setLaserStrokes] = useState<
+    Array<{ id: string; points: number[]; createdAt: number }>
+  >([]);
+
+  useEffect(() => {
+    if (laserStrokes.length === 0) return;
+    const interval = setInterval(() => {
+      const now = performance.now();
+      setLaserStrokes((prev) => prev.filter((s) => now - s.createdAt < 1500));
+    }, 16);
+    return () => clearInterval(interval);
+  }, [laserStrokes.length]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const saved = window.localStorage.getItem(PEN_ONLY_MODE_STORAGE_KEY);
-      if (saved !== null) {
-        setPenOnlyMode(saved === "true");
+      const savedPenOnly = window.localStorage.getItem(PEN_ONLY_MODE_STORAGE_KEY);
+      if (savedPenOnly !== null) {
+        setPenOnlyMode(savedPenOnly === "true");
+      }
+      const savedInkShape = window.localStorage.getItem(INK_TO_SHAPE_STORAGE_KEY);
+      if (savedInkShape !== null) {
+        setInkToShape(savedInkShape === "true");
       }
     } catch {
       // ignore localStorage errors
+    }
+  }, []);
+
+  const handleToggleInkToShape = useCallback((enabled: boolean) => {
+    setInkToShape(enabled);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(INK_TO_SHAPE_STORAGE_KEY, enabled ? "true" : "false");
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
@@ -4826,8 +4860,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           ? filterYRef.current.filter(worldPos.y, ts)
           : worldPos.y;
         const effectiveStyle: Style =
-          nib === "highlighter" &&
-          (!currentStyle.stroke || currentStyle.stroke.toLowerCase() === "#111827")
+          nib === "laser"
+            ? { stroke: "#ef4444", width: 4 }
+            : nib === "highlighter" &&
+              (!currentStyle.stroke || currentStyle.stroke.toLowerCase() === "#111827")
             ? { ...currentStyle, stroke: "#facc15" }
             : nib === "dashed"
             ? { ...currentStyle, dash: true }
@@ -5339,15 +5375,134 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         const pts = liveStrokePointsRef.current;
         const pressures = liveStrokePressuresRef.current;
         if (pts.length >= 4) {
-          dispatcher.dispatch({
-            type: "ink.stroke",
-            params: {
-              points: pts,
-              pressures,
-              nib: liveStroke.nib,
-              style: liveStroke.style,
-            },
-          });
+          if (liveStroke.nib === "laser") {
+            // Dedicated laser pointer: fade out completely after 1.5s, not persisting in Yjs
+            const strokeId = newElId("laser");
+            setLaserStrokes((prev) => [
+              ...prev,
+              { id: strokeId, points: [...pts], createdAt: performance.now() },
+            ]);
+          } else if (
+            inkToShape &&
+            (liveStroke.nib === undefined ||
+              liveStroke.nib === "pencil" ||
+              liveStroke.nib === "fountain")
+          ) {
+            // Ink-to-shape intelligence: check if matches straight segment, arrow, circle, triangle, or rectangle
+            const recognized = recognizeStrokeShape(pts);
+            if (recognized) {
+              if (recognized.type === "circle") {
+                const circId = newElId("circ");
+                dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    id: circId,
+                    type: "GeomCircle",
+                    style: {
+                      stroke: liveStroke.style.stroke ?? "#0891b2",
+                      width: liveStroke.style.width ?? 2,
+                      dash: liveStroke.style.dash ?? false,
+                    },
+                    props: {
+                      center: `${circId}_c`,
+                      centerPt: recognized.center,
+                      radius: { kind: "value", v: recognized.radius },
+                    },
+                  },
+                });
+              } else if (recognized.type === "segment") {
+                const segId = newElId("seg");
+                dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    id: segId,
+                    type: "GeomSegment",
+                    style: {
+                      stroke: liveStroke.style.stroke ?? "#334155",
+                      width: liveStroke.style.width ?? 2,
+                      dash: liveStroke.style.dash ?? false,
+                    },
+                    props: {
+                      from: `${segId}_a`,
+                      to: `${segId}_b`,
+                      fromPt: recognized.start,
+                      toPt: recognized.end,
+                    },
+                  },
+                });
+              } else if (recognized.type === "arrow") {
+                const vecId = newElId("vec");
+                dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    id: vecId,
+                    type: "GeomVector",
+                    style: {
+                      stroke: liveStroke.style.stroke ?? "#334155",
+                      width: liveStroke.style.width ?? 2,
+                      dash: liveStroke.style.dash ?? false,
+                    },
+                    props: {
+                      from: `${vecId}_a`,
+                      to: `${vecId}_b`,
+                      fromPt: recognized.start,
+                      toPt: recognized.end,
+                    },
+                  },
+                });
+              } else if (recognized.type === "triangle" || recognized.type === "rectangle") {
+                const polyId = newElId("poly");
+                const verts = recognized.vertices;
+                const names = getNextPointNames(verts.length, pageElements);
+                const marksEnabled = getConstructMarksEnabled();
+                const embedded: EmbeddedVertex[] = verts.map((pt, i) => ({
+                  id: `${polyId}_v${i}`,
+                  name: names[i] ?? `P${i + 1}`,
+                  x: pt.x,
+                  y: pt.y,
+                }));
+                dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    id: polyId,
+                    type: "GeomPolygon",
+                    style: {
+                      stroke: liveStroke.style.stroke ?? "#2563eb",
+                      fill: "rgba(37,99,235,0.06)",
+                      width: liveStroke.style.width ?? 2,
+                      dash: liveStroke.style.dash ?? false,
+                    },
+                    props: {
+                      vertices: embedded.map((v) => v.id),
+                      points: embedded,
+                      marksEnabled,
+                    },
+                  },
+                });
+              }
+            } else {
+              // Normal ink stroke
+              dispatcher.dispatch({
+                type: "ink.stroke",
+                params: {
+                  points: pts,
+                  pressures,
+                  nib: liveStroke.nib,
+                  style: liveStroke.style,
+                },
+              });
+            }
+          } else {
+            dispatcher.dispatch({
+              type: "ink.stroke",
+              params: {
+                points: pts,
+                pressures,
+                nib: liveStroke.nib,
+                style: liveStroke.style,
+              },
+            });
+          }
         }
         dispatcher.gesture(false);
         liveStrokePointsRef.current = [];
@@ -5364,6 +5519,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       findNearestPoint,
       commitTwoPointShape,
       liveStroke,
+      inkToShape,
     ]
   );
 
@@ -6030,6 +6186,29 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           scale={viewport.scale}
         />
       )}
+
+      {/* Ephemeral fading Laser Pointer strokes */}
+      {laserStrokes.map((ls) => {
+        const age = performance.now() - ls.createdAt;
+        const opacity = Math.max(0, 1 - age / 1500);
+        return (
+          <g key={ls.id} style={{ opacity, pointerEvents: "none" }} data-laser-stroke="true">
+            <InkElement
+              id={ls.id}
+              transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 99999 }}
+              style={{
+                stroke: "#ef4444",
+                width: 4.5,
+              }}
+              props={{
+                points: ls.points,
+                nib: "laser",
+              }}
+              scale={viewport.scale}
+            />
+          </g>
+        );
+      })}
     </SvgCanvas>
   );
 
@@ -6124,6 +6303,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       shortcutMap={shortcutMap}
       penOnlyMode={penOnlyMode}
       onTogglePenOnly={handleTogglePenOnly}
+      inkToShape={inkToShape}
+      onToggleInkToShape={handleToggleInkToShape}
     />
   );
 

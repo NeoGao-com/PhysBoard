@@ -335,4 +335,82 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     await penOnlyBtn.click();
     await expect(penOnlyBtn).toHaveAttribute('data-active', 'false');
   });
+
+  test('TC-02-10: Laser pointer draws glowing stroke and automatically fades out after 1.5s', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const initialCount = await canvas.getObjectCount();
+
+    // Select Laser Pointer tool
+    const laserBtn = page.locator('button[data-tool="ink:laser"]');
+    await expect(laserBtn).toBeVisible();
+    await laserBtn.click();
+    await expect(laserBtn).toHaveAttribute('data-active', 'true');
+
+    // Draw with laser pointer
+    await canvas.drawStroke([
+      { x: 300, y: 300 },
+      { x: 350, y: 320 },
+      { x: 400, y: 300 },
+    ]);
+
+    // Laser stroke should render with data-laser-stroke="true"
+    const laserStroke = page.locator('[data-laser-stroke="true"]');
+    await expect(laserStroke).toBeVisible();
+
+    // The persistent whiteboard element count should NOT increase (laser does not persist in Yjs)
+    const countDuringLaser = await canvas.getObjectCount();
+    expect(countDuringLaser).toBe(initialCount);
+
+    // Wait 1.6s for complete fade out
+    await page.waitForTimeout(1600);
+    await expect(laserStroke).toHaveCount(0);
+  });
+
+  test('TC-02-11: Ink-to-Shape automatically snaps rough drawn strokes to geometric primitives', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+    await toolbar.selectTool('ink');
+
+    const initialCount = await canvas.getObjectCount();
+
+    // 1. Draw a rough straight line segment -> snaps to GeomSegment
+    await canvas.drawStroke([
+      { x: 200, y: 200 },
+      { x: 250, y: 201 },
+      { x: 300, y: 200 },
+      { x: 350, y: 202 },
+      { x: 400, y: 200 },
+    ]);
+    await canvas.waitForObjectCount(initialCount + 1);
+    const latestSegment = canvas.getLatestObject();
+    await expect(latestSegment).toHaveAttribute('data-element-type', 'GeomSegment');
+
+    // 2. Draw a rough circle -> snaps to GeomCircle
+    const center = { x: 500, y: 300 };
+    const radius = 60;
+    const circlePoints: Array<{ x: number; y: number }> = [];
+    const steps = 16;
+    for (let i = 0; i <= steps; i++) {
+      const angle = (i / steps) * 2 * Math.PI;
+      circlePoints.push({
+        x: center.x + radius * Math.cos(angle) + (Math.random() * 4 - 2),
+        y: center.y + radius * Math.sin(angle) + (Math.random() * 4 - 2),
+      });
+    }
+    await canvas.drawStroke(circlePoints);
+    await canvas.waitForObjectCount(initialCount + 2);
+    const latestCircle = canvas.getLatestObject();
+    await expect(latestCircle).toHaveAttribute('data-element-type', 'GeomCircle');
+
+    // 3. Draw a rough triangle -> snaps to GeomPolygon
+    await canvas.drawStroke([
+      { x: 250, y: 400 },
+      { x: 350, y: 400 },
+      { x: 300, y: 480 },
+      { x: 250, y: 400 },
+    ]);
+    await canvas.waitForObjectCount(initialCount + 3);
+    const latestPoly = canvas.getLatestObject();
+    await expect(latestPoly).toHaveAttribute('data-element-type', 'GeomPolygon');
+  });
 });

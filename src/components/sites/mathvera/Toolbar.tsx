@@ -38,6 +38,7 @@ import {
   IconGrip,
   IconHandTouch,
   IconHighlighter,
+  IconLaser,
   IconMarquee,
   IconOpenFile,
   IconPen,
@@ -49,6 +50,7 @@ import {
   IconRedo,
   IconSave,
   IconSegment,
+  IconShapeSnap,
   IconStylusOnly,
   IconTrash,
   IconUndo,
@@ -61,6 +63,7 @@ const PEN_VARIANTS = [
   { tool: "ink:highlighter", label: "Bút dạ quang", short: "Dạ quang", desc: "Tô sáng nổi bật" },
   { tool: "ink:brush", label: "Bút lông (Cọ vẽ)", short: "Bút lông", desc: "Nét mềm bản rộng" },
   { tool: "ink:dashed", label: "Bút nét đứt", short: "Nét đứt", desc: "Vẽ tay nét đứt" },
+  { tool: "ink:laser", label: "Bút chỉ Laser (Tự mờ)", short: "Laser", desc: "Vệt sáng tự tan biến sau 1.5s" },
 ] as const;
 
 const PEN_TOOL_SET = new Set<string>(PEN_VARIANTS.map((v) => v.tool));
@@ -79,6 +82,8 @@ function renderPenIcon(tool: string, size = 14) {
       return <IconBrush size={size} />;
     case "ink:dashed":
       return <IconDashedPen size={size} />;
+    case "ink:laser":
+      return <IconLaser size={size} color="#ef4444" />;
     default:
       return <IconPen size={size} />;
   }
@@ -160,6 +165,8 @@ export interface ToolbarProps {
   embedded?: boolean;
   penOnlyMode?: boolean;
   onTogglePenOnly?: (enabled: boolean) => void;
+  inkToShape?: boolean;
+  onToggleInkToShape?: (enabled: boolean) => void;
 }
 
 type OpenDropdown =
@@ -225,6 +232,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   embedded = false,
   penOnlyMode = false,
   onTogglePenOnly,
+  inkToShape = true,
+  onToggleInkToShape,
 }) => {
   const withShortcut = (label: string, cmdId: string): string => {
     const combo = shortcutMap?.[cmdId];
@@ -757,7 +766,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             data-dropdown="pen"
             aria-haspopup="menu"
             aria-expanded={openMenu === "pen"}
-            aria-label="Chọn loại bút (Bi, Máy, Chì, Dạ quang, Lông, Nét đứt)"
+            aria-label="Chọn loại bút (Bi, Máy, Chì, Dạ quang, Lông, Nét đứt, Laser)"
             title="Chọn loại bút"
             onClick={() => togglePortalMenu("pen", penBtnRef.current)}
             style={caretStyle}
@@ -765,6 +774,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             ▾
           </button>
         </div>
+
+        {/* Laser Quick Tool Button */}
+        <button
+          type="button"
+          data-tool="ink:laser"
+          data-active={activeTool === "ink:laser" ? "true" : undefined}
+          aria-pressed={activeTool === "ink:laser"}
+          onClick={() => onSelectTool("ink:laser")}
+          style={
+            activeTool === "ink:laser"
+              ? { ...activeStyle, background: "#fee2e2", color: "#b91c1c" }
+              : btnBaseStyle
+          }
+          title="Bút chỉ Laser (Tự động tan biến sau 1.5s)"
+        >
+          <IconLaser size={14} color={activeTool === "ink:laser" ? "#b91c1c" : "#ef4444"} />
+          <span>Laser</span>
+        </button>
 
         {/* Eraser */}
         <button
@@ -1301,6 +1328,35 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             {penOnlyMode ? <IconStylusOnly size={14} color="#4338ca" /> : <IconHandTouch size={14} />}
             <span className="sr-only">
               {penOnlyMode ? "Chế độ chỉ bút đang bật" : "Chế độ vẽ tay đang bật"}
+            </span>
+          </button>
+        )}
+
+        {/* Ink-to-Shape intelligence toggle */}
+        {onToggleInkToShape && (
+          <button
+            type="button"
+            data-action="toggle-ink-shape"
+            data-active={inkToShape ? "true" : "false"}
+            aria-pressed={inkToShape}
+            onClick={() => onToggleInkToShape(!inkToShape)}
+            title={
+              inkToShape
+                ? "Nhận diện hình vẽ tay (Ink-to-Shape) đang BẬT. Bấm để tắt."
+                : "Nhận diện hình vẽ tay (Ink-to-Shape) đang TẮT. Bấm để bật."
+            }
+            aria-label={inkToShape ? "Tắt nhận diện hình vẽ tay" : "Bật nhận diện hình vẽ tay"}
+            style={{
+              ...btnBaseStyle,
+              padding: "0 5px",
+              background: inkToShape ? "#dbeafe" : "transparent",
+              color: inkToShape ? "#1d4ed8" : "#475569",
+              border: inkToShape ? "1px solid #bfdbfe" : "none",
+            }}
+          >
+            <IconShapeSnap size={14} color={inkToShape ? "#1d4ed8" : "#64748b"} />
+            <span className="sr-only">
+              {inkToShape ? "Nhận diện nét vẽ hình học đang bật" : "Nhận diện nét vẽ hình học đang tắt"}
             </span>
           </button>
         )}

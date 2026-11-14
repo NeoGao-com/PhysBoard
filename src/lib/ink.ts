@@ -244,7 +244,7 @@ export function generateFilledInkPath(
   pressures: number[] | undefined,
   scale: number,
   baseWidth: number = 2.4,
-  nib?: "fountain" | "pencil" | "highlighter" | "brush" | "dashed"
+  nib?: "fountain" | "pencil" | "highlighter" | "brush" | "dashed" | "laser"
 ): string {
   const rawPts: Array<[number, number, number]> = [];
   for (let i = 0; i + 1 < flatPoints.length; i += 2) {

@@ -32,10 +32,13 @@ export const InkElement: React.FC<InkElementProps> = ({
   const isVariableInk = props.nib === "fountain" || props.nib === "brush";
   const isHighlighter = props.nib === "highlighter";
   const isPencil = props.nib === "pencil";
+  const isLaser = props.nib === "laser";
   const isDashed = style.dash === true || props.nib === "dashed";
   const effectiveWidth =
     props.nib === "brush"
       ? strokeWidth * 1.9
+      : isLaser
+      ? Math.max(5, strokeWidth * 1.8)
       : isHighlighter
       ? Math.max(12, strokeWidth * 5.2)
       : isPencil
@@ -109,7 +112,15 @@ export const InkElement: React.FC<InkElementProps> = ({
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
           opacity={effectiveOpacity}
-          style={isHighlighter ? { mixBlendMode: "multiply" } : undefined}
+          style={
+            isHighlighter
+              ? { mixBlendMode: "multiply" }
+              : isLaser
+              ? {
+                  filter: "url(#laser-glow) drop-shadow(0 0 6px #ef4444) drop-shadow(0 0 12px #eab308)",
+                }
+              : undefined
+          }
         />
       )}
     </g>
