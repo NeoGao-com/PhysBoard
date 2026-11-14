@@ -542,7 +542,11 @@ export function getElementBoundingBox(
               ? 8.0
               : el.props?.instrumentKind === "protractor"
                 ? 6.4
-                : 4.8;
+                : el.props?.instrumentKind === "setsquare"
+                  ? 6.5
+                  : el.props?.instrumentKind === "compass"
+                    ? 5.0
+                    : 4.8;
     const defaultH =
       el.type === "PhysicsSim"
         ? 7.2
@@ -554,7 +558,11 @@ export function getElementBoundingBox(
               ? 1.4
               : el.props?.instrumentKind === "protractor"
                 ? 3.6
-                : 2.8;
+                : el.props?.instrumentKind === "setsquare"
+                  ? 5.0
+                  : el.props?.instrumentKind === "compass"
+                    ? 5.0
+                    : 2.8;
     const w =
       (typeof el.props?.width === "number" && el.props.width > 0
         ? el.props.width

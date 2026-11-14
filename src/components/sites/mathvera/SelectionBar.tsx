@@ -43,6 +43,7 @@ export interface SelectionBarProps {
   onPhysicsRecordData?: () => void;
   onPhysicsRotateInstrument?: (deltaDeg: number) => void;
   onPhysicsPlotRegression?: () => void;
+  onUpdateInstrumentProps?: (id: string, patch: Record<string, unknown>) => void;
   onSolidFaceFlatten?: () => void;
   onSolidFaceFill?: () => void;
   onSolidFaceExtendPlane?: () => void;
@@ -154,6 +155,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onPhysicsRecordData,
   onPhysicsRotateInstrument,
   onPhysicsPlotRegression,
+  onUpdateInstrumentProps,
   onSolidFaceFlatten,
   onSolidFaceFill,
   onSolidFaceExtendPlane,
@@ -660,6 +662,97 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               >
                 ↻ Xoay +15°
               </button>
+
+              {/* SetSquare angle mode switch */}
+              {selectedPhysicsEl.props.instrumentKind === "setsquare" && (
+                <button
+                  type="button"
+                  data-action="switch-setsquare-kind"
+                  onClick={() => {
+                    const current = selectedPhysicsEl.props.setSquareKind;
+                    const next = current === "30-60-90" ? "45-45-90" : "30-60-90";
+                    onUpdateInstrumentProps?.(selectedPhysicsEl.id, { setSquareKind: next });
+                  }}
+                  style={{
+                    ...actionBtnStyle,
+                    background: "#fef3c7",
+                    color: "#92400e",
+                    fontWeight: 600,
+                  }}
+                >
+                  📐 {selectedPhysicsEl.props.setSquareKind === "30-60-90" ? "Đổi sang 45°–45°" : "Đổi sang 30°–60°"}
+                </button>
+              )}
+
+              {/* Protractor 180 / 360 mode switch */}
+              {selectedPhysicsEl.props.instrumentKind === "protractor" && (
+                <>
+                  <button
+                    type="button"
+                    data-action="switch-protractor-type"
+                    onClick={() => {
+                      const is360 = selectedPhysicsEl.props.protractorType === "360";
+                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
+                        protractorType: is360 ? "180" : "360",
+                      });
+                    }}
+                    style={{
+                      ...actionBtnStyle,
+                      background: "#e0f2fe",
+                      color: "#0369a1",
+                      fontWeight: 600,
+                    }}
+                  >
+                    🔄 {selectedPhysicsEl.props.protractorType === "360" ? "Đổi sang 180°" : "Đổi sang 360°"}
+                  </button>
+                  <button
+                    type="button"
+                    data-action="step-protractor-angle"
+                    onClick={() => {
+                      const cur = Number(selectedPhysicsEl.props.protractorAngle ?? 45);
+                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
+                        protractorAngle: (cur + 15) % (selectedPhysicsEl.props.protractorType === "360" ? 360 : 180),
+                      });
+                    }}
+                    style={actionBtnStyle}
+                    title="Thay đổi góc đo trên thước"
+                  >
+                    Đo góc +15°
+                  </button>
+                </>
+              )}
+
+              {/* Compass radius adjustment */}
+              {selectedPhysicsEl.props.instrumentKind === "compass" && (
+                <>
+                  <button
+                    type="button"
+                    data-action="compass-radius-dec"
+                    onClick={() => {
+                      const cur = Number(selectedPhysicsEl.props.compassRadius ?? 3.0);
+                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
+                        compassRadius: Math.max(1.0, Number((cur - 0.5).toFixed(1))),
+                      });
+                    }}
+                    style={actionBtnStyle}
+                  >
+                    R -0.5cm
+                  </button>
+                  <button
+                    type="button"
+                    data-action="compass-radius-inc"
+                    onClick={() => {
+                      const cur = Number(selectedPhysicsEl.props.compassRadius ?? 3.0);
+                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
+                        compassRadius: Math.min(8.0, Number((cur + 0.5).toFixed(1))),
+                      });
+                    }}
+                    style={actionBtnStyle}
+                  >
+                    R +0.5cm
+                  </button>
+                </>
+              )}
             </>
           )}
 

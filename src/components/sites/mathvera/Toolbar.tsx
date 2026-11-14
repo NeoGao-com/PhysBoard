@@ -16,6 +16,7 @@ import {
 import { PageBar } from "./PageBar";
 import { MoreMenu } from "./MoreMenu";
 import { PhysicsMenu } from "./PhysicsMenu";
+import { TeachingInstrumentsMenu } from "./TeachingInstrumentsMenu";
 import { FILL_PALETTE } from "@/lib/geometry";
 import type { ShortcutMap } from "@/lib/commands";
 import type { ImportedImageResult, ImportedPdfPage } from "@/lib/pdf-import";
@@ -48,8 +49,12 @@ import {
   IconPolygon,
   IconRealWorld,
   IconRedo,
+  IconRuler,
   IconSave,
   IconSegment,
+  IconSetSquare,
+  IconProtractor,
+  IconCompassTool,
   IconShapeSnap,
   IconStylusOnly,
   IconTrash,
@@ -143,6 +148,7 @@ export interface ToolbarProps {
   onOpenDecorHelp?: () => void;
   onPhysicsAction?: (action: string) => void;
   onOpenPhysicsDrawer?: () => void;
+  onSelectInstrument?: (kind: "ruler" | "setsquare" | "setsquare-45" | "protractor" | "protractor-360" | "compass") => void;
   onGoHome?: () => void;
   onSaveFile?: () => void;
   onOpenFile?: () => void;
@@ -178,6 +184,7 @@ type OpenDropdown =
   | "statistics"
   | "realworld"
   | "physics"
+  | "instruments"
   | null;
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -210,6 +217,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenDecorHelp,
   onPhysicsAction,
   onOpenPhysicsDrawer,
+  onSelectInstrument,
   onGoHome,
   onSaveFile,
   onOpenFile,
@@ -354,6 +362,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const statsWrapRef = useRef<HTMLDivElement>(null);
   const realworldWrapRef = useRef<HTMLDivElement>(null);
   const physicsWrapRef = useRef<HTMLDivElement>(null);
+  const instrumentsWrapRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -369,7 +378,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         functionsWrapRef.current?.contains(target) ||
         statsWrapRef.current?.contains(target) ||
         realworldWrapRef.current?.contains(target) ||
-        physicsWrapRef.current?.contains(target)
+        physicsWrapRef.current?.contains(target) ||
+        instrumentsWrapRef.current?.contains(target)
       ) {
         return;
       }
@@ -1148,6 +1158,36 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             anchorRef={physicsWrapRef}
           />
         </div>
+
+        {/* Teaching Instruments Menu (Dụng cụ dạy học) */}
+        <div
+          ref={instrumentsWrapRef}
+          style={{ position: "relative", display: "inline-flex" }}
+        >
+          <button
+            type="button"
+            data-dropdown="instruments"
+            data-tool="instruments"
+            aria-haspopup="menu"
+            aria-expanded={openMenu === "instruments"}
+            onClick={() =>
+              setOpenMenu((prev) =>
+                prev === "instruments" ? null : "instruments"
+              )
+            }
+            style={openMenu === "instruments" ? activeStyle : btnBaseStyle}
+            title="Dụng cụ dạy học: Thước thẳng, Êke vuông, Thước đo góc 180°/360°, Compa ảo"
+          >
+            <IconRuler size={14} color="#d97706" />
+            <span>Dụng cụ dạy học ▾</span>
+          </button>
+          <TeachingInstrumentsMenu
+            open={openMenu === "instruments"}
+            onClose={() => setOpenMenu(null)}
+            onSelectInstrument={(kind) => onSelectInstrument?.(kind)}
+            anchorRef={instrumentsWrapRef}
+          />
+        </div>
       </div>
 
       {/* --- Pinned Right Controls --- */}
@@ -1360,7 +1400,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </span>
           </button>
         )}
-
         {/* Toolbar Zoom / Size Pill + Right-edge Resize Handle */}
         {!embedded && (
           <div

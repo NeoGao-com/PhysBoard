@@ -93,7 +93,6 @@ export const IconShapeSnap: React.FC<IconProps> = ({ size = 15, color = "current
     <path d="M14 7h6M17 4v6" strokeWidth={1.5} />
   </svg>
 );
-
 export const IconDashedPen: React.FC<IconProps> = ({ size = 15, color }) => (
   <svg {...base(size, color)}>
     <path d="M4 18c2-4 5-4 7 0s5 4 9-2" strokeDasharray="3 3" />
@@ -276,3 +275,30 @@ export const IconHandTouch: React.FC<IconProps> = ({ size = 15, color }) => (
   </svg>
 );
 
+export const IconRuler: React.FC<IconProps> = ({ size = 15, color }) => (
+  <svg {...base(size, color)}>
+    <path d="M3 7l4-4 14 14-4 4L3 7z" />
+    <path d="M6 10l2-2M9 13l3-3M12 16l2-2M15 19l3-3" />
+  </svg>
+);
+
+export const IconSetSquare: React.FC<IconProps> = ({ size = 15, color }) => (
+  <svg {...base(size, color)}>
+    <path d="M4 20h16L4 4v16z" />
+    <path d="M7 17h6L7 11v6z" />
+  </svg>
+);
+
+export const IconProtractor: React.FC<IconProps> = ({ size = 15, color }) => (
+  <svg {...base(size, color)}>
+    <path d="M3 15h18a9 9 0 0 0-18 0z" />
+    <path d="M12 15v-3M7 15v-1.5M17 15v-1.5" />
+  </svg>
+);
+
+export const IconCompassTool: React.FC<IconProps> = ({ size = 15, color }) => (
+  <svg {...base(size, color)}>
+    <circle cx="12" cy="5" r="2" />
+    <path d="M12 7l-5 14M12 7l5 14M9 14h6" />
+  </svg>
+);

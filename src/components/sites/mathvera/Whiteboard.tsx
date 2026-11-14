@@ -101,6 +101,7 @@ import {
   type RealWorldArtItem,
   recordRecentRealWorldId,
 } from "@/lib/realworld-art";
+import { snapPointToInstruments } from "@/lib/instruments";
 import { buildShareUrl, sanitizeRoomId } from "@/lib/room";
 import {
   downloadBlob,
@@ -143,6 +144,8 @@ import { PhysicsDrawer } from "./PhysicsDrawer";
 import { ExportModal } from "./ExportModal";
 import { ExamEditor } from "./ExamEditor";
 import type {
+  PhysicsInstrumentKind,
+  PhysicsInstrumentProps,
   PhysicsLabTableProps,
   PhysicsLessonPreset,
   PhysicsSimKind,
@@ -450,7 +453,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
     }
   }, []);
-
   const handleTogglePenOnly = useCallback((enabled: boolean) => {
     setPenOnlyMode(enabled);
     if (typeof window !== "undefined") {
@@ -1508,9 +1510,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       } else if (
         action === "phys:inst:ruler" ||
         action === "phys:inst:protractor" ||
-        action === "phys:inst:stopwatch"
+        action === "phys:inst:stopwatch" ||
+        action === "phys:inst:setsquare" ||
+        action === "phys:inst:compass"
       ) {
-        const instrumentKind = action.slice(10) as "ruler" | "protractor" | "stopwatch";
+        const instrumentKind = action.slice(10) as PhysicsInstrumentKind;
         const res = dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -1520,6 +1524,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               instrumentKind,
               ...(instrumentKind === "ruler" ? { lengthCm: 20 } : {}),
               ...(instrumentKind === "stopwatch" ? { running: false, elapsedSec: 0, laps: [] } : {}),
+              ...(instrumentKind === "setsquare" ? { setSquareKind: "30-60-90" } : {}),
+              ...(instrumentKind === "protractor" ? { protractorType: "180", protractorAngle: 45 } : {}),
+              ...(instrumentKind === "compass" ? { compassRadius: 3.0, compassAngle: 0 } : {}),
             },
           },
         });
@@ -1543,6 +1550,76 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       handleSelectTool("select");
     },
     [getViewCenter, dispatcher, handleInsertPhysicsSim, handleSelectTool]
+  );
+
+  const handleSelectTeachingInstrument = useCallback(
+    (kind: "ruler" | "setsquare" | "setsquare-45" | "protractor" | "protractor-360" | "compass") => {
+      const center = getViewCenter();
+      let instrumentKind: PhysicsInstrumentKind = "ruler";
+      let extraProps: Record<string, unknown> = {};
+
+      if (kind === "ruler") {
+        instrumentKind = "ruler";
+        extraProps = { lengthCm: 20 };
+      } else if (kind === "setsquare") {
+        instrumentKind = "setsquare";
+        extraProps = { setSquareKind: "30-60-90", width: 7.2, height: 4.5 };
+      } else if (kind === "setsquare-45") {
+        instrumentKind = "setsquare";
+        extraProps = { setSquareKind: "45-45-90", width: 6.0, height: 6.0 };
+      } else if (kind === "protractor") {
+        instrumentKind = "protractor";
+        extraProps = { protractorType: "180", protractorAngle: 45, width: 6.4, height: 3.6 };
+      } else if (kind === "protractor-360") {
+        instrumentKind = "protractor";
+        extraProps = { protractorType: "360", protractorAngle: 45, width: 6.4, height: 6.4 };
+      } else if (kind === "compass") {
+        instrumentKind = "compass";
+        extraProps = { compassRadius: 3.0, compassAngle: 0, width: 5.2, height: 5.2 };
+      }
+
+      const res = dispatcher.dispatch({
+        type: "object.create",
+        params: {
+          type: "PhysicsInstrument",
+          transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
+          props: {
+            instrumentKind,
+            ...extraProps,
+          },
+        },
+      });
+      if (res.created?.[0]) setSelectedIds([res.created[0]]);
+      handleSelectTool("select");
+    },
+    [getViewCenter, dispatcher, handleSelectTool]
+  );
+
+  const handleCompassDrawArc = useCallback(
+    (cx: number, cy: number, r: number, startDeg = 0, endDeg = 360) => {
+      const pts: number[] = [];
+      const pressures: number[] = [];
+      const step = 4;
+      const span = Math.abs(endDeg - startDeg);
+      const count = Math.max(16, Math.round(span / step));
+      for (let i = 0; i <= count; i++) {
+        const aDeg = startDeg + (i / count) * (endDeg - startDeg);
+        const rad = (aDeg * Math.PI) / 180;
+        pts.push(Number((cx + r * Math.cos(rad)).toFixed(3)));
+        pts.push(Number((cy + r * Math.sin(rad)).toFixed(3)));
+        pressures.push(0.65);
+      }
+      dispatcher.dispatch({
+        type: "ink.stroke",
+        params: {
+          points: pts,
+          pressures,
+          nib: "fountain",
+          style: { stroke: "#2563eb", width: 2.2 },
+        },
+      });
+    },
+    [dispatcher]
   );
 
   const handleExportPhysicsGraph = useCallback(
@@ -4922,17 +4999,21 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       // Ink / Multi-nib Pens
       if (isPenTool(activeTool)) {
         dispatcher.gesture(true);
+        // Magnetic snap to Ruler or Set Square edges if nearby
+        const instrumentSnap = snapPointToInstruments(worldPos, pageElements, 0.45);
+        const drawPt = instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
+
         const nib = resolvePenNib(activeTool) ?? undefined;
         const smooth = nib === "fountain" || nib === "brush";
         filterXRef.current.reset();
         filterYRef.current.reset();
         const ts = performance.now();
         const x = smooth
-          ? filterXRef.current.filter(worldPos.x, ts)
-          : worldPos.x;
+          ? filterXRef.current.filter(drawPt.x, ts)
+          : drawPt.x;
         const y = smooth
-          ? filterYRef.current.filter(worldPos.y, ts)
-          : worldPos.y;
+          ? filterYRef.current.filter(drawPt.y, ts)
+          : drawPt.y;
         const effectiveStyle: Style =
           nib === "laser"
             ? { stroke: "#ef4444", width: 4 }
@@ -5343,15 +5424,19 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         e.buttons === 1 &&
         liveStroke
       ) {
+        // Magnetic snap to Ruler or Set Square edges if nearby
+        const instrumentSnap = snapPointToInstruments(worldPos, pageElements, 0.45);
+        const drawPt = instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
+
         const nib = resolvePenNib(activeTool) ?? undefined;
         const smooth = nib === "fountain" || nib === "brush";
         const ts = performance.now();
         const x = smooth
-          ? filterXRef.current.filter(worldPos.x, ts)
-          : worldPos.x;
+          ? filterXRef.current.filter(drawPt.x, ts)
+          : drawPt.x;
         const y = smooth
-          ? filterYRef.current.filter(worldPos.y, ts)
-          : worldPos.y;
+          ? filterYRef.current.filter(drawPt.y, ts)
+          : drawPt.y;
         liveStrokePointsRef.current.push(x, y);
         liveStrokePressuresRef.current.push(e.pressure || 0.5);
         setLiveStroke({
@@ -6132,6 +6217,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             isSelected={isSel}
             onPointerDown={(e) => handleElementPointerDown(e, el.id)}
             onUpdateProps={handleUpdateElementProps}
+            onDrawArcStroke={handleCompassDrawArc}
           />
         );
 
@@ -6332,6 +6418,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onOpenRealWorldDrawer={() => setRealWorldDrawerOpen(true)}
       onPhysicsAction={handlePhysicsAction}
       onOpenPhysicsDrawer={() => setPhysicsDrawerOpen(true)}
+      onSelectInstrument={handleSelectTeachingInstrument}
       onGoHome={onGoHome}
       onSaveFile={() => {
         if (!doc) return;
@@ -7039,6 +7126,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               handlePlotLabRegression(selectedPhysicsEl.id);
             }
           }}
+          onUpdateInstrumentProps={handleUpdateElementProps}
         />
       )}
 

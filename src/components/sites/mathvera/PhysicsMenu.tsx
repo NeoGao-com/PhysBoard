@@ -76,6 +76,7 @@ export const PhysicsMenu: React.FC<PhysicsMenuProps> = ({
     <div
       role="menu"
       data-wb-physics-menu="true"
+      onPointerDown={(e) => e.stopPropagation()}
       style={{
         position: "fixed",
         top: pos?.top ?? 50,

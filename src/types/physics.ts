@@ -147,7 +147,12 @@ export type PhysicsDiagramProps =
       height?: number;
     };
 
-export type PhysicsInstrumentKind = "ruler" | "protractor" | "stopwatch";
+export type PhysicsInstrumentKind =
+  | "ruler"
+  | "protractor"
+  | "stopwatch"
+  | "setsquare"
+  | "compass";
 
 export interface PhysicsInstrumentProps {
   instrumentKind: PhysicsInstrumentKind;
@@ -162,6 +167,14 @@ export interface PhysicsInstrumentProps {
   height?: number;
   /** Optional linked Axes2D element id for realtime oscilloscope curve streaming. */
   linkedAxesId?: string;
+  // Specific instrument configurations
+  setSquareKind?: "30-60-90" | "45-45-90";
+  protractorType?: "180" | "360";
+  protractorAngle?: number;
+  compassRadius?: number; // in world cm/units
+  compassArcStart?: number; // degrees
+  compassArcEnd?: number; // degrees
+  compassAngle?: number; // rotation in degrees
 }
 
 export interface LabTableRow {
