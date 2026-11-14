@@ -31,6 +31,17 @@ export const StylePicker: React.FC<StylePickerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [customColors, setCustomColors] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem("physboard_custom_colors");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((c) => typeof c === "string").slice(0, 6) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [hexDraft, setHexDraft] = useState<string | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -38,6 +49,31 @@ export const StylePicker: React.FC<StylePickerProps> = ({
   const activeStroke = hasSelection ? selection.stroke : current.stroke;
   const activeWidth = hasSelection ? selection.width : current.width;
   const activeDash = hasSelection ? selection.dash : current.dash;
+  const displayedHex =
+    hexDraft ??
+    (typeof activeStroke === "string" && activeStroke.startsWith("#")
+      ? activeStroke
+      : "#2563eb");
+
+  const applyCustomColor = (hex: string, ctrlKey = false) => {
+    const normalized = /^#[0-9a-fA-F]{6}$/.test(hex.trim())
+      ? hex.trim().toLowerCase()
+      : null;
+    if (!normalized) return;
+    setHexDraft(normalized);
+    onPick({ stroke: normalized }, ctrlKey);
+    if (!COLOR_PRESETS.some((p) => p.hex.toLowerCase() === normalized)) {
+      setCustomColors((prev) => {
+        const next = [normalized, ...prev.filter((c) => c !== normalized)].slice(0, 6);
+        try {
+          window.localStorage.setItem("physboard_custom_colors", JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    }
+  };
 
   // Click outside and Escape key listener
   useEffect(() => {
@@ -78,7 +114,9 @@ export const StylePicker: React.FC<StylePickerProps> = ({
   };
 
   const handlePick = (patch: StylePatch) => (e: React.MouseEvent) => {
+    if ("stroke" in patch) setHexDraft(null);
     onPick(patch, e.ctrlKey || e.metaKey);
+    setIsOpen(false);
   };
 
   const strokeDisplayColor =
@@ -287,24 +325,30 @@ export const StylePicker: React.FC<StylePickerProps> = ({
               ))}
               {/* Custom + Color input */}
               <label
-                title="Màu khác…"
+                title="Chọn màu bất kỳ…"
                 style={{
                   width: 28,
                   height: 28,
                   borderRadius: 6,
-                  border: "1px dashed #94a3b8",
+                  border: "1px solid #cbd5e1",
                   display: "grid",
                   placeItems: "center",
                   cursor: "pointer",
                   position: "relative",
-                  fontSize: 16,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: "#ffffff",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.45)",
+                  background:
+                    "conic-gradient(#ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #3b82f6, #a855f7, #ef4444)",
                 }}
               >
                 +
                 <input
                   type="color"
                   aria-label="Màu khác"
-                  onChange={(e) => onPick({ stroke: e.target.value }, false)}
+                  value={/^#[0-9a-fA-F]{6}$/.test(displayedHex) ? displayedHex : "#2563eb"}
+                  onChange={(e) => applyCustomColor(e.target.value, false)}
                   style={{
                     position: "absolute",
                     inset: 0,
@@ -313,6 +357,94 @@ export const StylePicker: React.FC<StylePickerProps> = ({
                   }}
                 />
               </label>
+            </div>
+
+            {/* Custom Hex Input + Recent Custom Colors */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <label
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: 6,
+                    border: "1px solid #cbd5e1",
+                    background: /^#[0-9a-fA-F]{6}$/.test(displayedHex) ? displayedHex : "#2563eb",
+                    position: "relative",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                  title="Mở bảng chọn màu tuỳ ý"
+                >
+                  <input
+                    type="color"
+                    aria-label="Bảng màu tuỳ ý"
+                    value={/^#[0-9a-fA-F]{6}$/.test(displayedHex) ? displayedHex : "#2563eb"}
+                    onChange={(e) => applyCustomColor(e.target.value, false)}
+                    style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
+                  />
+                </label>
+                <input
+                  type="text"
+                  aria-label="Mã màu Hex"
+                  data-testid="custom-color-hex"
+                  value={displayedHex}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setHexDraft(v);
+                    if (/^#[0-9a-fA-F]{6}$/.test(v.trim())) {
+                      applyCustomColor(v, false);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (/^#[0-9a-fA-F]{6}$/.test(displayedHex.trim())) {
+                        applyCustomColor(displayedHex, false);
+                      }
+                      setIsOpen(false);
+                    }
+                  }}
+                  placeholder="#2563eb"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    height: 24,
+                    padding: "0 7px",
+                    borderRadius: 6,
+                    border: "1px solid #cbd5e1",
+                    fontSize: 11.5,
+                    fontFamily: "monospace",
+                    color: "#0f172a",
+                  }}
+                />
+              </div>
+              {customColors.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ fontSize: 10.5, color: "#64748b" }}>Gần đây:</span>
+                  {customColors.map((hex) => (
+                    <button
+                      key={hex}
+                      type="button"
+                      data-color={hex}
+                      aria-label={`Màu tuỳ ý ${hex}`}
+                      title={hex}
+                      onClick={(e) => {
+                        applyCustomColor(hex, e.ctrlKey || e.metaKey);
+                        setIsOpen(false);
+                      }}
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 5,
+                        border: "1px solid rgba(0,0,0,0.18)",
+                        background: hex,
+                        cursor: "pointer",
+                        outline: activeStroke === hex ? "2px solid #1a56db" : "none",
+                        outlineOffset: 1,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Stroke Width Radiogroup */}
@@ -381,6 +513,28 @@ export const StylePicker: React.FC<StylePickerProps> = ({
                   </button>
                 );
               })}
+            </div>
+
+            {/* Custom Width Slider */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 11, color: "#64748b", whiteSpace: "nowrap" }}>
+                Cỡ nét:
+              </span>
+              <input
+                type="range"
+                aria-label="Thanh kéo độ dày nét"
+                min={1}
+                max={14}
+                step={0.5}
+                value={typeof activeWidth === "number" ? activeWidth : 2}
+                onChange={(e) =>
+                  onPick({ width: Number(e.target.value) }, e.nativeEvent instanceof KeyboardEvent ? false : false)
+                }
+                style={{ flex: 1, cursor: "pointer", accentColor: "#2563eb" }}
+              />
+              <span style={{ fontSize: 11, fontWeight: 600, minWidth: 28, textAlign: "right" }}>
+                {typeof activeWidth === "number" ? `${activeWidth}px` : "2px"}
+              </span>
             </div>
 
             {/* Stroke Style Radiogroup */}

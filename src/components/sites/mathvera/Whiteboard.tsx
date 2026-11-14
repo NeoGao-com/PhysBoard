@@ -99,6 +99,7 @@ import {
   type RealWorldArtItem,
   recordRecentRealWorldId,
 } from "@/lib/realworld-art";
+import { snapPointToInstruments } from "@/lib/instruments";
 import { buildShareUrl, sanitizeRoomId } from "@/lib/room";
 import {
   downloadBlob,
@@ -108,6 +109,16 @@ import {
   loadState,
   serializeState,
 } from "@/lib/export";
+import {
+  BOARD_PAGES_YMAP,
+  type PageBoardConfig,
+  adaptElementForBoard,
+  adaptStrokeForBoard,
+  applyBoardConfigToAllPages,
+  readPageBoardConfig,
+  resolveBoardColors,
+  writePageBoardConfig,
+} from "@/lib/board-themes";
 import {
   getShortcutMap,
   matchCommandForKeyEvent,
@@ -131,6 +142,8 @@ import { PhysicsDrawer } from "./PhysicsDrawer";
 import { ExportModal } from "./ExportModal";
 import { ExamEditor } from "./ExamEditor";
 import type {
+  PhysicsInstrumentKind,
+  PhysicsInstrumentProps,
   PhysicsLabTableProps,
   PhysicsLessonPreset,
   PhysicsSimKind,
@@ -270,6 +283,31 @@ function normalizeToolId(tool: WhiteboardTool): WhiteboardTool {
   return tool;
 }
 
+function resolvePenNib(tool: WhiteboardTool): InkProps["nib"] | null {
+  switch (tool) {
+    case "ink":
+      return undefined;
+    case "ink:fountain":
+      return "fountain";
+    case "ink:pencil":
+      return "pencil";
+    case "ink:highlighter":
+      return "highlighter";
+    case "ink:brush":
+      return "brush";
+    case "ink:dashed":
+      return "dashed";
+    default:
+      return null;
+  }
+}
+
+const PEN_ONLY_MODE_STORAGE_KEY = "physboard_pen_only_mode";
+
+function isPenTool(tool: WhiteboardTool): boolean {
+  return resolvePenNib(tool) !== null;
+}
+
 function isEditableTarget(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName?.toLowerCase();
@@ -332,6 +370,26 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     dispatcher.setPage(currentPage);
   }, [dispatcher, currentPage]);
 
+  const [boardTick, setBoardTick] = useState(0);
+  useEffect(() => {
+    const map = doc.getMap<unknown>(BOARD_PAGES_YMAP);
+    const onBoardChange = () => setBoardTick((t) => t + 1);
+    map.observe(onBoardChange);
+    return () => map.unobserve(onBoardChange);
+  }, [doc]);
+
+  const currentBoardConfig = useMemo(
+    () => {
+      void boardTick;
+      return readPageBoardConfig(doc, currentPage);
+    },
+    [doc, currentPage, boardTick]
+  );
+  const currentBoardTheme = useMemo(
+    () => resolveBoardColors(currentBoardConfig),
+    [currentBoardConfig]
+  );
+
   // 2. Tool, Style & Global Display State
   const [activeTool, setActiveTool] = useState<WhiteboardTool>("ink");
   const [currentStyle, setCurrentStyle] = useState<Style>(() => {
@@ -347,6 +405,30 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [dotScale, setDotScale] = useState<number>(DEFAULT_DOT_SCALE);
   const [, setConstructMarksTick] = useState<number>(0);
   const [gridEnabled, setGridEnabled] = useState<boolean>(true);
+  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem(PEN_ONLY_MODE_STORAGE_KEY);
+      if (saved !== null) {
+        setPenOnlyMode(saved === "true");
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, []);
+
+  const handleTogglePenOnly = useCallback((enabled: boolean) => {
+    setPenOnlyMode(enabled);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(PEN_ONLY_MODE_STORAGE_KEY, enabled ? "true" : "false");
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
   const [statusHint, setStatusHint] = useState<string | null>(null);
   const [shortcutMap, setShortcutMap] = useState<ShortcutMap>(() =>
     getShortcutMap()
@@ -414,7 +496,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [liveStroke, setLiveStroke] = useState<{
     points: number[];
     pressures?: number[];
-    nib?: "fountain";
+    nib?: InkProps["nib"];
     style: Style;
   } | null>(null);
 
@@ -1394,9 +1476,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       } else if (
         action === "phys:inst:ruler" ||
         action === "phys:inst:protractor" ||
-        action === "phys:inst:stopwatch"
+        action === "phys:inst:stopwatch" ||
+        action === "phys:inst:setsquare" ||
+        action === "phys:inst:compass"
       ) {
-        const instrumentKind = action.slice(10) as "ruler" | "protractor" | "stopwatch";
+        const instrumentKind = action.slice(10) as PhysicsInstrumentKind;
         const res = dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -1406,6 +1490,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               instrumentKind,
               ...(instrumentKind === "ruler" ? { lengthCm: 20 } : {}),
               ...(instrumentKind === "stopwatch" ? { running: false, elapsedSec: 0, laps: [] } : {}),
+              ...(instrumentKind === "setsquare" ? { setSquareKind: "30-60-90" } : {}),
+              ...(instrumentKind === "protractor" ? { protractorType: "180", protractorAngle: 45 } : {}),
+              ...(instrumentKind === "compass" ? { compassRadius: 3.0, compassAngle: 0 } : {}),
             },
           },
         });
@@ -1429,6 +1516,76 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       handleSelectTool("select");
     },
     [getViewCenter, dispatcher, handleInsertPhysicsSim, handleSelectTool]
+  );
+
+  const handleSelectTeachingInstrument = useCallback(
+    (kind: "ruler" | "setsquare" | "setsquare-45" | "protractor" | "protractor-360" | "compass") => {
+      const center = getViewCenter();
+      let instrumentKind: PhysicsInstrumentKind = "ruler";
+      let extraProps: Record<string, unknown> = {};
+
+      if (kind === "ruler") {
+        instrumentKind = "ruler";
+        extraProps = { lengthCm: 20 };
+      } else if (kind === "setsquare") {
+        instrumentKind = "setsquare";
+        extraProps = { setSquareKind: "30-60-90", width: 7.2, height: 4.5 };
+      } else if (kind === "setsquare-45") {
+        instrumentKind = "setsquare";
+        extraProps = { setSquareKind: "45-45-90", width: 6.0, height: 6.0 };
+      } else if (kind === "protractor") {
+        instrumentKind = "protractor";
+        extraProps = { protractorType: "180", protractorAngle: 45, width: 6.4, height: 3.6 };
+      } else if (kind === "protractor-360") {
+        instrumentKind = "protractor";
+        extraProps = { protractorType: "360", protractorAngle: 45, width: 6.4, height: 6.4 };
+      } else if (kind === "compass") {
+        instrumentKind = "compass";
+        extraProps = { compassRadius: 3.0, compassAngle: 0, width: 5.2, height: 5.2 };
+      }
+
+      const res = dispatcher.dispatch({
+        type: "object.create",
+        params: {
+          type: "PhysicsInstrument",
+          transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
+          props: {
+            instrumentKind,
+            ...extraProps,
+          },
+        },
+      });
+      if (res.created?.[0]) setSelectedIds([res.created[0]]);
+      handleSelectTool("select");
+    },
+    [getViewCenter, dispatcher, handleSelectTool]
+  );
+
+  const handleCompassDrawArc = useCallback(
+    (cx: number, cy: number, r: number, startDeg = 0, endDeg = 360) => {
+      const pts: number[] = [];
+      const pressures: number[] = [];
+      const step = 4;
+      const span = Math.abs(endDeg - startDeg);
+      const count = Math.max(16, Math.round(span / step));
+      for (let i = 0; i <= count; i++) {
+        const aDeg = startDeg + (i / count) * (endDeg - startDeg);
+        const rad = (aDeg * Math.PI) / 180;
+        pts.push(Number((cx + r * Math.cos(rad)).toFixed(3)));
+        pts.push(Number((cy + r * Math.sin(rad)).toFixed(3)));
+        pressures.push(0.65);
+      }
+      dispatcher.dispatch({
+        type: "ink.stroke",
+        params: {
+          points: pts,
+          pressures,
+          nib: "fountain",
+          style: { stroke: "#2563eb", width: 2.2 },
+        },
+      });
+    },
+    [dispatcher]
   );
 
   const handleExportPhysicsGraph = useCallback(
@@ -2410,7 +2567,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const handleInsertPdfPages = useCallback(
     (pages: ImportedPdfPage[]) => {
       if (pages.length === 0) return;
-      const center = getViewCenter();
+      // When A4 format is active, center is (0, 0), otherwise use current view center
+      const isA4 = currentBoardConfig?.format === "a4_portrait" || currentBoardConfig?.format === "a4_landscape";
+      const targetPos = isA4 ? { x: 0, y: 0 } : getViewCenter();
       const startPage = currentPage;
       let targetCount = pageCount;
 
@@ -2420,6 +2579,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           while (targetCount < pageNum) {
             const added = addYjsPage(doc);
             targetCount = added.count;
+            // Inherit the board configuration (e.g. A4 format, surface theme) to the newly created pages
+            if (currentBoardConfig) {
+              writePageBoardConfig(doc, pageNum, currentBoardConfig);
+            }
+          }
+          // If inserting into current or existing page, also ensure its board format is consistent
+          if (currentBoardConfig && pageNum <= targetCount) {
+            writePageBoardConfig(doc, pageNum, currentBoardConfig);
           }
           dispatcher.dispatch({
             type: "object.create",
@@ -2427,8 +2594,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               type: "Image",
               page: pageNum,
               transform: {
-                x: center.x,
-                y: center.y,
+                x: targetPos.x,
+                y: targetPos.y,
                 scale: 1,
                 rotation: 0,
                 z: 0,
@@ -2439,8 +2606,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         });
       });
       setYjsCurrentPage(doc, startPage);
+      setStatusHint(`✓ Đã nhập thành công ${pages.length} trang PDF vào các trang bảng`);
     },
-    [dispatcher, doc, currentPage, pageCount, getViewCenter]
+    [dispatcher, doc, currentPage, pageCount, getViewCenter, currentBoardConfig]
   );
 
   const handleM3Action = useCallback(
@@ -4063,6 +4231,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   // --- Root Canvas Pointer Down ---
   const handleCanvasPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
+      // If Pen-Only mode is enabled: touches from fingers are routed to panning & navigation
+      if (penOnlyMode && e.pointerType === "touch") {
+        navPointerDown(e);
+        return;
+      }
+
       const rect = containerRef.current?.getBoundingClientRect();
       const worldPos = screenToWorld(
         e.clientX,
@@ -4715,26 +4889,38 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }
       }
 
-      // Ink / Fountain Pen
-      if (activeTool === "ink" || activeTool === "ink:fountain") {
+      // Ink / Multi-nib Pens
+      if (isPenTool(activeTool)) {
         dispatcher.gesture(true);
-        const isFountain = activeTool === "ink:fountain";
+        // Magnetic snap to Ruler or Set Square edges if nearby
+        const instrumentSnap = snapPointToInstruments(worldPos, pageElements, 0.45);
+        const drawPt = instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
+
+        const nib = resolvePenNib(activeTool) ?? undefined;
+        const smooth = nib === "fountain" || nib === "brush";
         filterXRef.current.reset();
         filterYRef.current.reset();
         const ts = performance.now();
-        const x = isFountain
-          ? filterXRef.current.filter(worldPos.x, ts)
-          : worldPos.x;
-        const y = isFountain
-          ? filterYRef.current.filter(worldPos.y, ts)
-          : worldPos.y;
+        const x = smooth
+          ? filterXRef.current.filter(drawPt.x, ts)
+          : drawPt.x;
+        const y = smooth
+          ? filterYRef.current.filter(drawPt.y, ts)
+          : drawPt.y;
+        const effectiveStyle: Style =
+          nib === "highlighter" &&
+          (!currentStyle.stroke || currentStyle.stroke.toLowerCase() === "#111827")
+            ? { ...currentStyle, stroke: "#facc15" }
+            : nib === "dashed"
+            ? { ...currentStyle, dash: true }
+            : currentStyle;
         liveStrokePointsRef.current = [x, y];
         liveStrokePressuresRef.current = [e.pressure || 0.5];
         setLiveStroke({
           points: [x, y],
           pressures: [e.pressure || 0.5],
-          nib: isFountain ? "fountain" : undefined,
-          style: currentStyle,
+          nib,
+          style: effectiveStyle,
         });
       }
     },
@@ -4757,6 +4943,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       solved3D.p3,
       handleSelectTool,
       handleConstructionClick,
+      penOnlyMode,
     ]
   );
 
@@ -5122,27 +5309,32 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return;
       }
 
-      // 6. Ink / Fountain Pen
+      // 6. Ink / Multi-nib Pens
       if (
-        (activeTool === "ink" || activeTool === "ink:fountain") &&
+        isPenTool(activeTool) &&
         e.buttons === 1 &&
         liveStroke
       ) {
-        const isFountain = activeTool === "ink:fountain";
+        // Magnetic snap to Ruler or Set Square edges if nearby
+        const instrumentSnap = snapPointToInstruments(worldPos, pageElements, 0.45);
+        const drawPt = instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
+
+        const nib = resolvePenNib(activeTool) ?? undefined;
+        const smooth = nib === "fountain" || nib === "brush";
         const ts = performance.now();
-        const x = isFountain
-          ? filterXRef.current.filter(worldPos.x, ts)
-          : worldPos.x;
-        const y = isFountain
-          ? filterYRef.current.filter(worldPos.y, ts)
-          : worldPos.y;
+        const x = smooth
+          ? filterXRef.current.filter(drawPt.x, ts)
+          : drawPt.x;
+        const y = smooth
+          ? filterYRef.current.filter(drawPt.y, ts)
+          : drawPt.y;
         liveStrokePointsRef.current.push(x, y);
         liveStrokePressuresRef.current.push(e.pressure || 0.5);
         setLiveStroke({
           points: [...liveStrokePointsRef.current],
           pressures: [...liveStrokePressuresRef.current],
-          nib: isFountain ? "fountain" : undefined,
-          style: currentStyle,
+          nib,
+          style: liveStroke.style,
         });
       }
     },
@@ -5154,7 +5346,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       activeTool,
       pageElements,
       liveStroke,
-      currentStyle,
     ]
   );
 
@@ -5240,7 +5431,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               points: pts,
               pressures,
               nib: liveStroke.nib,
-              style: currentStyle,
+              style: liveStroke.style,
             },
           });
         }
@@ -5259,7 +5450,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       findNearestPoint,
       commitTwoPointShape,
       liveStroke,
-      currentStyle,
     ]
   );
 
@@ -5329,8 +5519,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   );
 
   // --- Shared Renderers (used in both Fullscreen Whiteboard & 50/50 Split Exam Mode) ---
-  const renderBoardElement = (el: CanvasElement) => {
-    if (el.style?.hidden) return null;
+  const renderBoardElement = (rawEl: CanvasElement) => {
+    if (rawEl.style?.hidden) return null;
+    const el = adaptElementForBoard(rawEl, currentBoardTheme.isDark);
     const isSel = selectedIds.includes(el.id);
 
     switch (el.type) {
@@ -5796,6 +5987,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             isSelected={isSel}
             onPointerDown={(e) => handleElementPointerDown(e, el.id)}
             onUpdateProps={handleUpdateElementProps}
+            onDrawArcStroke={handleCompassDrawArc}
           />
         );
 
@@ -5824,6 +6016,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       isPanning={isPanning}
       isSpacePressed={isSpacePressed}
       contained={contained}
+      boardConfig={currentBoardConfig}
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
@@ -5909,7 +6102,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         <InkElement
           id="live-in-progress-stroke"
           transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
-          style={liveStroke.style}
+          style={{
+            ...liveStroke.style,
+            stroke: adaptStrokeForBoard(
+              liveStroke.style?.stroke,
+              currentBoardTheme.isDark
+            ),
+          }}
           props={{
             points: liveStroke.points,
             pressures: liveStroke.pressures,
@@ -5966,6 +6165,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onOpenRealWorldDrawer={() => setRealWorldDrawerOpen(true)}
       onPhysicsAction={handlePhysicsAction}
       onOpenPhysicsDrawer={() => setPhysicsDrawerOpen(true)}
+      onSelectInstrument={handleSelectTeachingInstrument}
       onGoHome={onGoHome}
       onSaveFile={() => {
         if (!doc) return;
@@ -5993,6 +6193,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       hasPaper={hasPaper}
       labelScale={labelScale}
       dotScale={dotScale}
+      boardConfig={currentBoardConfig}
+      onChangeBoardConfig={(next: PageBoardConfig) => {
+        writePageBoardConfig(doc, currentPage, next);
+        if (next.pattern !== "none") setGridEnabled(true);
+      }}
+      onApplyBoardAllPages={(cfg: PageBoardConfig) => {
+        applyBoardConfigToAllPages(doc, pageCount, cfg);
+        setStatusHint("✓ Đã áp dụng loại bảng cho tất cả các trang");
+      }}
       onScaleGeometry={(factor) => dispatcher.scaleGeometry(factor)}
       onChangeLabelScale={setLabelScale}
       onChangeDotScale={setDotScale}
@@ -6001,6 +6210,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onExportTikz={() => setExportModalMode("tikz")}
       onOpenJsonModal={() => setExportModalMode("json")}
       shortcutMap={shortcutMap}
+      penOnlyMode={penOnlyMode}
+      onTogglePenOnly={handleTogglePenOnly}
     />
   );
 
@@ -6660,6 +6871,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               handlePlotLabRegression(selectedPhysicsEl.id);
             }
           }}
+          onUpdateInstrumentProps={handleUpdateElementProps}
         />
       )}
 

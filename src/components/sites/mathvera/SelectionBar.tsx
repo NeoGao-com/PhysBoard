@@ -43,6 +43,7 @@ export interface SelectionBarProps {
   onPhysicsRecordData?: () => void;
   onPhysicsRotateInstrument?: (deltaDeg: number) => void;
   onPhysicsPlotRegression?: () => void;
+  onUpdateInstrumentProps?: (id: string, patch: Record<string, unknown>) => void;
   onSolidFaceFlatten?: () => void;
   onSolidFaceFill?: () => void;
   onSolidFaceExtendPlane?: () => void;
@@ -97,7 +98,8 @@ const pillGroupStyle: React.CSSProperties = {
   border: "1px solid #cbd5e1",
   background: "#ffffff",
   color: "#1e293b",
-  font: "13.5px system-ui, -apple-system, sans-serif",
+  fontSize: 13.5,
+  fontFamily: "system-ui, -apple-system, sans-serif",
   boxShadow: "0 2px 8px rgba(15,23,42,0.12)",
 };
 
@@ -109,7 +111,8 @@ const pillMiniBtnStyle: React.CSSProperties = {
   cursor: "pointer",
   padding: "3px 6px",
   borderRadius: 6,
-  font: "13.5px system-ui, -apple-system, sans-serif",
+  fontSize: 13.5,
+  fontFamily: "system-ui, -apple-system, sans-serif",
   lineHeight: 1.2,
 };
 
@@ -152,6 +155,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onPhysicsRecordData,
   onPhysicsRotateInstrument,
   onPhysicsPlotRegression,
+  onUpdateInstrumentProps,
   onSolidFaceFlatten,
   onSolidFaceFill,
   onSolidFaceExtendPlane,
@@ -230,7 +234,8 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               background: "#fef3c7",
               color: "#92400e",
               fontWeight: 700,
-              font: "14px system-ui, -apple-system, sans-serif",
+              fontSize: 14,
+              fontFamily: "system-ui, -apple-system, sans-serif",
               boxShadow: "0 2px 8px rgba(15,23,42,0.1)",
             }}
           >
@@ -442,7 +447,8 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
             color: "#ffffff",
             fontWeight: 700,
             cursor: "pointer",
-            font: "15px system-ui, -apple-system, sans-serif",
+            fontSize: 15,
+            fontFamily: "system-ui, -apple-system, sans-serif",
             boxShadow: "0 4px 16px rgba(220,38,38,0.45)",
           }}
         >
@@ -468,7 +474,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               title={allPointNamesHidden ? "Hiện lại tên điểm" : "Ẩn tên điểm khỏi bảng"}
               style={{
                 ...actionBtnStyle,
-                borderColor: allPointNamesHidden ? "#2563eb" : "#cbd5e1",
+                border: allPointNamesHidden ? "1px solid #2563eb" : "1px solid #cbd5e1",
                 background: allPointNamesHidden ? "#eff6ff" : "#ffffff",
                 color: allPointNamesHidden ? "#1d4ed8" : "#1e293b",
               }}
@@ -656,6 +662,97 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               >
                 ↻ Xoay +15°
               </button>
+
+              {/* SetSquare angle mode switch */}
+              {selectedPhysicsEl.props.instrumentKind === "setsquare" && (
+                <button
+                  type="button"
+                  data-action="switch-setsquare-kind"
+                  onClick={() => {
+                    const current = selectedPhysicsEl.props.setSquareKind;
+                    const next = current === "30-60-90" ? "45-45-90" : "30-60-90";
+                    onUpdateInstrumentProps?.(selectedPhysicsEl.id, { setSquareKind: next });
+                  }}
+                  style={{
+                    ...actionBtnStyle,
+                    background: "#fef3c7",
+                    color: "#92400e",
+                    fontWeight: 600,
+                  }}
+                >
+                  📐 {selectedPhysicsEl.props.setSquareKind === "30-60-90" ? "Đổi sang 45°–45°" : "Đổi sang 30°–60°"}
+                </button>
+              )}
+
+              {/* Protractor 180 / 360 mode switch */}
+              {selectedPhysicsEl.props.instrumentKind === "protractor" && (
+                <>
+                  <button
+                    type="button"
+                    data-action="switch-protractor-type"
+                    onClick={() => {
+                      const is360 = selectedPhysicsEl.props.protractorType === "360";
+                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
+                        protractorType: is360 ? "180" : "360",
+                      });
+                    }}
+                    style={{
+                      ...actionBtnStyle,
+                      background: "#e0f2fe",
+                      color: "#0369a1",
+                      fontWeight: 600,
+                    }}
+                  >
+                    🔄 {selectedPhysicsEl.props.protractorType === "360" ? "Đổi sang 180°" : "Đổi sang 360°"}
+                  </button>
+                  <button
+                    type="button"
+                    data-action="step-protractor-angle"
+                    onClick={() => {
+                      const cur = Number(selectedPhysicsEl.props.protractorAngle ?? 45);
+                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
+                        protractorAngle: (cur + 15) % (selectedPhysicsEl.props.protractorType === "360" ? 360 : 180),
+                      });
+                    }}
+                    style={actionBtnStyle}
+                    title="Thay đổi góc đo trên thước"
+                  >
+                    Đo góc +15°
+                  </button>
+                </>
+              )}
+
+              {/* Compass radius adjustment */}
+              {selectedPhysicsEl.props.instrumentKind === "compass" && (
+                <>
+                  <button
+                    type="button"
+                    data-action="compass-radius-dec"
+                    onClick={() => {
+                      const cur = Number(selectedPhysicsEl.props.compassRadius ?? 3.0);
+                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
+                        compassRadius: Math.max(1.0, Number((cur - 0.5).toFixed(1))),
+                      });
+                    }}
+                    style={actionBtnStyle}
+                  >
+                    R -0.5cm
+                  </button>
+                  <button
+                    type="button"
+                    data-action="compass-radius-inc"
+                    onClick={() => {
+                      const cur = Number(selectedPhysicsEl.props.compassRadius ?? 3.0);
+                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
+                        compassRadius: Math.min(8.0, Number((cur + 0.5).toFixed(1))),
+                      });
+                    }}
+                    style={actionBtnStyle}
+                  >
+                    R +0.5cm
+                  </button>
+                </>
+              )}
             </>
           )}
 
@@ -676,19 +773,19 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
           </button>
         )}
 
+        {/* Duplicate */}
+        <button
+          type="button"
+          data-action="duplicate"
+          onClick={onDuplicate}
+          title="Tạo một bản sao ngay bên cạnh (giữ nguyên cách dựng)"
+          style={actionBtnStyle}
+        >
+          ⧉ Nhân bản
+        </button>
+
         {!isPointsContext && (
           <>
-            {/* Duplicate */}
-            <button
-              type="button"
-              data-action="duplicate"
-              onClick={onDuplicate}
-              title="Tạo một bản sao ngay bên cạnh (giữ nguyên cách dựng)"
-              style={actionBtnStyle}
-            >
-              ⧉ Nhân bản
-            </button>
-
             {/* Copy */}
             <button
               type="button"

@@ -28,9 +28,21 @@ export const InkElement: React.FC<InkElementProps> = ({
   const points = useMemo(() => props.points ?? [], [props.points]);
   const strokeColor = style.stroke ?? "#111827";
   const strokeWidth = style.width ?? DEFAULT_WIDTH;
-  const isDashed = style.dash === true;
 
-  const isFountain = props.nib === "fountain";
+  const isVariableInk = props.nib === "fountain" || props.nib === "brush";
+  const isHighlighter = props.nib === "highlighter";
+  const isPencil = props.nib === "pencil";
+  const isDashed = style.dash === true || props.nib === "dashed";
+  const effectiveWidth =
+    props.nib === "brush"
+      ? strokeWidth * 1.9
+      : isHighlighter
+      ? Math.max(12, strokeWidth * 5.2)
+      : isPencil
+      ? Math.max(1.2, strokeWidth * 0.8)
+      : strokeWidth;
+  const effectiveOpacity =
+    style.opacity ?? (isHighlighter ? 0.36 : isPencil ? 0.78 : 1);
 
   // Polyline coordinates for hit testing
   const polylinePoints = useMemo(() => {
@@ -43,17 +55,17 @@ export const InkElement: React.FC<InkElementProps> = ({
 
   // SVG Path Data
   const pathData = useMemo(() => {
-    if (isFountain) {
+    if (isVariableInk) {
       return generateFilledInkPath(
         points,
         props.pressures,
         scale,
-        strokeWidth,
+        effectiveWidth,
         props.nib
       );
     }
     return generateCatmullRomSpline(points);
-  }, [points, props.pressures, scale, strokeWidth, isFountain, props.nib]);
+  }, [points, props.pressures, scale, effectiveWidth, isVariableInk, props.nib]);
 
   return (
     <g
@@ -61,7 +73,7 @@ export const InkElement: React.FC<InkElementProps> = ({
       data-element-type="Ink"
       data-nib={props.nib}
       data-selected={isSelected ? "true" : undefined}
-      className={isFountain ? "wb-fountain-stroke" : "wb-ink-stroke"}
+      className={isVariableInk ? "wb-fountain-stroke" : "wb-ink-stroke"}
       transform={`translate(${transform.x} ${-transform.y})`}
       onPointerDown={onPointerDown}
       style={{ cursor: "pointer" }}
@@ -71,30 +83,33 @@ export const InkElement: React.FC<InkElementProps> = ({
         points={polylinePoints}
         fill="none"
         stroke="rgba(0,0,0,0.001)"
-        strokeWidth={20}
+        strokeWidth={Math.max(20, effectiveWidth)}
         pointerEvents="stroke"
         vectorEffect="non-scaling-stroke"
       />
 
       {/* 2. Rendered stroke path */}
-      {isFountain ? (
+      {isVariableInk ? (
         <path
           d={pathData}
           fill={strokeColor}
           stroke="none"
-          opacity={style.opacity ?? 1}
+          opacity={effectiveOpacity}
         />
       ) : (
         <path
           d={pathData}
           fill="none"
           stroke={strokeColor}
-          strokeWidth={strokeWidth}
-          strokeDasharray={isDashed ? "6 4" : undefined}
+          strokeWidth={effectiveWidth}
+          strokeDasharray={
+            isDashed ? "7 5" : isPencil ? "1.6 0.6" : undefined
+          }
           strokeLinecap="round"
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
-          opacity={style.opacity ?? 1}
+          opacity={effectiveOpacity}
+          style={isHighlighter ? { mixBlendMode: "multiply" } : undefined}
         />
       )}
     </g>

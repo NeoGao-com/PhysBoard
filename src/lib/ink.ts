@@ -244,7 +244,7 @@ export function generateFilledInkPath(
   pressures: number[] | undefined,
   scale: number,
   baseWidth: number = 2.4,
-  nib?: "fountain"
+  nib?: "fountain" | "pencil" | "highlighter" | "brush" | "dashed"
 ): string {
   const rawPts: Array<[number, number, number]> = [];
   for (let i = 0; i + 1 < flatPoints.length; i += 2) {
@@ -289,7 +289,7 @@ export function generateFilledInkPath(
   }
 
   let outline: Array<[number, number]>;
-  if (nib === "fountain") {
+  if (nib === "fountain" || nib === "brush") {
     const widths = computeFountainPenThickness(subdivided, baseWidth);
     if (subdivided.length === 1) {
       const [x, y] = subdivided[0];
