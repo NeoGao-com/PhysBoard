@@ -13,7 +13,6 @@ export interface HtmlSimElementProps {
 
 export const HtmlSimElement: React.FC<HtmlSimElementProps> = ({
   element,
-  scale = 45,
   isSelected = false,
   onPointerDown,
   onUpdateProps,
@@ -22,11 +21,18 @@ export const HtmlSimElement: React.FC<HtmlSimElementProps> = ({
   const title = typeof element.props?.title === "string" ? element.props.title : "Mô phỏng Thí nghiệm";
   const widthPx = typeof element.props?.widthPx === "number" ? element.props.widthPx : 860;
   const heightPx = typeof element.props?.heightPx === "number" ? element.props.heightPx : 560;
-  
+  const totalH = heightPx + 38;
+
+  const sc = element.transform.scale || 1;
+  const defaultW = widthPx / 45;
+  const defaultH = totalH / 45;
+  const worldW = (typeof element.props?.width === "number" && element.props.width > 0 ? element.props.width : defaultW) * sc;
+  const worldH = (typeof element.props?.height === "number" && element.props.height > 0 ? element.props.height : defaultH) * sc;
+  const tx = element.transform.x;
+  const ty = element.transform.y;
+
   // Interactive mode toggle: when interactive, iframe captures pointer events; when not, whiteboard handles moving/resizing
   const [interactive, setInteractive] = useState(false);
-
-  const invScale = (element.transform.scale || 1) / (scale || 45);
 
   return (
     <g
@@ -36,14 +42,14 @@ export const HtmlSimElement: React.FC<HtmlSimElementProps> = ({
       data-wb-type="HtmlSim"
       className="wb-html-sim"
       data-selected={isSelected ? "true" : undefined}
-      transform={`translate(${element.transform.x} ${-element.transform.y}) scale(${invScale})`}
+      transform={`translate(${tx - worldW / 2} ${-ty - worldH / 2}) scale(${worldW / widthPx} ${worldH / totalH})`}
       onPointerDown={onPointerDown}
     >
       <foreignObject
         x={0}
         y={0}
         width={widthPx}
-        height={heightPx + 38}
+        height={totalH}
         style={{ overflow: "visible" }}
       >
         <div
@@ -117,7 +123,12 @@ export const HtmlSimElement: React.FC<HtmlSimElementProps> = ({
                     const nw = Number(w);
                     const nh = Number(h);
                     if (Number.isFinite(nw) && Number.isFinite(nh) && nw > 200 && nh > 200) {
-                      onUpdateProps?.(element.id, { widthPx: nw, heightPx: nh });
+                      onUpdateProps?.(element.id, {
+                        widthPx: nw,
+                        heightPx: nh,
+                        width: nw / 45,
+                        height: (nh + 38) / 45,
+                      });
                     }
                   }
                 }}

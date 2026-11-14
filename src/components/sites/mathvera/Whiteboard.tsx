@@ -5523,7 +5523,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               initEl.type === "PhysicsSim" ||
               initEl.type === "PhysicsDiagram" ||
               initEl.type === "PhysicsInstrument" ||
-              initEl.type === "PhysicsLabTable"
+              initEl.type === "PhysicsLabTable" ||
+              initEl.type === "HtmlSim"
             ) {
               const s = Math.max(0.45, Math.abs(avgScale));
               dispatcher.dispatch({
