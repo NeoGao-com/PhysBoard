@@ -159,6 +159,55 @@ export const VarTableElement: React.FC<VarTableElementProps> = ({
     onUpdate?.(element.id, { rows: nextRows });
   };
 
+  const addSignRow = () => {
+    const newSignRow: VarTableRow = {
+      kind: "sign",
+      label: "y''",
+      cells: Array.from({ length: 2 * n - 1 }, (_, i) => (i % 2 === 0 ? "0" : "+")),
+    };
+    onUpdate?.(element.id, { rows: [...data.rows, newSignRow] });
+  };
+
+  const addVariationRow = () => {
+    const newVarRow: VarTableRow = {
+      kind: "variation",
+      label: "y",
+      cells: Array.from({ length: n }, () => ({
+        v: [{ latex: "0", level: "mid" }],
+      })),
+    };
+    onUpdate?.(element.id, { rows: [...data.rows, newVarRow] });
+  };
+
+  const addColumnX = () => {
+    const nextXs = [...data.xs, "x_0"];
+    const nextRows = data.rows.map((row) => {
+      if (row.kind === "sign") {
+        return {
+          ...row,
+          cells: [...row.cells, "+", "0"],
+        };
+      } else {
+        return {
+          ...row,
+          cells: [...row.cells, { v: [{ latex: "0", level: "mid" as const }] }],
+        };
+      }
+    });
+    onUpdate?.(element.id, { xs: nextXs, rows: nextRows });
+  };
+
+  const deleteRow = (rowIdx: number) => {
+    if (data.rows.length <= 1) return;
+    const nextRows = data.rows.filter((_, i) => i !== rowIdx);
+    onUpdate?.(element.id, { rows: nextRows });
+  };
+
+  const editRowLabel = (rowIdx: number, newLabel: string) => {
+    const nextRows = data.rows.map((r, i) => (i === rowIdx ? { ...r, label: newLabel } : r));
+    onUpdate?.(element.id, { rows: nextRows });
+  };
+
   const totalCols = 2 * n - 1;
 
   return (
@@ -176,121 +225,228 @@ export const VarTableElement: React.FC<VarTableElementProps> = ({
       <foreignObject
         x={0}
         y={0}
-        width={tableW + 12}
-        height={totalH + 12}
+        width={tableW + 120}
+        height={totalH + 60}
         style={{ overflow: "visible" }}
       >
-        <div
-          style={{
-            display: "inline-block",
-            background: "#ffffff",
-            border: `1.5px solid ${strokeColor}`,
-            borderRadius: 6,
-            boxShadow: "0 2px 10px rgba(15, 23, 42, 0.08)",
-            overflow: "hidden",
-            fontFamily: "system-ui, sans-serif",
-            pointerEvents: "auto",
-          }}
-        >
-          <table
-            className="var-table"
+        <div style={{ display: "inline-block", position: "relative" }}>
+          {isSelected && (
+            <div
+              data-export-skip="true"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginBottom: 6,
+                background: "#0f172a",
+                padding: "4px 8px",
+                borderRadius: 6,
+                boxShadow: "0 4px 12px rgba(15,23,42,0.25)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={addSignRow}
+                style={{
+                  background: "#2563eb",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "3px 7px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                + Thêm hàng dấu (y&apos;&apos;)
+              </button>
+              <button
+                type="button"
+                onClick={addVariationRow}
+                style={{
+                  background: "#0891b2",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "3px 7px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                + Thêm hàng f(x)
+              </button>
+              <button
+                type="button"
+                onClick={addColumnX}
+                style={{
+                  background: "#475569",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "3px 7px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                + Thêm mốc x
+              </button>
+            </div>
+          )}
+
+          <div
             style={{
-              borderCollapse: "collapse",
-              tableLayout: "fixed",
-              width: tableW,
-              color: "#0f172a",
-              fontSize: 15,
+              display: "inline-block",
+              background: "#ffffff",
+              border: `1.5px solid ${strokeColor}`,
+              borderRadius: 6,
+              boxShadow: "0 2px 10px rgba(15, 23, 42, 0.08)",
+              overflow: "hidden",
+              fontFamily: "system-ui, sans-serif",
+              pointerEvents: "auto",
             }}
           >
-            <colgroup>
-              <col style={{ width: headerColW }} />
-              {Array.from({ length: totalCols }, (_, ci) => (
-                <col
-                  key={ci}
-                  style={{ width: ci % 2 === 0 ? nodeColW : intervalColW }}
-                />
-              ))}
-            </colgroup>
-            <tbody>
-              {/* Row 1: x values */}
-              <tr style={{ height: 36, borderBottom: "1px solid #475569" }}>
-                <td
-                  style={{
-                    borderRight: "1px solid #475569",
-                    textAlign: "center",
-                    fontWeight: 600,
-                    background: "#f8fafc",
-                  }}
-                >
-                  <KaTeXFormula latex="x" />
-                </td>
-                {Array.from({ length: totalCols }, (_, ci) => {
-                  if (ci % 2 === 1) {
-                    return <td key={ci} />;
-                  }
-                  const idx = ci / 2;
-                  const xVal = data.xs[idx] ?? "";
-                  const isEd = editingSlot?.kind === "x" && editingSlot.idx === idx;
-                  return (
+            <table
+              className="var-table"
+              style={{
+                borderCollapse: "collapse",
+                tableLayout: "fixed",
+                width: tableW,
+                color: "#0f172a",
+                fontSize: 15,
+              }}
+            >
+              <colgroup>
+                <col style={{ width: headerColW }} />
+                {Array.from({ length: totalCols }, (_, ci) => (
+                  <col
+                    key={ci}
+                    style={{ width: ci % 2 === 0 ? nodeColW : intervalColW }}
+                  />
+                ))}
+              </colgroup>
+              <tbody>
+                {/* Row 1: x values */}
+                <tr style={{ height: 36, borderBottom: "1px solid #475569" }}>
+                  <td
+                    style={{
+                      borderRight: "1px solid #475569",
+                      textAlign: "center",
+                      fontWeight: 600,
+                      background: "#f8fafc",
+                    }}
+                  >
+                    <KaTeXFormula latex="x" />
+                  </td>
+                  {Array.from({ length: totalCols }, (_, ci) => {
+                    if (ci % 2 === 1) {
+                      return <td key={ci} />;
+                    }
+                    const idx = ci / 2;
+                    const xVal = data.xs[idx] ?? "";
+                    const isEd = editingSlot?.kind === "x" && editingSlot.idx === idx;
+                    return (
+                      <td
+                        key={ci}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSlot({ kind: "x", idx });
+                          setDraft(xVal);
+                        }}
+                        style={{
+                          textAlign: "center",
+                          verticalAlign: "middle",
+                          padding: "2px 4px",
+                        }}
+                      >
+                        {isEd ? (
+                          <input
+                            autoFocus
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            onBlur={commitSlot}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => {
+                              e.stopPropagation();
+                              if (e.key === "Enter") commitSlot();
+                              if (e.key === "Escape") setEditingSlot(null);
+                            }}
+                            style={{
+                              width: "100%",
+                              fontSize: 12,
+                              border: "1px solid #2563eb",
+                              borderRadius: 3,
+                              textAlign: "center",
+                            }}
+                          />
+                        ) : (
+                          <KaTeXFormula latex={xVal || "\\square"} />
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+
+                {/* Subsequent rows: Sign and Variation */}
+                {data.rows.map((row, rowIdx) => {
+                  const labelSlot = (
                     <td
-                      key={ci}
+                      key="header-cell"
                       onDoubleClick={(e) => {
                         e.stopPropagation();
-                        setEditingSlot({ kind: "x", idx });
-                        setDraft(xVal);
+                        const next = window.prompt("Tên hàng (LaTeX):", row.label);
+                        if (next !== null && next.trim()) editRowLabel(rowIdx, next.trim());
                       }}
+                      title="Nháy đúp để đổi tên hàng"
                       style={{
+                        borderRight: "1px solid #475569",
                         textAlign: "center",
-                        verticalAlign: "middle",
-                        padding: "2px 4px",
+                        fontWeight: 600,
+                        background: "#f8fafc",
+                        position: "relative",
                       }}
                     >
-                      {isEd ? (
-                        <input
-                          autoFocus
-                          value={draft}
-                          onChange={(e) => setDraft(e.target.value)}
-                          onBlur={commitSlot}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onKeyDown={(e) => {
+                      <KaTeXFormula latex={row.label} />
+                      {isSelected && data.rows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
                             e.stopPropagation();
-                            if (e.key === "Enter") commitSlot();
-                            if (e.key === "Escape") setEditingSlot(null);
+                            deleteRow(rowIdx);
                           }}
+                          title="Xóa hàng này"
                           style={{
-                            width: "100%",
-                            fontSize: 12,
-                            border: "1px solid #2563eb",
+                            position: "absolute",
+                            top: 2,
+                            left: 2,
+                            border: "none",
+                            background: "rgba(239,68,68,0.15)",
+                            color: "#dc2626",
+                            fontSize: 10,
                             borderRadius: 3,
-                            textAlign: "center",
+                            width: 14,
+                            height: 14,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            padding: 0,
                           }}
-                        />
-                      ) : (
-                        <KaTeXFormula latex={xVal || "\\square"} />
+                        >
+                          ✕
+                        </button>
                       )}
                     </td>
                   );
-                })}
-              </tr>
 
-              {/* Subsequent rows: Sign and Variation */}
-              {data.rows.map((row, rowIdx) => {
-                if (row.kind === "sign") {
-                  return (
-                    <tr
-                      key={rowIdx}
-                      style={{ height: 34, borderBottom: "1px solid #475569" }}
-                    >
-                      <td
-                        style={{
-                          borderRight: "1px solid #475569",
-                          textAlign: "center",
-                          fontWeight: 600,
-                          background: "#f8fafc",
-                        }}
+                  if (row.kind === "sign") {
+                    return (
+                      <tr
+                        key={rowIdx}
+                        style={{ height: 34, borderBottom: "1px solid #475569" }}
                       >
-                        <KaTeXFormula latex={row.label} />
-                      </td>
+                        {labelSlot}
                       {Array.from({ length: totalCols }, (_, ci) => {
                         const cellVal = row.cells[ci] ?? "";
                         return (
@@ -505,6 +661,7 @@ export const VarTableElement: React.FC<VarTableElementProps> = ({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       </foreignObject>
     </g>
