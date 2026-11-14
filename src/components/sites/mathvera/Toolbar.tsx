@@ -790,24 +790,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </button>
         </div>
 
-        {/* Laser Quick Tool Button */}
-        <button
-          type="button"
-          data-tool="ink:laser"
-          data-active={activeTool === "ink:laser" ? "true" : undefined}
-          aria-pressed={activeTool === "ink:laser"}
-          onClick={() => onSelectTool("ink:laser")}
-          style={
-            activeTool === "ink:laser"
-              ? { ...activeStyle, background: "#fee2e2", color: "#b91c1c" }
-              : btnBaseStyle
-          }
-          title="Bút chỉ Laser (Tự động tan biến sau 1.5s)"
-        >
-          <IconLaser size={14} color={activeTool === "ink:laser" ? "#b91c1c" : "#ef4444"} />
-          <span>Laser</span>
-        </button>
-
         {/* Eraser */}
         <button
           type="button"

@@ -25,9 +25,9 @@ export interface PageBoardConfig {
 
 export const DEFAULT_PAGE_BOARD_CONFIG: PageBoardConfig = {
   surface: "white",
-  pattern: "ruled",
+  pattern: "grid",
   gridSize: "md",
-  format: "a4_portrait",
+  format: "infinite",
 };
 
 export interface BoardSurfacePreset {
