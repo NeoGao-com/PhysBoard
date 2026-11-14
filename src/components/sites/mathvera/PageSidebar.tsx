@@ -9,6 +9,7 @@ export interface PageSidebarProps {
   onSelectPage: (page: number) => void;
   onAddPage: () => void;
   onDeletePage?: (page: number) => void;
+  onOpenPageManager?: () => void;
   boardConfig?: PageBoardConfig;
   isOpen: boolean;
   onToggleOpen: () => void;
@@ -20,6 +21,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onSelectPage,
   onAddPage,
   onDeletePage,
+  onOpenPageManager,
   boardConfig,
   isOpen,
   onToggleOpen,
@@ -98,21 +100,40 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: "#0f172a" }}>
           SỔ TAY ({totalPages})
         </span>
-        <button
-          type="button"
-          onClick={onToggleOpen}
-          title="Thu gọn thanh trang"
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "#64748b",
-            fontSize: 15,
-            cursor: "pointer",
-            padding: 2,
-          }}
-        >
-          ◀
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {onOpenPageManager && (
+            <button
+              type="button"
+              onClick={onOpenPageManager}
+              title="Mở trình quản lý trang (chọn nhiều trang, xóa hàng loạt)"
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#2563eb",
+                fontSize: 14,
+                cursor: "pointer",
+                padding: 2,
+              }}
+            >
+              📑
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onToggleOpen}
+            title="Thu gọn thanh trang"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#64748b",
+              fontSize: 15,
+              cursor: "pointer",
+              padding: 2,
+            }}
+          >
+            ◀
+          </button>
+        </div>
       </div>
 
       {/* Pages Vertical Thumbnails List */}
@@ -263,12 +284,15 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
         })}
       </div>
 
-      {/* Footer: Add Page Button */}
+      {/* Footer: Add Page & Page Manager Buttons */}
       <div
         style={{
           padding: 10,
           borderTop: "1px solid #e2e8f0",
           background: "#ffffff",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
         }}
       >
         <button
@@ -295,6 +319,32 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           <span>+</span>
           <span>Thêm trang</span>
         </button>
+
+        {onOpenPageManager && (
+          <button
+            type="button"
+            onClick={onOpenPageManager}
+            data-wb-open-page-manager="true"
+            style={{
+              width: "100%",
+              background: "#f1f5f9",
+              color: "#334155",
+              border: "1px solid #cbd5e1",
+              borderRadius: 6,
+              padding: "6px 0",
+              fontSize: 11.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+            }}
+          >
+            <span>📑</span>
+            <span>Quản lý trang</span>
+          </button>
+        )}
       </div>
     </aside>
   );

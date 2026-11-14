@@ -137,8 +137,22 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
 
   const resampled = resamplePoints(pts, 64);
 
-  // 1. Check Circle / Ellipse
-  if (isClosedRoughly && pts.length >= 10) {
+  // Compute closed shape area and perimeter for isoperimetric circularity quotient
+  let closedArea = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const j = (i + 1) % pts.length;
+    closedArea += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+  }
+  closedArea = Math.abs(closedArea) / 2;
+  const peri = arcLen + (isClosedRoughly ? endToStartDist : 0);
+  const circularity = peri > 1e-4 ? (4 * Math.PI * closedArea) / (peri * peri) : 0;
+
+  // 1. Check Circle FIRST if it is round
+  // A hand-drawn circle typically has circularity in [0.80, 1.05], low radius stdDev (< 0.22), and maxR/minR < 1.52.
+  // Note: A square has theoretical circularity = pi/4 ≈ 0.785 and maxR/minR = sqrt(2) ≈ 1.414.
+  // A rectangle (e.g. 2x1) has circularity ≈ 0.698 and maxR/minR > 2.0.
+  // An equilateral triangle has circularity ≈ 0.604.
+  if (isClosedRoughly && pts.length >= 10 && circularity >= 0.80) {
     let cx = 0;
     let cy = 0;
     for (const p of resampled) {
@@ -154,8 +168,10 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
     if (meanR > 0.15) {
       const variance = radii.reduce((s, r) => s + Math.pow(r - meanR, 2), 0) / radii.length;
       const stdDev = Math.sqrt(variance);
-      // If radius deviation is small (< 22% of mean radius), it's a circle!
-      if (stdDev / meanR < 0.22) {
+      const minR = Math.min(...radii);
+      const maxR = Math.max(...radii);
+
+      if (stdDev / meanR < 0.22 && maxR / Math.max(1e-4, minR) < 1.50) {
         return {
           type: "circle",
           center,
@@ -165,9 +181,9 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
     }
   }
 
-  // 2. Check Polygon (Triangle or Rectangle) when closed or nearly closed
-  if (isClosedRoughly && pts.length >= 6) {
-    // Simplify using RDP with epsilon scaled by bounding box
+  // 2. Check Polygon (Triangle or Rectangle / Square) when closed or nearly closed
+  // Important: Gate with circularity < 0.83 so shapes resembling circles never get reduced into 4-corner quadrilaterals!
+  if (isClosedRoughly && pts.length >= 6 && circularity < 0.83) {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const p of pts) {
       if (p.x < minX) minX = p.x;
@@ -178,24 +194,19 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
     const diag = Math.hypot(maxX - minX, maxY - minY);
     if (diag > 0.3) {
       // Test candidate epsilons to find clear corners
-      for (const epsFactor of [0.15, 0.12, 0.08, 0.18]) {
+      for (const epsFactor of [0.15, 0.12, 0.08, 0.18, 0.22]) {
         const eps = diag * epsFactor;
         const simplified = simplifyRDP(pts, eps);
         // Since it's closed, first and last point are essentially the same vertex
         let cornerCandidates = simplified.slice();
-        if (cornerCandidates.length > 2 && dist2D(cornerCandidates[0], cornerCandidates[cornerCandidates.length - 1]) < diag * 0.35) {
+        if (
+          cornerCandidates.length > 2 &&
+          dist2D(cornerCandidates[0], cornerCandidates[cornerCandidates.length - 1]) < diag * 0.35
+        ) {
           cornerCandidates = cornerCandidates.slice(0, -1);
         }
 
-        // Triangle: 3 vertices
-        if (cornerCandidates.length === 3) {
-          return {
-            type: "triangle",
-            vertices: [cornerCandidates[0], cornerCandidates[1], cornerCandidates[2]],
-          };
-        }
-
-        // Quadrilateral / Rectangle: 4 vertices
+        // Quadrilateral / Rectangle / Square: 4 vertices
         if (cornerCandidates.length === 4) {
           const [A, B, C, D] = cornerCandidates;
           const ab = dist2D(A, B);
@@ -206,6 +217,20 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
             return {
               type: "rectangle",
               vertices: [A, B, C, D],
+            };
+          }
+        }
+
+        // Triangle: 3 vertices
+        if (cornerCandidates.length === 3) {
+          const [A, B, C] = cornerCandidates;
+          const ab = dist2D(A, B);
+          const bc = dist2D(B, C);
+          const ca = dist2D(C, A);
+          if (ab > 0.1 && bc > 0.1 && ca > 0.1) {
+            return {
+              type: "triangle",
+              vertices: [A, B, C],
             };
           }
         }

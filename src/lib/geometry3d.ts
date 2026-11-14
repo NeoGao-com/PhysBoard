@@ -65,6 +65,8 @@ export interface Axes3DProps {
   yNeg?: number;
   zPos?: number;
   zNeg?: number;
+  azimuth?: number;
+  elevation?: number;
 }
 
 export interface RoundSectionProps {
@@ -1010,13 +1012,24 @@ export function createOxyzElement(
 
 export function projectOxyzPoint(
   axesTransform: { x: number; y: number; scale?: number },
-  p3: Point3D
+  p3: Point3D,
+  orbitCam?: CameraMatrix3
 ): Point2D {
   const sc = axesTransform.scale || 1;
-  return {
-    x: axesTransform.x + sc * (p3.y - 0.5 * p3.x),
-    y: axesTransform.y + sc * (p3.z - 0.5 * p3.x),
+  if (!orbitCam) {
+    return {
+      x: axesTransform.x + sc * (p3.y - 0.5 * p3.x),
+      y: axesTransform.y + sc * (p3.z - 0.5 * p3.x),
+    };
+  }
+  // World Oxyz vector mapped to 3D space (y -> +X, z -> +Y, -x -> +Z)
+  const v3: Point3D = { x: p3.y, y: p3.z, z: -p3.x };
+  const rot: Point3D = {
+    x: orbitCam[0] * v3.x + orbitCam[1] * v3.y + orbitCam[2] * v3.z,
+    y: orbitCam[3] * v3.x + orbitCam[4] * v3.y + orbitCam[5] * v3.z,
+    z: orbitCam[6] * v3.x + orbitCam[7] * v3.y + orbitCam[8] * v3.z,
   };
+  return { x: axesTransform.x + sc * rot.x, y: axesTransform.y + sc * rot.y };
 }
 
 export interface OxyzAxisRenderSpec {
@@ -1051,22 +1064,7 @@ export function buildOxyzAxes(
   const bounds = resolveOxyzBounds(props);
   const sc = transform.scale || 1;
 
-  const toScreenWorld = (p3: Point3D): Point2D => {
-    if (!orbitCam) {
-      return {
-        x: transform.x + sc * (p3.y - 0.5 * p3.x),
-        y: transform.y + sc * (p3.z - 0.5 * p3.x),
-      };
-    }
-    // World Oxyz vector mapped to 3D space (y -> +X, z -> +Y, -x -> +Z)
-    const v3: Point3D = { x: p3.y, y: p3.z, z: -p3.x };
-    const rot: Point3D = {
-      x: orbitCam[0] * v3.x + orbitCam[1] * v3.y + orbitCam[2] * v3.z,
-      y: orbitCam[3] * v3.x + orbitCam[4] * v3.y + orbitCam[5] * v3.z,
-      z: orbitCam[6] * v3.x + orbitCam[7] * v3.y + orbitCam[8] * v3.z,
-    };
-    return { x: transform.x + sc * rot.x, y: transform.y + sc * rot.y };
-  };
+  const toScreenWorld = (p3: Point3D): Point2D => projectOxyzPoint(transform, p3, orbitCam);
 
   const makeAxis = (
     label: "x" | "y" | "z",
@@ -1237,7 +1235,10 @@ export const Ops3D = {
 
 // --- Full 3D Scene Constraint Solver (qp) ---
 
-export function solveGeometry3D(elements: CanvasElement[]): Solved3DScene {
+export function solveGeometry3D(
+  elements: CanvasElement[],
+  orbitCamById?: Record<string, CameraMatrix3>
+): Solved3DScene {
   const byId = new Map(elements.map((el) => [el.id, el]));
   const pts = new Map<string, Point2D>();
   const p3 = new Map<string, Point3D>();
@@ -1245,6 +1246,17 @@ export function solveGeometry3D(elements: CanvasElement[]): Solved3DScene {
   const lifts = new Map<string, SolidLift>();
   const undef = new Set<string>();
   const solidOfPoint = new Map<string, string>();
+
+  const getAxesCamera = (axes: CanvasElement): CameraMatrix3 | undefined => {
+    if (orbitCamById && orbitCamById[axes.id]) {
+      return orbitCamById[axes.id];
+    }
+    const ap = axes.props as Partial<Axes3DProps>;
+    if (typeof ap?.azimuth === "number" || typeof ap?.elevation === "number") {
+      return azimuthElevationToCamera(ap.azimuth ?? 26, ap.elevation ?? 17);
+    }
+    return undefined;
+  };
 
   // Index embedded polygon vertices
   for (const el of elements) {
@@ -1286,13 +1298,16 @@ export function solveGeometry3D(elements: CanvasElement[]): Solved3DScene {
     let finalLift = baseLift;
     let displayPts2 = validPts2;
     const hasOrbit =
+      Boolean(orbitCamById?.[solid.id]) ||
       typeof solid.props.azimuth === "number" ||
       typeof solid.props.elevation === "number";
     if (hasOrbit && !solid.props.through) {
-      const cam = azimuthElevationToCamera(
-        typeof solid.props.azimuth === "number" ? solid.props.azimuth : 26,
-        typeof solid.props.elevation === "number" ? solid.props.elevation : 17
-      );
+      const cam =
+        orbitCamById?.[solid.id] ??
+        azimuthElevationToCamera(
+          typeof solid.props.azimuth === "number" ? solid.props.azimuth : 26,
+          typeof solid.props.elevation === "number" ? solid.props.elevation : 17
+        );
       const orb = applyOrbitToPoints(baseLift.p3, cam, 1, baseLift);
       finalLift = { p3: orb.rotatedP3, faces: baseLift.faces, view: orb.view };
       displayPts2 = orb.pts2d;
@@ -1499,7 +1514,8 @@ export function solveGeometry3D(elements: CanvasElement[]): Solved3DScene {
         const axes = byId.get(c.axes);
         if (axes?.type === "Axes3D") {
           const pos3 = { x: c.x, y: c.y, z: c.z };
-          pts.set(el.id, projectOxyzPoint(axes.transform, pos3));
+          const cam = getAxesCamera(axes);
+          pts.set(el.id, projectOxyzPoint(axes.transform, pos3, cam));
           p3.set(el.id, pos3);
           owner.set(el.id, axes.id);
         } else {
@@ -1876,6 +1892,7 @@ export function computeFlattenedFace(
 export interface UnfoldedPolyhedronNetResult {
   solidId: string;
   polygons: CanvasElement[];
+  points?: CanvasElement[];
   tabLines?: Array<{ from: Point2D; to: Point2D }>;
 }
 
@@ -1932,7 +1949,116 @@ export function computeUnfoldedPolyhedronNet(
     y: origin.y + (uv.v - avgV),
   }));
 
+  // Find all standalone points (e.g. midpoints, centroids, points on edge/face) attached to this 3D solid
+  const attachedPoints = elements.filter(
+    (e) =>
+      e.type === "GeomPoint" &&
+      !e.props.handle &&
+      !ptIds.includes(e.id) &&
+      (scene.owner.get(e.id) === solidId || e.props.solidId === solidId) &&
+      !scene.undef.has(e.id) &&
+      scene.p3.has(e.id)
+  );
+
   const createdPolygons: CanvasElement[] = [];
+  const createdPoints: CanvasElement[] = [];
+  const mappedPointIds = new Set<string>();
+
+  const getBarycentricTriangle3D = (
+    p: Point3D,
+    a: Point3D,
+    b: Point3D,
+    c: Point3D
+  ): { u: number; v: number; w: number } | null => {
+    const v0 = sub3(b, a);
+    const v1 = sub3(c, a);
+    const v2 = sub3(p, a);
+    const n = cross3(v0, v1);
+    const nLen = len3(n);
+    if (nLen < 1e-9) return null;
+    const distToPlane = Math.abs(dot3(n, v2)) / nLen;
+    if (distToPlane > 0.08) return null;
+
+    const d00 = dot3(v0, v0);
+    const d01 = dot3(v0, v1);
+    const d11 = dot3(v1, v1);
+    const d20 = dot3(v2, v0);
+    const d21 = dot3(v2, v1);
+    const denom = d00 * d11 - d01 * d01;
+    if (Math.abs(denom) < 1e-9) return null;
+    const v = (d11 * d20 - d01 * d21) / denom;
+    const w = (d00 * d21 - d01 * d20) / denom;
+    const u = 1.0 - v - w;
+    return { u, v, w };
+  };
+
+  const mapPointOnFace2D = (
+    pt3D: Point3D,
+    faceIndices: number[],
+    facePoly2D: Point2D[]
+  ): Point2D | null => {
+    if (faceIndices.length === 3) {
+      const a3 = solidPts3D[faceIndices[0]];
+      const b3 = solidPts3D[faceIndices[1]];
+      const c3 = solidPts3D[faceIndices[2]];
+      const bary = getBarycentricTriangle3D(pt3D, a3, b3, c3);
+      if (bary && bary.u >= -0.06 && bary.v >= -0.06 && bary.w >= -0.06) {
+        return {
+          x: bary.u * facePoly2D[0].x + bary.v * facePoly2D[1].x + bary.w * facePoly2D[2].x,
+          y: bary.u * facePoly2D[0].y + bary.v * facePoly2D[1].y + bary.w * facePoly2D[2].y,
+        };
+      }
+    } else if (faceIndices.length === 4) {
+      const a3 = solidPts3D[faceIndices[0]];
+      const b3 = solidPts3D[faceIndices[1]];
+      const c3 = solidPts3D[faceIndices[2]];
+      const d3 = solidPts3D[faceIndices[3]];
+      const bABC = getBarycentricTriangle3D(pt3D, a3, b3, c3);
+      if (bABC && bABC.u >= -0.06 && bABC.v >= -0.06 && bABC.w >= -0.06) {
+        return {
+          x: bABC.u * facePoly2D[0].x + bABC.v * facePoly2D[1].x + bABC.w * facePoly2D[2].x,
+          y: bABC.u * facePoly2D[0].y + bABC.v * facePoly2D[1].y + bABC.w * facePoly2D[2].y,
+        };
+      }
+      const bACD = getBarycentricTriangle3D(pt3D, a3, c3, d3);
+      if (bACD && bACD.u >= -0.06 && bACD.v >= -0.06 && bACD.w >= -0.06) {
+        return {
+          x: bACD.u * facePoly2D[0].x + bACD.v * facePoly2D[2].x + bACD.w * facePoly2D[3].x,
+          y: bACD.u * facePoly2D[0].y + bACD.v * facePoly2D[2].y + bACD.w * facePoly2D[3].y,
+        };
+      }
+    }
+    return null;
+  };
+
+  const projectAttachedPointsOnFace = (
+    faceIndices: number[],
+    facePoly2D: Point2D[]
+  ) => {
+    for (const ptEl of attachedPoints) {
+      if (mappedPointIds.has(ptEl.id)) continue;
+      const pt3 = scene.p3.get(ptEl.id);
+      if (!pt3) continue;
+      const pos2D = mapPointOnFace2D(pt3, faceIndices, facePoly2D);
+      if (pos2D) {
+        mappedPointIds.add(ptEl.id);
+        const name = typeof ptEl.props.name === "string" ? ptEl.props.name : "";
+        const netPtId = `net_pt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        createdPoints.push({
+          id: netPtId,
+          type: "GeomPoint",
+          transform: { x: pos2D.x, y: pos2D.y, scale: 1, rotation: 0, z: 10 },
+          style: { stroke: "#dc2626", fill: "#dc2626" },
+          meta: { createdBy: "local", createdAtSeq: 0, page: 1 },
+          props: {
+            name,
+            dot: ptEl.props.dot ?? "dot",
+            dotSize: ptEl.props.dotSize ?? 1.5,
+          },
+        });
+      }
+    }
+  };
 
   const makePolygonElement = (
     pts: Point2D[],
@@ -1966,7 +2092,7 @@ export function computeUnfoldedPolyhedronNet(
     return `${vIdx + 1}`;
   };
 
-  // 1. Add base face polygon
+  // 1. Add base face polygon & project attached points on base face
   createdPolygons.push(
     makePolygonElement(
       basePoly2D,
@@ -1975,6 +2101,7 @@ export function computeUnfoldedPolyhedronNet(
       "rgba(30, 64, 175, 0.12)"
     )
   );
+  projectAttachedPointsOnFace(baseFace, basePoly2D);
 
   // 2. Unfold adjacent lateral faces around each edge of the base face
   const nBaseEdges = baseFace.length;
@@ -2030,14 +2157,17 @@ export function computeUnfoldedPolyhedronNet(
         y: edgeP1.y + uApex * ex.y + vApex * ey.y,
       };
 
+      const tri2D = [edgeP1, edgeP2, apex2D];
+      const triIdxs = [i1, i2, apexIdx];
       createdPolygons.push(
         makePolygonElement(
-          [edgeP1, edgeP2, apex2D],
-          [getLabel(i1), getLabel(i2), getLabel(apexIdx)],
+          tri2D,
+          triIdxs.map((idx) => getLabel(idx)),
           "#0284c7",
           "rgba(2, 132, 199, 0.08)"
         )
       );
+      projectAttachedPointsOnFace(triIdxs, tri2D);
     } else if (adjFace.length === 4) {
       // Quad lateral face (box, prism, frustum): [i1, i2, j2, j1]
       // Find opposite vertices j1 (connected to i1) and j2 (connected to i2)
@@ -2056,14 +2186,17 @@ export function computeUnfoldedPolyhedronNet(
           y: edgeP2.y + h2 * ey.y,
         };
 
+        const quad2D = [edgeP1, edgeP2, pJ2_2D, pJ1_2D];
+        const quadIdxs = [i1, i2, j2, j1];
         createdPolygons.push(
           makePolygonElement(
-            [edgeP1, edgeP2, pJ2_2D, pJ1_2D],
-            [getLabel(i1), getLabel(i2), getLabel(j2), getLabel(j1)],
+            quad2D,
+            quadIdxs.map((idx) => getLabel(idx)),
             "#059669",
             "rgba(5, 150, 105, 0.08)"
           )
         );
+        projectAttachedPointsOnFace(quadIdxs, quad2D);
 
         // If this is face e === 0 for prism/box, attach top cap face to pJ1_2D, pJ2_2D
         if (e === 0 && lift.faces.length > 2) {
@@ -2093,6 +2226,7 @@ export function computeUnfoldedPolyhedronNet(
                   "rgba(30, 64, 175, 0.12)"
                 )
               );
+              projectAttachedPointsOnFace(topFace, topPoly2D);
             }
           }
         }
@@ -2100,7 +2234,7 @@ export function computeUnfoldedPolyhedronNet(
     }
   }
 
-  return { solidId, polygons: createdPolygons };
+  return { solidId, polygons: createdPolygons, points: createdPoints };
 }
 
 export type SolidSubSelection =
@@ -3015,10 +3149,11 @@ export interface SpaceFigureRenderGeometry {
 export function computeSpaceFigureGeometry(
   axesTransform: { x: number; y: number; scale?: number },
   axesProps: Axes3DProps,
-  def: SpaceFigureDef
+  def: SpaceFigureDef,
+  orbitCam?: CameraMatrix3
 ): SpaceFigureRenderGeometry | null {
   const bounds = resolveOxyzBounds(axesProps);
-  const proj = (pt: Point3D) => projectOxyzPoint(axesTransform, pt);
+  const proj = (pt: Point3D) => projectOxyzPoint(axesTransform, pt, orbitCam);
 
   if (def.kind === "plane") {
     const { a, b, c, d } = def;

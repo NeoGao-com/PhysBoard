@@ -628,10 +628,18 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
     const axesEl = props.axes ? byId.get(props.axes) : undefined;
     if (!axesEl || axesEl.type !== "Axes3D" || !props.def) return null;
 
+    const axesProps = axesEl.props as Partial<Axes3DProps>;
+    const axesCam =
+      orbitCam ??
+      (typeof axesProps.azimuth === "number" || typeof axesProps.elevation === "number"
+        ? azimuthElevationToCamera(axesProps.azimuth ?? 26, axesProps.elevation ?? 17)
+        : undefined);
+
     const geom = computeSpaceFigureGeometry(
       axesEl.transform,
       axesEl.props as Axes3DProps,
-      props.def
+      props.def,
+      axesCam
     );
     if (!geom) return null;
 

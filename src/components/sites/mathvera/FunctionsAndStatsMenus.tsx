@@ -210,7 +210,7 @@ export const FunctionsMenu: React.FC<FunctionsMenuProps> = ({
         type="button"
         role="menuitem"
         data-menu-item="bang-bien-thien"
-        onClick={() => fire({ kind: "tool", toolId: "bang-bien-thien", hint: "Bấm lên bảng để đặt bảng biến thiên" })}
+        onClick={() => fire({ kind: "open-vartable-dialog", mode: "variation" })}
         style={menuItemBtnStyle}
       >
         <span>↗</span>
@@ -220,7 +220,7 @@ export const FunctionsMenu: React.FC<FunctionsMenuProps> = ({
         type="button"
         role="menuitem"
         data-menu-item="bang-xet-dau"
-        onClick={() => fire({ kind: "tool", toolId: "bang-xet-dau", hint: "Bấm lên bảng để đặt bảng xét dấu" })}
+        onClick={() => fire({ kind: "open-vartable-dialog", mode: "sign" })}
         style={menuItemBtnStyle}
       >
         <span>±</span>
@@ -1561,6 +1561,588 @@ const AxesVectorDialogInner: React.FC<AxesVectorDialogProps> = ({
           style={{ padding: "5px 14px", borderRadius: 7, border: "none", background: "#2563eb", color: "#fff", fontWeight: 600, cursor: "pointer" }}
         >
           Vẽ vectơ
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// 8b. Axes3DPointDialog — Đặt điểm M(x; y; z) trên hệ trục Oxyz
+// ---------------------------------------------------------------------------
+
+export interface Axes3DPointDialogProps {
+  open: boolean;
+  defaultName?: string;
+  onSubmit: (name: string, x: number, y: number, z: number) => void;
+  onCancel: () => void;
+}
+
+export const Axes3DPointDialog: React.FC<Axes3DPointDialogProps> = (props) => {
+  if (!props.open) return null;
+  return <Axes3DPointDialogInner {...props} />;
+};
+
+const Axes3DPointDialogInner: React.FC<Axes3DPointDialogProps> = ({
+  defaultName = "M",
+  onSubmit,
+  onCancel,
+}) => {
+  const [name, setName] = useState(defaultName);
+  const [xStr, setXStr] = useState("2");
+  const [yStr, setYStr] = useState("3");
+  const [zStr, setZStr] = useState("4");
+
+  const handleSubmit = () => {
+    const x = Number(xStr.replace(",", ".")) || 0;
+    const y = Number(yStr.replace(",", ".")) || 0;
+    const z = Number(zStr.replace(",", ".")) || 0;
+    onSubmit(name.trim() || "M", x, y, z);
+  };
+
+  return (
+    <div
+      data-wb-axes3d-point-dialog="true"
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Escape") onCancel();
+        if (e.key === "Enter") handleSubmit();
+      }}
+      style={{
+        position: "fixed",
+        top: 64,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#ffffff",
+        border: "1px solid #cbd5e1",
+        borderRadius: 12,
+        boxShadow: "0 12px 30px rgba(15,23,42,0.18)",
+        padding: 14,
+        zIndex: 95,
+        width: 390,
+        fontFamily: "system-ui, sans-serif",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>
+        Đặt điểm M(x; y; z) trên không gian toạ độ Oxyz
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13 }}>
+          <span style={{ fontWeight: 600 }}>Tên</span>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{ width: 44, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>x =</span>
+          <input
+            value={xStr}
+            onChange={(e) => setXStr(e.target.value)}
+            style={{ width: 54, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>y =</span>
+          <input
+            value={yStr}
+            onChange={(e) => setYStr(e.target.value)}
+            style={{ width: 54, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>z =</span>
+          <input
+            value={zStr}
+            onChange={(e) => setZStr(e.target.value)}
+            style={{ width: 54, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ padding: "5px 12px", borderRadius: 7, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer" }}
+        >
+          Huỷ
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          style={{ padding: "5px 14px", borderRadius: 7, border: "none", background: "#2563eb", color: "#fff", fontWeight: 600, cursor: "pointer" }}
+        >
+          Đặt điểm Oxyz
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// 8c. Axes3DVectorDialog — Đặt vectơ u⃗(x; y; z) trên không gian toạ độ Oxyz
+// ---------------------------------------------------------------------------
+
+export interface Axes3DVectorDialogProps {
+  open: boolean;
+  onSubmit: (
+    vx: number,
+    vy: number,
+    vz: number,
+    x0: number,
+    y0: number,
+    z0: number
+  ) => void;
+  onCancel: () => void;
+}
+
+export const Axes3DVectorDialog: React.FC<Axes3DVectorDialogProps> = (props) => {
+  if (!props.open) return null;
+  return <Axes3DVectorDialogInner {...props} />;
+};
+
+const Axes3DVectorDialogInner: React.FC<Axes3DVectorDialogProps> = ({
+  onSubmit,
+  onCancel,
+}) => {
+  const [vxStr, setVxStr] = useState("2");
+  const [vyStr, setVyStr] = useState("3");
+  const [vzStr, setVzStr] = useState("3");
+  const [x0Str, setX0Str] = useState("0");
+  const [y0Str, setY0Str] = useState("0");
+  const [z0Str, setZ0Str] = useState("0");
+
+  const handleSubmit = () => {
+    const vx = Number(vxStr.replace(",", ".")) || 0;
+    const vy = Number(vyStr.replace(",", ".")) || 0;
+    const vz = Number(vzStr.replace(",", ".")) || 0;
+    const x0 = Number(x0Str.replace(",", ".")) || 0;
+    const y0 = Number(y0Str.replace(",", ".")) || 0;
+    const z0 = Number(z0Str.replace(",", ".")) || 0;
+    onSubmit(vx, vy, vz, x0, y0, z0);
+  };
+
+  return (
+    <div
+      data-wb-axes3d-vector-dialog="true"
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Escape") onCancel();
+        if (e.key === "Enter") handleSubmit();
+      }}
+      style={{
+        position: "fixed",
+        top: 64,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#ffffff",
+        border: "1px solid #cbd5e1",
+        borderRadius: 12,
+        boxShadow: "0 12px 30px rgba(15,23,42,0.18)",
+        padding: 14,
+        zIndex: 95,
+        width: 420,
+        fontFamily: "system-ui, sans-serif",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>
+        Vẽ Vectơ toạ độ u⃗(x; y; z) trong không gian Oxyz
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <span style={{ fontSize: 12.5, color: "#475569", minWidth: 70, fontWeight: 600 }}>
+          Vectơ u⃗:
+        </span>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>x =</span>
+          <input
+            autoFocus
+            value={vxStr}
+            onChange={(e) => setVxStr(e.target.value)}
+            style={{ width: 50, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>y =</span>
+          <input
+            value={vyStr}
+            onChange={(e) => setVyStr(e.target.value)}
+            style={{ width: 50, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>z =</span>
+          <input
+            value={vzStr}
+            onChange={(e) => setVzStr(e.target.value)}
+            style={{ width: 50, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <span style={{ fontSize: 12.5, color: "#475569", minWidth: 70 }}>Điểm gốc:</span>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>x₀ =</span>
+          <input
+            value={x0Str}
+            onChange={(e) => setX0Str(e.target.value)}
+            style={{ width: 50, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>y₀ =</span>
+          <input
+            value={y0Str}
+            onChange={(e) => setY0Str(e.target.value)}
+            style={{ width: 50, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+          <span>z₀ =</span>
+          <input
+            value={z0Str}
+            onChange={(e) => setZ0Str(e.target.value)}
+            style={{ width: 50, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+          />
+        </label>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ padding: "5px 12px", borderRadius: 7, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer" }}
+        >
+          Huỷ
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          style={{ padding: "5px 14px", borderRadius: 7, border: "none", background: "#0891b2", color: "#fff", fontWeight: 600, cursor: "pointer" }}
+        >
+          Vẽ vectơ Oxyz
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// 8d. Axes3DFigureDialog — Dựng Mặt phẳng (P), Đường thẳng (d), Mặt cầu (S)
+// ---------------------------------------------------------------------------
+
+export type Axes3DFigureKind = "plane" | "line" | "sphere";
+
+export interface Axes3DFigureDialogProps {
+  open: boolean;
+  kind: Axes3DFigureKind;
+  onSubmit: (
+    def:
+      | { kind: "plane"; a: number; b: number; c: number; d: number }
+      | { kind: "line"; p: [number, number, number]; u: [number, number, number] }
+      | { kind: "sphere"; c: [number, number, number]; r: number },
+    name?: string,
+    color?: string
+  ) => void;
+  onCancel: () => void;
+}
+
+export const Axes3DFigureDialog: React.FC<Axes3DFigureDialogProps> = (props) => {
+  if (!props.open) return null;
+  return <Axes3DFigureDialogInner key={props.kind} {...props} />;
+};
+
+const AXES3D_FIGURE_COLORS = ["#7c3aed", "#0891b2", "#ea580c", "#059669", "#dc2626", "#2563eb"];
+
+const Axes3DFigureDialogInner: React.FC<Axes3DFigureDialogProps> = ({
+  kind,
+  onSubmit,
+  onCancel,
+}) => {
+  // Plane: Ax + By + Cz + D = 0
+  const [pa, setPa] = useState("1");
+  const [pb, setPb] = useState("1");
+  const [pc, setPc] = useState("1");
+  const [pd, setPd] = useState("-3");
+
+  // Line: M(x0, y0, z0) + t * (ux, uy, uz)
+  const [lx0, setLx0] = useState("0");
+  const [ly0, setLy0] = useState("0");
+  const [lz0, setLz0] = useState("0");
+  const [lux, setLux] = useState("1");
+  const [luy, setLuy] = useState("2");
+  const [luz, setLuz] = useState("3");
+
+  // Sphere: I(cx, cy, cz), R
+  const [scx, setScx] = useState("1");
+  const [scy, setScy] = useState("1");
+  const [scz, setScz] = useState("1");
+  const [sr, setSr] = useState("2");
+
+  const [name, setName] = useState(
+    kind === "plane" ? "(P)" : kind === "line" ? "(d)" : "(S)"
+  );
+  const [color, setColor] = useState(
+    kind === "plane" ? "#7c3aed" : kind === "line" ? "#059669" : "#ea580c"
+  );
+
+  const handleSubmit = () => {
+    if (kind === "plane") {
+      const a = Number(pa.replace(",", ".")) || 0;
+      const b = Number(pb.replace(",", ".")) || 0;
+      const c = Number(pc.replace(",", ".")) || 0;
+      const d = Number(pd.replace(",", ".")) || 0;
+      onSubmit({ kind: "plane", a, b, c, d }, name.trim() || "(P)", color);
+    } else if (kind === "line") {
+      const p: [number, number, number] = [
+        Number(lx0.replace(",", ".")) || 0,
+        Number(ly0.replace(",", ".")) || 0,
+        Number(lz0.replace(",", ".")) || 0,
+      ];
+      const u: [number, number, number] = [
+        Number(lux.replace(",", ".")) || 0,
+        Number(luy.replace(",", ".")) || 0,
+        Number(luz.replace(",", ".")) || 1,
+      ];
+      onSubmit({ kind: "line", p, u }, name.trim() || "(d)", color);
+    } else {
+      const c: [number, number, number] = [
+        Number(scx.replace(",", ".")) || 0,
+        Number(scy.replace(",", ".")) || 0,
+        Number(scz.replace(",", ".")) || 0,
+      ];
+      const r = Math.max(0.1, Number(sr.replace(",", ".")) || 1);
+      onSubmit({ kind: "sphere", c, r }, name.trim() || "(S)", color);
+    }
+  };
+
+  const title =
+    kind === "plane"
+      ? "Dựng Mặt phẳng (P): Ax + By + Cz + D = 0"
+      : kind === "line"
+        ? "Dựng Đường thẳng (d) qua điểm M₀ và VTCP u⃗"
+        : "Dựng Mặt cầu (S): Tâm I(a; b; c), bán kính R";
+
+  return (
+    <div
+      data-wb-axes3d-figure-dialog={kind}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Escape") onCancel();
+        if (e.key === "Enter") handleSubmit();
+      }}
+      style={{
+        position: "fixed",
+        top: 64,
+        left: "50%",
+        transform: "translateX(-50%)",
+        background: "#ffffff",
+        border: "1px solid #cbd5e1",
+        borderRadius: 12,
+        boxShadow: "0 12px 30px rgba(15,23,42,0.18)",
+        padding: 14,
+        zIndex: 95,
+        width: 440,
+        fontFamily: "system-ui, sans-serif",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+        {title}
+      </div>
+
+      {kind === "plane" && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+            <span>A =</span>
+            <input
+              autoFocus
+              value={pa}
+              onChange={(e) => setPa(e.target.value)}
+              style={{ width: 44, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+            <span>B =</span>
+            <input
+              value={pb}
+              onChange={(e) => setPb(e.target.value)}
+              style={{ width: 44, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+            <span>C =</span>
+            <input
+              value={pc}
+              onChange={(e) => setPc(e.target.value)}
+              style={{ width: 44, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+            <span>D =</span>
+            <input
+              value={pd}
+              onChange={(e) => setPd(e.target.value)}
+              style={{ width: 44, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+            />
+          </label>
+        </div>
+      )}
+
+      {kind === "line" && (
+        <>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 12.5, color: "#475569", minWidth: 64 }}>Điểm M₀:</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+              <span>x₀ =</span>
+              <input
+                autoFocus
+                value={lx0}
+                onChange={(e) => setLx0(e.target.value)}
+                style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+              />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+              <span>y₀ =</span>
+              <input
+                value={ly0}
+                onChange={(e) => setLy0(e.target.value)}
+                style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+              />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+              <span>z₀ =</span>
+              <input
+                value={lz0}
+                onChange={(e) => setLz0(e.target.value)}
+                style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+              />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ fontSize: 12.5, color: "#475569", minWidth: 64 }}>VTCP u⃗:</span>
+            <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+              <span>u₁ =</span>
+              <input
+                value={lux}
+                onChange={(e) => setLux(e.target.value)}
+                style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+              />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+              <span>u₂ =</span>
+              <input
+                value={luy}
+                onChange={(e) => setLuy(e.target.value)}
+                style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+              />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+              <span>u₃ =</span>
+              <input
+                value={luz}
+                onChange={(e) => setLuz(e.target.value)}
+                style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+              />
+            </label>
+          </div>
+        </>
+      )}
+
+      {kind === "sphere" && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12.5, color: "#475569", minWidth: 54 }}>Tâm I:</span>
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+            <span>a =</span>
+            <input
+              autoFocus
+              value={scx}
+              onChange={(e) => setScx(e.target.value)}
+              style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+            <span>b =</span>
+            <input
+              value={scy}
+              onChange={(e) => setScy(e.target.value)}
+              style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13 }}>
+            <span>c =</span>
+            <input
+              value={scz}
+              onChange={(e) => setScz(e.target.value)}
+              style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+            />
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13, marginLeft: 4 }}>
+            <span style={{ fontWeight: 600 }}>R =</span>
+            <input
+              value={sr}
+              onChange={(e) => setSr(e.target.value)}
+              style={{ width: 48, border: "1px solid #cbd5e1", borderRadius: 6, padding: "4px 6px" }}
+            />
+          </label>
+        </div>
+      )}
+
+      {/* Label & Color */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13 }}>
+          <span style={{ color: "#475569" }}>Ký hiệu:</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{ width: 64, border: "1px solid #cbd5e1", borderRadius: 6, padding: "3px 6px" }}
+          />
+        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 12, color: "#64748b" }}>Màu:</span>
+          {AXES3D_FIGURE_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setColor(c)}
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                border: color === c ? "2px solid #0f172a" : "1px solid #cbd5e1",
+                background: c,
+                cursor: "pointer",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ padding: "5px 12px", borderRadius: 7, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer" }}
+        >
+          Huỷ
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          style={{ padding: "5px 14px", borderRadius: 7, border: "none", background: color, color: "#fff", fontWeight: 600, cursor: "pointer" }}
+        >
+          Dựng đối tượng Oxyz
         </button>
       </div>
     </div>

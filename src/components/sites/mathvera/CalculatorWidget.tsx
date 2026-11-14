@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-// @ts-ignore
 import { CalcPanel } from "./CasioFx580Panel";
 
 export interface CalculatorWidgetProps {

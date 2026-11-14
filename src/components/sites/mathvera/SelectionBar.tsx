@@ -8,13 +8,18 @@ export interface SelectionBarProps {
   selectedCount: number;
   hiddenCount?: number;
   selectedAxes2D?: CanvasElement | null;
+  selectedAxes3D?: CanvasElement | null;
   selectedPhysicsEl?: CanvasElement | null;
+  selectedSolidEl?: CanvasElement | null;
   selectedPoints?: CanvasElement[];
+  selectedMathText?: CanvasElement | null;
   selectedSolidSubPart?: SolidSubSelection | null;
   isSolidFaceFilled?: boolean;
   isSolidEdgeMeasured?: boolean;
   labelScale?: number;
   dotScale?: number;
+  onEditMath?: () => void;
+  onSolveEquation?: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onCopy: () => void;
@@ -32,6 +37,11 @@ export interface SelectionBarProps {
   onAxesToggleGrid?: () => void;
   onAxesToggleTicks?: () => void;
   onAxesAddVector?: () => void;
+  onAxes3DAddPoint?: () => void;
+  onAxes3DAddVector?: () => void;
+  onAxes3DAddPlane?: () => void;
+  onAxes3DAddLine?: () => void;
+  onAxes3DAddSphere?: () => void;
   onAxesOpenConic?: () => void;
   onAxesOpenEquation?: () => void;
   onAxesOpenInequality?: () => void;
@@ -44,6 +54,7 @@ export interface SelectionBarProps {
   onPhysicsRotateInstrument?: (deltaDeg: number) => void;
   onPhysicsPlotRegression?: () => void;
   onUpdateInstrumentProps?: (id: string, patch: Record<string, unknown>) => void;
+  onSolidUnfold?: () => void;
   onSolidFaceFlatten?: () => void;
   onSolidFaceFill?: () => void;
   onSolidFaceExtendPlane?: () => void;
@@ -120,13 +131,18 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   selectedCount,
   hiddenCount = 0,
   selectedAxes2D = null,
+  selectedAxes3D = null,
   selectedPhysicsEl = null,
+  selectedSolidEl = null,
   selectedPoints = [],
+  selectedMathText = null,
   selectedSolidSubPart = null,
   isSolidFaceFilled = false,
   isSolidEdgeMeasured = false,
   labelScale = 1,
   dotScale = 1.5,
+  onEditMath,
+  onSolveEquation,
   onDelete,
   onDuplicate,
   onCopy,
@@ -144,6 +160,11 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onAxesToggleGrid,
   onAxesToggleTicks,
   onAxesAddVector,
+  onAxes3DAddPoint,
+  onAxes3DAddVector,
+  onAxes3DAddPlane,
+  onAxes3DAddLine,
+  onAxes3DAddSphere,
   onAxesOpenConic,
   onAxesOpenEquation,
   onAxesOpenInequality,
@@ -156,6 +177,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onPhysicsRotateInstrument,
   onPhysicsPlotRegression,
   onUpdateInstrumentProps,
+  onSolidUnfold,
   onSolidFaceFlatten,
   onSolidFaceFill,
   onSolidFaceExtendPlane,
@@ -455,6 +477,64 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
           🗑 Xoá{selectedCount > 1 ? ` (${selectedCount})` : ""}
         </button>
 
+        {/* MathText / Formula Context Actions */}
+        {selectedCount === 1 && selectedMathText && (
+          <>
+            <button
+              type="button"
+              data-action="math-edit"
+              onClick={onEditMath}
+              title="Chỉnh sửa nội dung công thức toán"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#2563eb",
+                color: "#ffffff",
+                fontWeight: 700,
+                boxShadow: "0 3px 12px rgba(37, 99, 235, 0.35)",
+              }}
+            >
+              ✏️ Sửa công thức
+            </button>
+            <button
+              type="button"
+              data-action="math-solve"
+              onClick={onSolveEquation}
+              title="Giải phương trình hoặc hệ phương trình của công thức này"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#7c3aed",
+                color: "#ffffff",
+                fontWeight: 700,
+                boxShadow: "0 3px 12px rgba(124, 58, 237, 0.35)",
+              }}
+            >
+              ⚡ Giải phương trình / Hệ PT
+            </button>
+          </>
+        )}
+
+        {/* Solid3D Unfold (Trải hình phẳng) Button */}
+        {selectedCount === 1 && selectedSolidEl && (
+          <button
+            type="button"
+            data-action="solid-unfold"
+            onClick={onSolidUnfold}
+            title="Trải phẳng tất cả các mặt của hình không gian này ra mặt phẳng 2D"
+            style={{
+              ...actionBtnStyle,
+              border: "none",
+              background: "#0891b2",
+              color: "#ffffff",
+              fontWeight: 700,
+              boxShadow: "0 3px 12px rgba(8, 145, 178, 0.35)",
+            }}
+          >
+            📐 Trải phẳng hình (Unfold Net)
+          </button>
+        )}
+
         {/* Contextual Point Selection Actions */}
         {isPointsContext && (
           <>
@@ -595,6 +675,92 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               }}
             >
               + Điểm (x; y)
+            </button>
+          </>
+        )}
+
+        {/* Contextual Axes3D (Oxyz) Primary Actions */}
+        {selectedCount === 1 && selectedAxes3D && (
+          <>
+            <button
+              type="button"
+              data-action="axes3d-add-point"
+              onClick={onAxes3DAddPoint}
+              title="Đặt điểm theo toạ độ không gian M(x; y; z)"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#2563eb",
+                color: "#ffffff",
+                fontWeight: 600,
+                boxShadow: "0 3px 12px rgba(37, 99, 235, 0.35)",
+              }}
+            >
+              + Điểm M(x; y; z)
+            </button>
+            <button
+              type="button"
+              data-action="axes3d-add-vector"
+              onClick={onAxes3DAddVector}
+              title="Vẽ vectơ toạ độ u⃗ = (x; y; z) trong không gian Oxyz"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#0891b2",
+                color: "#ffffff",
+                fontWeight: 600,
+                boxShadow: "0 3px 12px rgba(8, 145, 178, 0.35)",
+              }}
+            >
+              + Vectơ u⃗(x; y; z)
+            </button>
+            <button
+              type="button"
+              data-action="axes3d-add-plane"
+              onClick={onAxes3DAddPlane}
+              title="Dựng mặt phẳng Ax + By + Cz + D = 0"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#7c3aed",
+                color: "#ffffff",
+                fontWeight: 600,
+                boxShadow: "0 3px 12px rgba(124, 58, 237, 0.35)",
+              }}
+            >
+              ◩ Mặt phẳng (P)
+            </button>
+            <button
+              type="button"
+              data-action="axes3d-add-line"
+              onClick={onAxes3DAddLine}
+              title="Dựng đường thẳng tham số trong không gian qua điểm M và VTCP u⃗"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#059669",
+                color: "#ffffff",
+                fontWeight: 600,
+                boxShadow: "0 3px 12px rgba(5, 150, 105, 0.35)",
+              }}
+            >
+              ⁄ Đường thẳng (d)
+            </button>
+            <button
+              type="button"
+              data-action="axes3d-add-sphere"
+              onClick={onAxes3DAddSphere}
+              title="Dựng mặt cầu tâm I(x; y; z) bán kính R"
+              style={{
+                ...actionBtnStyle,
+                border: "none",
+                background: "#ea580c",
+                color: "#ffffff",
+                fontWeight: 600,
+                boxShadow: "0 3px 12px rgba(234, 88, 12, 0.35)",
+              }}
+            >
+              ◯ Mặt cầu (S)
             </button>
           </>
         )}

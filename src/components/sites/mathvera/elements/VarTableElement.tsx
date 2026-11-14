@@ -2,7 +2,13 @@
 
 import React, { useMemo, useState } from "react";
 import { CanvasElement } from "@/types/whiteboard";
-import { VarTableCellValue, VarTableData, VarTableRow } from "@/lib/math-eval";
+import {
+  VarTableCellValue,
+  VarTableData,
+  VarTableRow,
+  buildVarTableFromExpr,
+  buildSignTableFromExpr,
+} from "@/lib/math-eval";
 import { KaTeXFormula } from "./MathElement";
 
 export interface VarTableElementProps {
@@ -244,8 +250,59 @@ export const VarTableElement: React.FC<VarTableElementProps> = ({
                 boxShadow: "0 4px 12px rgba(15,23,42,0.25)",
               }}
             >
+              {data.source && (
+                <div
+                  style={{
+                    color: "#93c5fd",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    marginRight: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <span>y =</span>
+                  <KaTeXFormula latex={data.source} />
+                </div>
+              )}
               <button
                 type="button"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const currentFormula = data.source || "x^3 - 3x + 1";
+                  const next = window.prompt("Nhập lại hàm số f(x):", currentFormula);
+                  if (next !== null && next.trim()) {
+                    const clean = next.trim();
+                    const hasVarRow = data.rows.some((r) => r.kind === "variation");
+                    const res = hasVarRow
+                      ? buildVarTableFromExpr(clean)
+                      : buildSignTableFromExpr(clean);
+                    if ("error" in res) {
+                      window.alert("Lỗi phân tích hàm số: " + res.error);
+                    } else {
+                      onUpdate?.(element.id, { ...res, source: clean });
+                    }
+                  }
+                }}
+                title="Đổi hàm số để tạo lại bảng"
+                style={{
+                  background: "#10b981",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "3px 8px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                ✏️ Sửa hàm
+              </button>
+              <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={addSignRow}
                 style={{
                   background: "#2563eb",
@@ -262,6 +319,7 @@ export const VarTableElement: React.FC<VarTableElementProps> = ({
               </button>
               <button
                 type="button"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={addVariationRow}
                 style={{
                   background: "#0891b2",
@@ -278,6 +336,7 @@ export const VarTableElement: React.FC<VarTableElementProps> = ({
               </button>
               <button
                 type="button"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={addColumnX}
                 style={{
                   background: "#475569",
@@ -411,6 +470,7 @@ export const VarTableElement: React.FC<VarTableElementProps> = ({
                       {isSelected && data.rows.length > 1 && (
                         <button
                           type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteRow(rowIdx);

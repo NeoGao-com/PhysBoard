@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import * as Y from "yjs";
 import { StylePicker, StylePatch } from "./StylePicker";
-import { InsertMenu } from "./InsertMenu";
 import { PlaneGeometryMenu } from "./PlaneGeometryMenu";
 import { SpaceGeometryMenu } from "./SpaceGeometryMenu";
 import {
@@ -14,15 +13,16 @@ import {
   M3MenuAction,
 } from "./FunctionsAndStatsMenus";
 import { PageBar } from "./PageBar";
-import { MoreMenu } from "./MoreMenu";
 import { PhysicsMenu } from "./PhysicsMenu";
-import { TeachingInstrumentsMenu } from "./TeachingInstrumentsMenu";
 import { FILL_PALETTE } from "@/lib/geometry";
 import type { ShortcutMap } from "@/lib/commands";
 import type { ImportedImageResult, ImportedPdfPage } from "@/lib/pdf-import";
 import { RealWorldArtItem } from "@/lib/realworld-art";
 import type { PageBoardConfig } from "@/lib/board-themes";
 import { WhiteboardTool, SelectionStyleState } from "@/types/whiteboard";
+import { LaserConfig } from "@/lib/laser-config";
+import { ToolbarVisibilityConfig } from "@/lib/toolbar-config";
+import { importPdfPages } from "@/lib/pdf-import";
 import {
   IconBrush,
   IconBucket,
@@ -46,14 +46,16 @@ import {
   IconPen,
   IconPencil,
   IconPhysics,
+  IconPdf,
+  IconHtmlSim,
   IconPoint,
   IconPolygon,
   IconRealWorld,
   IconRedo,
-  IconRuler,
   IconSave,
   IconSegment,
   IconSetSquare,
+  IconSettings,
   IconProtractor,
   IconCompassTool,
   IconShapeSnap,
@@ -149,6 +151,7 @@ export interface ToolbarProps {
   onOpenDecorHelp?: () => void;
   onPhysicsAction?: (action: string) => void;
   onOpenPhysicsDrawer?: () => void;
+  onOpenHtmlSimModal?: () => void;
   onSelectInstrument?: (kind: "ruler" | "setsquare" | "setsquare-45" | "protractor" | "protractor-360" | "compass") => void;
   onGoHome?: () => void;
   onSaveFile?: () => void;
@@ -168,6 +171,7 @@ export interface ToolbarProps {
   onOpenCalculator?: () => void;
   isCalculatorOpen?: boolean;
   onOpenCommandPalette?: () => void;
+  onExportPdf?: () => void;
   onExportTikz?: () => void;
   onOpenJsonModal?: () => void;
   shortcutMap?: ShortcutMap;
@@ -176,6 +180,12 @@ export interface ToolbarProps {
   onTogglePenOnly?: (enabled: boolean) => void;
   inkToShape?: boolean;
   onToggleInkToShape?: (enabled: boolean) => void;
+  autoSwitchTarget?: "select" | "ink" | "off";
+  onToggleAutoSwitchTarget?: () => void;
+  laserConfig?: LaserConfig;
+  onOpenLaserSettings?: () => void;
+  toolbarVisibility?: ToolbarVisibilityConfig;
+  onOpenSettings?: () => void;
 }
 
 type OpenDropdown =
@@ -220,6 +230,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenDecorHelp,
   onPhysicsAction,
   onOpenPhysicsDrawer,
+  onOpenHtmlSimModal,
   onSelectInstrument,
   onGoHome,
   onSaveFile,
@@ -239,6 +250,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenCalculator,
   isCalculatorOpen,
   onOpenCommandPalette,
+  onExportPdf,
   onExportTikz,
   onOpenJsonModal,
   shortcutMap,
@@ -247,6 +259,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onTogglePenOnly,
   inkToShape = true,
   onToggleInkToShape,
+  autoSwitchTarget = "select",
+  onToggleAutoSwitchTarget,
+  laserConfig,
+  onOpenLaserSettings,
+  toolbarVisibility,
+  onOpenSettings,
 }) => {
   const withShortcut = (label: string, cmdId: string): string => {
     const combo = shortcutMap?.[cmdId];
@@ -383,8 +401,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const statsWrapRef = useRef<HTMLDivElement>(null);
   const realworldWrapRef = useRef<HTMLDivElement>(null);
   const physicsWrapRef = useRef<HTMLDivElement>(null);
-  const instrumentsWrapRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const [pdfImporting, setPdfImporting] = useState(false);
 
   useEffect(() => {
     if (!openMenu) return;
@@ -399,8 +418,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         functionsWrapRef.current?.contains(target) ||
         statsWrapRef.current?.contains(target) ||
         realworldWrapRef.current?.contains(target) ||
-        physicsWrapRef.current?.contains(target) ||
-        instrumentsWrapRef.current?.contains(target)
+        physicsWrapRef.current?.contains(target)
       ) {
         return;
       }
@@ -472,6 +490,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     SEGMENT_VARIANTS.find(
       (v) => v.tool === (isSegmentActive ? activeTool : lastSegmentTool)
     ) ?? SEGMENT_VARIANTS[0];
+
+  const vis = toolbarVisibility ?? {
+    groupSelection: true,
+    toolSelect: true,
+    toolMarquee: true,
+    toolEraser: true,
+    toolTrash: true,
+    toolUndoRedo: true,
+    groupDrawing: true,
+    toolPen: true,
+    toolFormula: true,
+    toolInsertPdf: true,
+    groupPlaneGeometry: true,
+    toolPoint: true,
+    toolSegment: true,
+    toolCircle: true,
+    toolPolygon: true,
+    toolPlaneMenu: true,
+    toolFill: true,
+    groupSpaceGeometry: true,
+    toolSpaceMenu: true,
+    toolFunctionsMenu: true,
+    toolStatsMenu: true,
+    groupPhysics: true,
+    toolPhysics: true,
+    toolRealWorld: true,
+    toolCalculator: true,
+  };
 
   const btnBaseStyle: React.CSSProperties = {
     height: 25,
@@ -842,6 +888,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         {/* --- GROUP 1: Chọn, Bút, Tẩy | Màu & Nét | Công thức & Chèn --- */}
         {/* Select Split */}
+        {vis.groupSelection && vis.toolSelect && (
         <div
           ref={selectBtnRef}
           style={{
@@ -896,8 +943,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             ▾
           </button>
         </div>
+        )}
 
         {/* Pen Split (6 pen types via dropdown + quick fountain shortcut) */}
+        {vis.groupDrawing && vis.toolPen && (
         <div
           ref={penBtnRef}
           style={{
@@ -961,26 +1010,76 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             ▾
           </button>
         </div>
+        )}
 
-        {/* Laser Quick Tool Button */}
-        <button
-          type="button"
-          data-tool="ink:laser"
-          data-active={activeTool === "ink:laser" ? "true" : undefined}
-          aria-pressed={activeTool === "ink:laser"}
-          onClick={() => onSelectTool("ink:laser")}
-          style={
-            activeTool === "ink:laser"
-              ? { ...activeStyle, background: "#fee2e2", color: "#b91c1c" }
-              : btnBaseStyle
-          }
-          title="Bút chỉ Laser (Tự động tan biến sau 1.5s)"
-        >
-          <IconLaser size={14} color={activeTool === "ink:laser" ? "#b91c1c" : "#ef4444"} />
-          <span>Laser</span>
-        </button>
+        {/* Laser Quick Tool Button with Split Setting Caret */}
+        <div style={{ display: "inline-flex", alignItems: "center" }}>
+          <button
+            type="button"
+            data-tool="ink:laser"
+            data-active={activeTool === "ink:laser" ? "true" : undefined}
+            aria-pressed={activeTool === "ink:laser"}
+            onClick={() => onSelectTool("ink:laser")}
+            style={
+              activeTool === "ink:laser"
+                ? {
+                    ...activeStyle,
+                    background: "#fee2e2",
+                    color: "#b91c1c",
+                    borderTopRightRadius: 0,
+                    borderBottomRightRadius: 0,
+                    paddingRight: 4,
+                  }
+                : {
+                    ...btnBaseStyle,
+                    borderTopRightRadius: 0,
+                    borderBottomRightRadius: 0,
+                    paddingRight: 4,
+                  }
+            }
+            title={
+              laserConfig?.mode === "dot"
+                ? `Bút chỉ Laser (Dấu chấm ${laserConfig.dotSize}px)`
+                : "Bút chỉ Laser (Vệt sáng tan biến sau 1.5s)"
+            }
+          >
+            {laserConfig?.mode === "dot" ? (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 9,
+                  height: 9,
+                  borderRadius: "50%",
+                  background: laserConfig?.color || "#ef4444",
+                  boxShadow: `0 0 4px ${laserConfig?.color || "#ef4444"}`,
+                }}
+              />
+            ) : (
+              <IconLaser size={14} color={activeTool === "ink:laser" ? "#b91c1c" : laserConfig?.color || "#ef4444"} />
+            )}
+            <span>Laser</span>
+          </button>
+          <button
+            type="button"
+            data-action="laser-settings"
+            aria-label="Cài đặt chế độ Laser (Dấu chấm / Vệt sáng, kích thước, màu)"
+            title="Cài đặt Laser: Chọn 1 dấu chấm hoặc vệt sáng, thay đổi kích thước & màu sắc"
+            onClick={onOpenLaserSettings}
+            style={{
+              ...caretStyle,
+              borderTopLeftRadius: 0,
+              borderBottomLeftRadius: 0,
+              background: activeTool === "ink:laser" ? "#fee2e2" : "transparent",
+              color: activeTool === "ink:laser" ? "#b91c1c" : "#64748b",
+              borderLeft: "1px solid rgba(0,0,0,0.08)",
+            }}
+          >
+            ⚙
+          </button>
+        </div>
 
         {/* Eraser */}
+        {vis.groupSelection && vis.toolEraser && (
         <button
           type="button"
           data-tool="erase"
@@ -993,6 +1092,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <IconEraser size={14} />
           <span>Tẩy</span>
         </button>
+        )}
 
         {/* StylePicker (Color & Width) */}
         <StylePicker
@@ -1010,6 +1110,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         />
 
         {/* Formula */}
+        {vis.groupDrawing && vis.toolFormula && (
         <button
           type="button"
           data-tool="formula"
@@ -1022,17 +1123,66 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <IconFormula size={14} />
           <span>Công thức</span>
         </button>
+        )}
 
-        {/* Insert Dropdown */}
-        <InsertMenu
-          activeTool={activeTool}
-          onInsertTable={(r, c) => onInsertTable?.(r, c)}
-          onInsertImage={(img) => onInsertImage?.(img)}
-          onInsertPdfPages={(pages) => onInsertPdfPages?.(pages)}
-          onOpenCalculator={onOpenCalculator}
-          buttonStyle={btnBaseStyle}
-          activeButtonStyle={activeStyle}
+        {/* Chèn file PDF trực tiếp (thay thế menu chèn cũ) */}
+        {vis.groupDrawing && vis.toolInsertPdf && (
+        <>
+        <input
+          ref={pdfInputRef}
+          type="file"
+          accept="application/pdf"
+          style={{ display: "none" }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            setPdfImporting(true);
+            try {
+              const result = await importPdfPages(file);
+              onInsertPdfPages?.(result.pages);
+            } catch (err) {
+              console.error("Lỗi chèn file PDF:", err);
+            } finally {
+              setPdfImporting(false);
+            }
+          }}
         />
+        <button
+          type="button"
+          data-tool="insert-pdf"
+          disabled={pdfImporting}
+          onClick={() => pdfInputRef.current?.click()}
+          style={{
+            ...btnBaseStyle,
+            opacity: pdfImporting ? 0.6 : 1,
+            cursor: pdfImporting ? "wait" : "pointer",
+          }}
+          title="Chèn file PDF vào bảng"
+        >
+          <IconPdf size={14} color="#ef4444" />
+          <span>{pdfImporting ? "Đang nạp..." : "Chèn PDF"}</span>
+        </button>
+        </>
+        )}
+
+        {/* Nút nạp mô phỏng HTML (.html, .htm) trực tiếp */}
+        {onOpenHtmlSimModal && (
+          <button
+            type="button"
+            data-tool="insert-html-sim"
+            onClick={onOpenHtmlSimModal}
+            style={{
+              ...btnBaseStyle,
+              color: "#15803d",
+              fontWeight: 600,
+            }}
+            title="Nạp & nhúng file mô phỏng HTML thí nghiệm trực tiếp vào bảng"
+          >
+            <IconHtmlSim size={14} color="#16a34a" />
+            <span>Nạp HTML</span>
+          </button>
+        )}
 
         {dividerV}
 
@@ -1207,14 +1357,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {dividerV}
 
         {/* --- GROUP 3: Không gian, Giải tích & Thí nghiệm --- */}
+        {vis.groupSpaceGeometry && (
+        <>
+        {vis.toolSpaceMenu && (
         <SpaceGeometryMenu
           activeTool={typeof activeTool === "string" ? activeTool : null}
           onSelectTool={(t) => onSelectTool(t)}
           triggerStyle={btnBaseStyle}
           activeTriggerStyle={activeStyle}
         />
+        )}
 
         {/* Functions Menu */}
+        {vis.toolFunctionsMenu && (
         <div
           ref={functionsWrapRef}
           style={{ position: "relative", display: "inline-flex" }}
@@ -1243,8 +1398,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             anchorRef={functionsWrapRef}
           />
         </div>
+        )}
 
         {/* Statistics Menu */}
+        {vis.toolStatsMenu && (
         <div
           ref={statsWrapRef}
           style={{ position: "relative", display: "inline-flex" }}
@@ -1273,8 +1430,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             anchorRef={statsWrapRef}
           />
         </div>
+        )}
+        </>
+        )}
 
+        {/* --- GROUP 4: Vật lý & Dụng cụ --- */}
+        {vis.groupPhysics && (
+        <>
         {/* Real-World Menu */}
+        {vis.toolRealWorld && (
         <div
           ref={realworldWrapRef}
           style={{ position: "relative", display: "inline-flex" }}
@@ -1305,8 +1469,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             anchorRef={realworldWrapRef}
           />
         </div>
+        )}
 
         {/* Physics Menu */}
+        {vis.toolPhysics && (
         <div
           ref={physicsWrapRef}
           style={{ position: "relative", display: "inline-flex" }}
@@ -1333,42 +1499,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             onClose={() => setOpenMenu(null)}
             onAction={(act) => onPhysicsAction?.(act)}
             onOpenDrawer={() => onOpenPhysicsDrawer?.()}
+            onOpenHtmlSimModal={() => onOpenHtmlSimModal?.()}
             anchorRef={physicsWrapRef}
           />
         </div>
-
-        {/* Teaching Instruments Menu (Dụng cụ dạy học) */}
-        <div
-          ref={instrumentsWrapRef}
-          style={{ position: "relative", display: "inline-flex" }}
-        >
-          <button
-            type="button"
-            data-dropdown="instruments"
-            data-tool="instruments"
-            aria-haspopup="menu"
-            aria-expanded={openMenu === "instruments"}
-            onClick={() =>
-              setOpenMenu((prev) =>
-                prev === "instruments" ? null : "instruments"
-              )
-            }
-            style={openMenu === "instruments" ? activeStyle : btnBaseStyle}
-            title="Dụng cụ dạy học: Thước thẳng, Êke vuông, Thước đo góc 180°/360°, Compa ảo"
-          >
-            <IconRuler size={14} color="#d97706" />
-            <span>Dụng cụ dạy học ▾</span>
-          </button>
-          <TeachingInstrumentsMenu
-            open={openMenu === "instruments"}
-            onClose={() => setOpenMenu(null)}
-            onSelectInstrument={(kind) => onSelectInstrument?.(kind)}
-            anchorRef={instrumentsWrapRef}
-          />
-        </div>
+        )}
 
         {/* Quick Calculator Tool */}
-        {onOpenCalculator && (
+        {vis.toolCalculator && onOpenCalculator && (
           <button
             type="button"
             data-tool="calculator"
@@ -1382,6 +1520,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <IconCalculator size={14} />
             <span>Máy tính</span>
           </button>
+        )}
+        </>
         )}
       </div>
 
@@ -1414,6 +1554,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {dividerV}
 
         {/* Delete */}
+        {vis.groupSelection && vis.toolTrash && (
         <button
           type="button"
           data-tool="delete"
@@ -1431,8 +1572,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           <IconTrash size={14} />
         </button>
+        )}
 
-        {/* Undo */}
+        {/* Undo & Redo */}
+        {vis.groupSelection && vis.toolUndoRedo && (
+        <>
         <button
           type="button"
           data-tool="undo"
@@ -1451,7 +1595,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <IconUndo size={14} />
         </button>
 
-        {/* Redo */}
         <button
           type="button"
           data-tool="redo"
@@ -1469,6 +1612,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           <IconRedo size={14} />
         </button>
+        </>
+        )}
 
         {/* Local Offline Save & Open File */}
         {onSaveFile && (
@@ -1538,63 +1683,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <IconFullscreen exit={isFullscreen} size={14} />
         </button>
 
-        {/* Stylus-only vs Hand-drawing quick toggle */}
-        {onTogglePenOnly && (
-          <button
-            type="button"
-            data-action="toggle-pen-only"
-            data-active={penOnlyMode ? "true" : "false"}
-            aria-pressed={penOnlyMode}
-            onClick={() => onTogglePenOnly(!penOnlyMode)}
-            title={
-              penOnlyMode
-                ? "Chế độ CHỈ BÚT đang BẬT (tay chỉ chọn/kéo/thu phóng). Bấm để cho phép tay vẽ."
-                : "Chế độ VẼ TAY đang BẬT. Bấm để chuyển sang CHỈ VIẾT BẰNG BÚT STYLUS (tay chỉ điều hướng/chọn/kéo)."
-            }
-            aria-label={penOnlyMode ? "Chỉ viết bằng bút Stylus" : "Cho phép vẽ bằng tay"}
-            style={{
-              ...btnBaseStyle,
-              padding: "0 5px",
-              background: penOnlyMode ? "#e0e7ff" : "transparent",
-              color: penOnlyMode ? "#3730a3" : "#475569",
-              border: penOnlyMode ? "1px solid #c7d2fe" : "none",
-            }}
-          >
-            {penOnlyMode ? <IconStylusOnly size={14} color="#4338ca" /> : <IconHandTouch size={14} />}
-            <span className="sr-only">
-              {penOnlyMode ? "Chế độ chỉ bút đang bật" : "Chế độ vẽ tay đang bật"}
-            </span>
-          </button>
-        )}
+        {/* Stylus-only vs Hand-drawing quick toggle (also configurable in Settings) */}
+        {/* Ink-to-Shape quick toggle (also configurable in Settings) */}
 
-        {/* Ink-to-Shape intelligence toggle */}
-        {onToggleInkToShape && (
-          <button
-            type="button"
-            data-action="toggle-ink-shape"
-            data-active={inkToShape ? "true" : "false"}
-            aria-pressed={inkToShape}
-            onClick={() => onToggleInkToShape(!inkToShape)}
-            title={
-              inkToShape
-                ? "Nhận diện hình vẽ tay (Ink-to-Shape) đang BẬT. Bấm để tắt."
-                : "Nhận diện hình vẽ tay (Ink-to-Shape) đang TẮT. Bấm để bật."
-            }
-            aria-label={inkToShape ? "Tắt nhận diện hình vẽ tay" : "Bật nhận diện hình vẽ tay"}
-            style={{
-              ...btnBaseStyle,
-              padding: "0 5px",
-              background: inkToShape ? "#dbeafe" : "transparent",
-              color: inkToShape ? "#1d4ed8" : "#475569",
-              border: inkToShape ? "1px solid #bfdbfe" : "none",
-            }}
-          >
-            <IconShapeSnap size={14} color={inkToShape ? "#1d4ed8" : "#64748b"} />
-            <span className="sr-only">
-              {inkToShape ? "Nhận diện nét vẽ hình học đang bật" : "Nhận diện nét vẽ hình học đang tắt"}
-            </span>
-          </button>
-        )}
         {/* Toolbar Zoom / Size Pill + Right-edge Resize Handle */}
         {!embedded && (
           <div
@@ -1680,28 +1771,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         )}
 
-        {/* More Menu */}
-        <MoreMenu
-          doc={doc}
-          page={page.current}
-          getBoardElement={getBoardElement}
-          hasPaper={hasPaper}
-          labelScale={labelScale}
-          dotScale={dotScale}
-          boardConfig={boardConfig}
-          onChangeBoardConfig={onChangeBoardConfig}
-          onApplyBoardAllPages={onApplyBoardAllPages}
-          onScaleGeometry={onScaleGeometry}
-          onChangeLabelScale={onChangeLabelScale}
-          onChangeDotScale={onChangeDotScale}
-          onOpenExam={onOpenExam}
-          onOpenCommandPalette={onOpenCommandPalette}
-          onExportTikz={onExportTikz}
-          onOpenJsonModal={onOpenJsonModal}
-          penOnlyMode={penOnlyMode}
-          onTogglePenOnly={onTogglePenOnly}
-          buttonStyle={{ height: 26, padding: "0 4px" }}
-        />
+        {/* Nút Cài đặt Hệ thống & Thanh công cụ (đã gộp toàn bộ tính năng menu ⋯) */}
+        <button
+          type="button"
+          data-action="more"
+          onClick={onOpenSettings}
+          title="Cài đặt hệ thống, khổ bảng, tỉ lệ hình & ẩn/hiện thanh công cụ"
+          aria-label="Cài đặt hệ thống & thanh công cụ"
+          style={{
+            ...btnBaseStyle,
+            padding: "0 8px",
+            color: "#1e293b",
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            fontWeight: 600,
+            gap: 5,
+          }}
+        >
+          <IconSettings size={15} color="#2563eb" />
+          <span>Cài đặt</span>
+        </button>
 
         {/* Minimize / Collapse Toolbar Button */}
         {!embedded && (

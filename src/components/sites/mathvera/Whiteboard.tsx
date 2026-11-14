@@ -77,6 +77,7 @@ import {
   computePolyhedronSection,
   computeUnfoldedPolyhedronNet,
   createOxyzElement,
+  projectOxyzPoint,
   createPlaneParallelogramElements,
   createSolid3DElement,
   defaultCameraForSolid,
@@ -144,6 +145,7 @@ import { RealWorldDrawer } from "./RealWorldDrawer";
 import { PhysicsDrawer } from "./PhysicsDrawer";
 import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportModal } from "./ExportModal";
+import { ExportPdfModal } from "./ExportPdfModal";
 import { ExamEditor } from "./ExamEditor";
 import type {
   PhysicsInstrumentKind,
@@ -164,13 +166,19 @@ import { createDefaultFbdDiagramProps } from "@/lib/physics-forces";
 import { createDefaultOpticsDiagramProps } from "@/lib/physics-optics";
 import {
   addYjsPage,
+  deleteYjsPages,
   setYjsCurrentPage,
   useYjsPages,
 } from "./PageBar";
 import { PageSidebar } from "./PageSidebar";
+import { PageManagerModal } from "./PageManagerModal";
 import {
   AxesPointDialog,
   AxesVectorDialog,
+  Axes3DPointDialog,
+  Axes3DVectorDialog,
+  Axes3DFigureDialog,
+  Axes3DFigureKind,
   BayesConfigDialog,
   ChartConfigDialog,
   ConicConfigDialog,
@@ -195,6 +203,21 @@ import {
   PhysicsLabTableElement,
   computeLinearRegression,
 } from "./elements/PhysicsLabTableElement";
+import { HtmlSimElement } from "./elements/HtmlSimElement";
+import { HtmlSimModal } from "./HtmlSimModal";
+import { LaserSettingsModal } from "./LaserSettingsModal";
+import { SettingsModal } from "./SettingsModal";
+import {
+  ToolbarVisibilityConfig,
+  loadToolbarVisibilityConfig,
+  saveToolbarVisibilityConfig,
+} from "@/lib/toolbar-config";
+import {
+  LaserConfig,
+  DEFAULT_LASER_CONFIG,
+  loadLaserConfig,
+  saveLaserConfig,
+} from "@/lib/laser-config";
 import {
   ImageElement,
   MathElement,
@@ -228,6 +251,13 @@ import {
   LineDecorElement,
   RealObjectElement,
 } from "./elements/RealObjectElement";
+import {
+  EquationSolverModal,
+} from "./EquationSolverModal";
+import {
+  solveEquationOrSystem,
+  type EquationSolution,
+} from "@/lib/equation-solver";
 
 export interface WhiteboardProps {
   roomId?: string;
@@ -415,11 +445,61 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [gridEnabled, setGridEnabled] = useState<boolean>(true);
   const [penOnlyMode, setPenOnlyMode] = useState<boolean>(false);
   const [inkToShape, setInkToShape] = useState<boolean>(true);
+  const [autoSwitchTarget, setAutoSwitchTarget] = useState<"select" | "ink" | "off">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("physboard_auto_switch_target");
+      if (saved === "select" || saved === "ink" || saved === "off") return saved;
+    }
+    return "select";
+  });
+
+  const previousToolBeforeEraserRef = useRef<WhiteboardTool>("ink");
+  const eraserDidEraseRef = useRef<boolean>(false);
+
+  const handleToggleAutoSwitchTarget = useCallback(() => {
+    setAutoSwitchTarget((prev) => {
+      const next = prev === "select" ? "ink" : prev === "ink" ? "off" : "select";
+      if (typeof window !== "undefined") {
+        localStorage.setItem("physboard_auto_switch_target", next);
+      }
+      return next;
+    });
+  }, []);
+
+  const resetToolAfterCreation = useCallback(() => {
+    if (autoSwitchTarget === "off") return;
+    setActiveTool(autoSwitchTarget === "ink" ? "ink" : "select");
+  }, [autoSwitchTarget]);
+
+  const resetToolAfterEraser = useCallback(() => {
+    if (autoSwitchTarget === "off") return;
+    const prev = previousToolBeforeEraserRef.current;
+    if (autoSwitchTarget === "ink") {
+      setActiveTool(prev && prev !== "erase" ? prev : "ink");
+    } else {
+      setActiveTool("select");
+    }
+  }, [autoSwitchTarget]);
 
   // Dedicated laser pointer ephemeral strokes (not in Yjs, decaying over time)
   const [laserStrokes, setLaserStrokes] = useState<
-    Array<{ id: string; points: number[]; createdAt: number }>
+    Array<{ id: string; points: number[]; createdAt: number; color?: string; width?: number }>
   >([]);
+  const [laserConfig, setLaserConfig] = useState<LaserConfig>(() => loadLaserConfig());
+  const [laserSettingsOpen, setLaserSettingsOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [toolbarConfig, setToolbarConfig] = useState<ToolbarVisibilityConfig>(() => loadToolbarVisibilityConfig());
+
+  const handleUpdateToolbarConfig = useCallback((cfg: ToolbarVisibilityConfig) => {
+    setToolbarConfig(cfg);
+    saveToolbarVisibilityConfig(cfg);
+  }, []);
+  const [liveLaserScreenPos, setLiveLaserScreenPos] = useState<{ x: number; y: number } | null>(null);
+
+  const handleUpdateLaserConfig = useCallback((newCfg: LaserConfig) => {
+    setLaserConfig(newCfg);
+    saveLaserConfig(newCfg);
+  }, []);
 
   useEffect(() => {
     if (laserStrokes.length === 0) return;
@@ -484,12 +564,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     worldPos: Point2D;
     initialLatex: string;
   } | null>(null);
+  const [equationSolution, setEquationSolution] = useState<EquationSolution | null>(null);
+  const [equationModalOpen, setEquationModalOpen] = useState(false);
   const [plotDialogOpen, setPlotDialogOpen] = useState(false);
   const [pointRenameSession, setPointRenameSession] = useState<{
     items: Array<{ id: string; originalName: string; draftName: string }>;
   } | null>(null);
   const [axesPointDialogOpen, setAxesPointDialogOpen] = useState(false);
   const [axesVectorDialogOpen, setAxesVectorDialogOpen] = useState(false);
+  const [axes3DPointDialogOpen, setAxes3DPointDialogOpen] = useState(false);
+  const [axes3DVectorDialogOpen, setAxes3DVectorDialogOpen] = useState(false);
+  const [axes3DFigureDialogKind, setAxes3DFigureDialogKind] =
+    useState<Axes3DFigureKind | null>(null);
   const [curve2dDialogMode, setCurve2dDialogMode] =
     useState<Curve2DDialogMode | null>(null);
   const [conicDialogKind, setConicDialogKind] = useState<
@@ -503,12 +589,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [numberLineDialogOpen, setNumberLineDialogOpen] = useState(false);
   const [realWorldDrawerOpen, setRealWorldDrawerOpen] = useState(false);
   const [physicsDrawerOpen, setPhysicsDrawerOpen] = useState(false);
+  const [htmlSimModalOpen, setHtmlSimModalOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [exportModalMode, setExportModalMode] = useState<"tikz" | "json" | null>(
     null
   );
+  const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false);
   const [examOpen, setExamOpen] = useState(false);
   const [pageSidebarOpen, setPageSidebarOpen] = useState(true);
+  const [pageManagerOpen, setPageManagerOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [fillNamesInput, setFillNamesInput] = useState("");
@@ -719,8 +808,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   );
 
   const solved3D = useMemo(
-    () => solveGeometry3D(pageElements),
-    [pageElements]
+    () => solveGeometry3D(pageElements, orbitCamById),
+    [pageElements, orbitCamById]
   );
 
   const hydratedPts = useMemo(
@@ -1196,6 +1285,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const handleSelectTool = useCallback(
     (rawTool: WhiteboardTool) => {
       const next = normalizeToolId(rawTool);
+      if (next === "erase" && activeTool !== "erase") {
+        previousToolBeforeEraserRef.current = activeTool;
+      }
       draftTwoPtRef.current = null;
       setDraftPreviewLine(null);
       setDraftPolygonPts([]);
@@ -1340,14 +1432,20 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
   // 3D Orbit Helpers
   const activeOrbitElement = useMemo(() => {
-    const id =
+    let id =
       orbitActiveId ??
       selectedElements.find(
-        (el) => el.type === "Solid3D" || el.type === "Axes3D"
+        (el) => el.type === "Solid3D" || el.type === "Axes3D" || el.type === "SpaceFigure"
       )?.id ??
       null;
     if (!id) return null;
-    const el = byId.get(id);
+    let el = byId.get(id);
+    if (el?.type === "SpaceFigure" && (el.props as any)?.axes) {
+      const parentAxes = byId.get((el.props as any).axes);
+      if (parentAxes && parentAxes.type === "Axes3D") {
+        el = parentAxes;
+      }
+    }
     if (!el || (el.type !== "Solid3D" && el.type !== "Axes3D")) return null;
     return el;
   }, [orbitActiveId, selectedElements, byId]);
@@ -2027,11 +2125,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           }
           break;
         case "action:exportPdf":
-          if (doc) {
-            exportPDF(containerRef.current, doc, currentPage)
-              .then((blob) => downloadBlob(blob, "physboard-bang-ve.pdf"))
-              .catch(() => {});
-          }
+          setExportPdfModalOpen(true);
           break;
         case "action:exportTikz":
           setExportModalMode("tikz");
@@ -2723,6 +2817,29 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     return id;
   }, [selectedAxes2D, pageElements, getViewCenter, dispatcher]);
 
+  const ensureAxes3D = useCallback((): string => {
+    const sel =
+      selectedElements.length === 1 && selectedElements[0].type === "Axes3D"
+        ? selectedElements[0]
+        : null;
+    if (sel) return sel.id;
+    const existing = pageElements.find((el) => el.type === "Axes3D");
+    if (existing) return existing.id;
+    const center = getViewCenter();
+    const axesEl = createOxyzElement(center, { page: currentPage });
+    dispatcher.dispatch({
+      type: "object.create",
+      params: {
+        id: axesEl.id,
+        type: axesEl.type,
+        transform: axesEl.transform,
+        style: axesEl.style,
+        props: axesEl.props,
+      },
+    });
+    return axesEl.id;
+  }, [selectedElements, pageElements, getViewCenter, currentPage, dispatcher]);
+
   const handleSubmitPlot = useCallback(
     (
       exprLatex: string,
@@ -2953,6 +3070,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       worldPos: { x: el.transform.x, y: el.transform.y },
       initialLatex: typeof el.props?.latex === "string" ? el.props.latex : "",
     });
+  }, []);
+
+  const handleSolveMathLatex = useCallback((latex: string) => {
+    const sol = solveEquationOrSystem(latex);
+    setEquationSolution(sol);
+    setEquationModalOpen(true);
   }, []);
 
   // --- Construction Tool Click Handler ---
@@ -4026,8 +4149,23 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   },
                 });
               });
+              netRes.points?.forEach((ptEl) => {
+                dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    id: ptEl.id,
+                    type: ptEl.type,
+                    transform: ptEl.transform,
+                    style: ptEl.style,
+                    props: ptEl.props,
+                  },
+                });
+              });
             });
-            setStatusHint(`✓ Đã trải phẳng ${netRes.polygons.length} mặt của khối thành hình 2D`);
+            const ptsCount = netRes.points?.length ?? 0;
+            setStatusHint(
+              `✓ Đã trải phẳng ${netRes.polygons.length} mặt của khối${ptsCount > 0 ? ` cùng ${ptsCount} điểm đặc biệt` : ""}`
+            );
           } else {
             setStatusHint("Không thể trải phẳng khối này (chỉ hỗ trợ hình chóp, lăng trụ, hộp chữ nhật, lập phương)");
           }
@@ -4251,6 +4389,35 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             map.set(rid, { x: refEl.transform.x, y: refEl.transform.y });
           }
         }
+        // If el is a segment or line, also move any attached LineDecor
+        for (const other of pageElements) {
+          if (other.type === "LineDecor" && other.props?.target === el.id) {
+            if (!map.has(other.id)) {
+              map.set(other.id, { x: other.transform.x, y: other.transform.y });
+            }
+          }
+        }
+        // If el is a LineDecor, also move its target segment and endpoints
+        if (el.type === "LineDecor" && typeof el.props?.target === "string") {
+          const targetSeg = byId.get(el.props.target);
+          if (targetSeg) {
+            if (!map.has(targetSeg.id)) {
+              map.set(targetSeg.id, { x: targetSeg.transform.x, y: targetSeg.transform.y });
+            }
+            if (typeof targetSeg.props?.from === "string") {
+              const pA = byId.get(targetSeg.props.from);
+              if (pA && !map.has(pA.id)) {
+                map.set(pA.id, { x: pA.transform.x, y: pA.transform.y });
+              }
+            }
+            if (typeof targetSeg.props?.to === "string") {
+              const pB = byId.get(targetSeg.props.to);
+              if (pB && !map.has(pB.id)) {
+                map.set(pB.id, { x: pB.transform.x, y: pB.transform.y });
+              }
+            }
+          }
+        }
       }
       dragBoxStartRef.current = {
         startX: worldPos.x,
@@ -4259,7 +4426,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       };
       dispatcher.gesture(true);
     },
-    [dispatcher, containerRef, viewport, selectedElements, byId]
+    [dispatcher, containerRef, viewport, selectedElements, byId, pageElements]
   );
 
   const handleElementPointerDown = useCallback(
@@ -4395,6 +4562,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
       // Contact Eraser
       if (activeTool === "erase") {
+        eraserDidEraseRef.current = true;
         checkEraserCollision(worldPos, pageElements, viewport.scale, (id) => {
           dispatcher.deleteObjects([id]);
         });
@@ -4533,7 +4701,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4561,7 +4729,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4690,7 +4858,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           setSelectedIds([newId]);
           setOrbitActiveId(newId);
         }
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4713,7 +4881,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           setSelectedIds([newId]);
           setOrbitActiveId(newId);
         }
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4736,7 +4904,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4787,7 +4955,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4813,7 +4981,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4845,7 +5013,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4888,7 +5056,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4909,7 +5077,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4944,7 +5112,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -4997,7 +5165,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           },
         });
         if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         setStatusHint(null);
         return;
       }
@@ -5029,7 +5197,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           : drawPt.y;
         const effectiveStyle: Style =
           nib === "laser"
-            ? { stroke: "#ef4444", width: 4 }
+            ? { stroke: laserConfig.color || "#ef4444", width: laserConfig.trailWidth || 4.5 }
             : nib === "highlighter" &&
               (!currentStyle.stroke || currentStyle.stroke.toLowerCase() === "#111827")
             ? { ...currentStyle, stroke: "#facc15" }
@@ -5075,6 +5243,17 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       navPointerMove(e);
 
       const rect = containerRef.current?.getBoundingClientRect();
+
+      // Track laser screen position when active
+      if (activeTool === "ink:laser") {
+        setLiveLaserScreenPos({
+          x: e.clientX - (rect?.left ?? 0),
+          y: e.clientY - (rect?.top ?? 0),
+        });
+      } else if (liveLaserScreenPos !== null) {
+        setLiveLaserScreenPos(null);
+      }
+
       const worldPos = screenToWorld(
         e.clientX,
         e.clientY,
@@ -5425,6 +5604,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
       // 5. Eraser Sweep
       if (activeTool === "erase" && e.buttons === 1) {
+        eraserDidEraseRef.current = true;
         checkEraserCollision(worldPos, pageElements, viewport.scale, (id) => {
           dispatcher.deleteObjects([id]);
         });
@@ -5552,7 +5732,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             const strokeId = newElId("laser");
             setLaserStrokes((prev) => [
               ...prev,
-              { id: strokeId, points: [...pts], createdAt: performance.now() },
+              {
+                id: strokeId,
+                points: [...pts],
+                createdAt: performance.now(),
+                color: laserConfig.color,
+                width: laserConfig.trailWidth,
+              },
             ]);
           } else if (
             inkToShape &&
@@ -5680,6 +5866,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         liveStrokePressuresRef.current = [];
         setLiveStroke(null);
       }
+
+      if (activeTool === "erase") {
+        if (eraserDidEraseRef.current) {
+          eraserDidEraseRef.current = false;
+          resetToolAfterEraser();
+        }
+      }
     },
     [
       navPointerUp,
@@ -5691,6 +5884,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       commitTwoPointShape,
       liveStroke,
       inkToShape,
+      activeTool,
+      resetToolAfterEraser,
     ]
   );
 
@@ -5727,33 +5922,68 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [navPointerCancel, dispatcher, liveStroke]
   );
 
-  // Drag-and-drop image file onto canvas
+  // Drag-and-drop image or HTML simulation file onto canvas
   const handleDropOnCanvas = useCallback(
     async (e: React.DragEvent<HTMLDivElement>) => {
       const file = e.dataTransfer.files?.[0];
-      if (!file || !file.type.startsWith("image/")) return;
+      if (!file) return;
+
+      const isImage = file.type.startsWith("image/");
+      const isHtml = file.name.endsWith(".html") || file.name.endsWith(".htm") || file.type === "text/html";
+      if (!isImage && !isHtml) return;
+
       e.preventDefault();
-      try {
-        const img = await readImageFile(file);
-        const rect = containerRef.current?.getBoundingClientRect();
-        const pt = screenToWorld(
-          e.clientX,
-          e.clientY,
-          viewport.tx,
-          viewport.ty,
-          viewport.scale,
-          rect
-        );
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "Image",
-            transform: { x: pt.x, y: pt.y, scale: 1, rotation: 0, z: 0 },
-            props: { src: img.src, w: img.w, h: img.h },
-          },
-        });
-      } catch {
-        // Ignore invalid dropped image
+      const rect = containerRef.current?.getBoundingClientRect();
+      const pt = screenToWorld(
+        e.clientX,
+        e.clientY,
+        viewport.tx,
+        viewport.ty,
+        viewport.scale,
+        rect
+      );
+
+      if (isHtml) {
+        try {
+          const text = await file.text();
+          if (text) {
+            const titleMatch = /<title>(.*?)<\/title>/i.exec(text);
+            const title = titleMatch ? titleMatch[1].trim() : file.name.replace(/\.[^/.]+$/, "");
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "HtmlSim",
+                transform: { x: pt.x, y: pt.y, scale: 1, rotation: 0, z: 0 },
+                props: {
+                  title,
+                  htmlContent: text,
+                  widthPx: 860,
+                  heightPx: 560,
+                },
+              },
+            });
+            setStatusHint(`✓ Đã nhúng mô phỏng HTML: ${title}`);
+          }
+        } catch {
+          // Ignore invalid dropped html
+        }
+        return;
+      }
+
+      if (isImage) {
+        try {
+          const img = await readImageFile(file);
+          dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "Image",
+              transform: { x: pt.x, y: pt.y, scale: 1, rotation: 0, z: 0 },
+              props: { src: img.src, w: img.w, h: img.h },
+            },
+          });
+        } catch {
+          // Ignore invalid dropped image
+        }
       }
     },
     [containerRef, viewport, dispatcher]
@@ -5950,7 +6180,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             scale={viewport.scale}
             labelScale={labelScale}
             dotScale={dotScale}
-            orbitCam={orbitCamById[el.id]}
+            orbitCam={
+              orbitCamById[el.id] ??
+              (el.type === "SpaceFigure" && (el.props as any)?.axes
+                ? orbitCamById[(el.props as any).axes]
+                : undefined)
+            }
             isSelected={isSel}
             selectedSubPart={activeSolidSubPart}
             onPointerDown={(e, id) => handleElementPointerDown(e, id)}
@@ -6181,6 +6416,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             key={el.id}
             element={el}
             allElements={pageElements}
+            points={hydratedPts}
             isSelected={isSel}
             onPointerDown={(e) => handleElementPointerDown(e, el.id)}
           />
@@ -6192,6 +6428,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             key={el.id}
             element={el}
             allElements={pageElements}
+            points={hydratedPts}
             isSelected={isSel}
             onPointerDown={(e) => handleElementPointerDown(e, el.id)}
           />
@@ -6245,6 +6482,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           />
         );
 
+      case "HtmlSim":
+        return (
+          <HtmlSimElement
+            key={el.id}
+            element={el}
+            scale={viewport.scale}
+            isSelected={isSel}
+            onPointerDown={(e) => handleElementPointerDown(e, el.id)}
+            onUpdateProps={handleUpdateElementProps}
+          />
+        );
+
       default:
         return null;
     }
@@ -6285,7 +6534,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 Boolean(selectedPhysicsEl) ||
                 (selectedElements.length === 1 &&
                   (selectedElements[0].type === "Slider" ||
-                    selectedElements[0].type === "Solid3D"))
+                    selectedElements[0].type === "Solid3D" ||
+                    selectedElements[0].type === "VarTable" ||
+                    selectedElements[0].type === "HtmlSim"))
               }
               onHandlePointerDown={handleHandlePointerDown}
               onBoxPointerDown={handleBoxPointerDown}
@@ -6337,8 +6588,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   id={ls.id}
                   transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 99999 }}
                   style={{
-                    stroke: "#ef4444",
-                    width: 4.5,
+                    stroke: ls.color || "#ef4444",
+                    width: ls.width || 4.5,
                   }}
                   props={{
                     points: ls.points,
@@ -6351,13 +6602,58 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           })}
         </>
       }
+      cursorOverride={activeTool === "ink:laser" && laserConfig.mode === "dot" ? "none" : undefined}
       overlayChildren={
-        <PeerCursors
-          peers={peerCursors}
-          viewport={viewport}
-          peerCount={peerCount}
-          showCounter={!contained}
-        />
+        <>
+          <PeerCursors
+            peers={peerCursors}
+            viewport={viewport}
+            peerCount={peerCount}
+            showCounter={!contained}
+          />
+          {/* Live Single Dot Laser Pointer indicator with customizable size and halo glow */}
+          {activeTool === "ink:laser" && laserConfig.mode === "dot" && liveLaserScreenPos && (
+            <div
+              data-laser-spot="true"
+              data-export-skip="true"
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                transform: `translate3d(${liveLaserScreenPos.x}px, ${liveLaserScreenPos.y}px, 0) translate(-50%, -50%)`,
+                pointerEvents: "none",
+                zIndex: 99999,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {/* Outer soft pulsing glow */}
+              <div
+                style={{
+                  position: "absolute",
+                  width: laserConfig.dotSize * 2.2,
+                  height: laserConfig.dotSize * 2.2,
+                  borderRadius: "50%",
+                  background: laserConfig.color || "#ef4444",
+                  opacity: 0.28,
+                  filter: "blur(4px)",
+                }}
+              />
+              {/* Core intense laser spot */}
+              <div
+                style={{
+                  width: laserConfig.dotSize,
+                  height: laserConfig.dotSize,
+                  borderRadius: "50%",
+                  background: laserConfig.color || "#ef4444",
+                  boxShadow: `0 0 6px ${laserConfig.color || "#ef4444"}, 0 0 14px #fbbf24`,
+                  border: "1.5px solid #ffffff",
+                }}
+              />
+            </div>
+          )}
+        </>
       }
     >
       {isA4Format ? (
@@ -6480,6 +6776,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onOpenRealWorldDrawer={() => setRealWorldDrawerOpen(true)}
       onPhysicsAction={handlePhysicsAction}
       onOpenPhysicsDrawer={() => setPhysicsDrawerOpen(true)}
+      onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
       onSelectInstrument={handleSelectTeachingInstrument}
       onOpenCalculator={() => setCalculatorOpen((prev) => !prev)}
       isCalculatorOpen={calculatorOpen}
@@ -6524,6 +6821,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onChangeDotScale={setDotScale}
       onOpenExam={() => setExamOpen(true)}
       onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+      onExportPdf={() => setExportPdfModalOpen(true)}
       onExportTikz={() => setExportModalMode("tikz")}
       onOpenJsonModal={() => setExportModalMode("json")}
       shortcutMap={shortcutMap}
@@ -6531,6 +6829,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onTogglePenOnly={handleTogglePenOnly}
       inkToShape={inkToShape}
       onToggleInkToShape={handleToggleInkToShape}
+      autoSwitchTarget={autoSwitchTarget}
+      onToggleAutoSwitchTarget={handleToggleAutoSwitchTarget}
+      laserConfig={laserConfig}
+      onOpenLaserSettings={() => setLaserSettingsOpen(true)}
+      toolbarVisibility={toolbarConfig}
+      onOpenSettings={() => setSettingsModalOpen(true)}
     />
   );
 
@@ -6591,6 +6895,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             totalPages={pageCount}
             isOpen={pageSidebarOpen}
             onToggleOpen={() => setPageSidebarOpen((v) => !v)}
+            onOpenPageManager={() => setPageManagerOpen(true)}
             onSelectPage={(p) => {
               setYjsCurrentPage(doc, p);
               if (isA4Format) {
@@ -6613,13 +6918,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             }}
             onDeletePage={(p) => {
               if (doc && pageCount > 1) {
-                const map = doc.getMap<number>("pages");
-                doc.transact(() => {
-                  map.set("count", Math.max(1, pageCount - 1));
-                  if (currentPage >= p && currentPage > 1) {
-                    map.set("cur", currentPage - 1);
-                  }
-                });
+                deleteYjsPages(doc, [p]);
               }
             }}
           />
@@ -6849,8 +7148,39 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           selectedCount={selectedIds.length}
           hiddenCount={hiddenCount}
           selectedAxes2D={selectedAxes2D}
+          selectedAxes3D={
+            selectedElements.length === 1 && selectedElements[0].type === "Axes3D"
+              ? selectedElements[0]
+              : null
+          }
           selectedPhysicsEl={selectedPhysicsEl}
+          selectedSolidEl={
+            selectedElements.length === 1 && selectedElements[0].type === "Solid3D"
+              ? selectedElements[0]
+              : null
+          }
           selectedPoints={selectedPoints}
+          selectedMathText={
+            selectedElements.length === 1 && selectedElements[0].type === "MathText"
+              ? selectedElements[0]
+              : null
+          }
+          onEditMath={() => {
+            const mathEl =
+              selectedElements.length === 1 && selectedElements[0].type === "MathText"
+                ? selectedElements[0]
+                : null;
+            if (mathEl) handleEditMathElement(mathEl);
+          }}
+          onSolveEquation={() => {
+            const mathEl =
+              selectedElements.length === 1 && selectedElements[0].type === "MathText"
+                ? selectedElements[0]
+                : null;
+            if (mathEl && typeof mathEl.props?.latex === "string") {
+              handleSolveMathLatex(mathEl.props.latex);
+            }
+          }}
           selectedSolidSubPart={activeSolidSubPart}
           isSolidFaceFilled={Boolean(
             activeSolidSubPart?.kind === "face" &&
@@ -6866,6 +7196,48 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           )}
           labelScale={labelScale}
           dotScale={dotScale}
+          onSolidUnfold={() => {
+            const solid =
+              selectedElements.length === 1 && selectedElements[0].type === "Solid3D"
+                ? selectedElements[0]
+                : null;
+            if (!solid) return;
+            const netRes = computeUnfoldedPolyhedronNet(solid.id, solved3D, pageElements);
+            if (netRes && netRes.polygons.length > 0) {
+              dispatcher.batch(() => {
+                netRes.polygons.forEach((polyEl) => {
+                  dispatcher.dispatch({
+                    type: "object.create",
+                    params: {
+                      id: polyEl.id,
+                      type: polyEl.type,
+                      transform: polyEl.transform,
+                      style: polyEl.style,
+                      props: polyEl.props,
+                    },
+                  });
+                });
+                netRes.points?.forEach((ptEl) => {
+                  dispatcher.dispatch({
+                    type: "object.create",
+                    params: {
+                      id: ptEl.id,
+                      type: ptEl.type,
+                      transform: ptEl.transform,
+                      style: ptEl.style,
+                      props: ptEl.props,
+                    },
+                  });
+                });
+              });
+              const ptsCount = netRes.points?.length ?? 0;
+              setStatusHint(
+                `✓ Đã trải phẳng ${netRes.polygons.length} mặt của khối${ptsCount > 0 ? ` cùng ${ptsCount} điểm đặc biệt` : ""}`
+              );
+            } else {
+              setStatusHint("Không thể trải phẳng khối này (chỉ hỗ trợ hình chóp, lăng trụ, hộp chữ nhật, lập phương)");
+            }
+          }}
           onSolidSelectWhole={() => setSolidSubSel(null)}
           onSolidFaceFlatten={() => {
             if (activeSolidSubPart?.kind !== "face") return;
@@ -7176,6 +7548,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             handleUpdateElementProps(selectedAxes2D.id, { ticks: nextTicks });
           }}
           onAxesAddVector={() => setAxesVectorDialogOpen(true)}
+          onAxes3DAddPoint={() => setAxes3DPointDialogOpen(true)}
+          onAxes3DAddVector={() => setAxes3DVectorDialogOpen(true)}
+          onAxes3DAddPlane={() => setAxes3DFigureDialogKind("plane")}
+          onAxes3DAddLine={() => setAxes3DFigureDialogKind("line")}
+          onAxes3DAddSphere={() => setAxes3DFigureDialogKind("sphere")}
           onAxesOpenConic={() => setConicDialogKind("ellipse")}
           onAxesOpenEquation={() => setCurve2dDialogMode("equation")}
           onAxesOpenInequality={() => setCurve2dDialogMode("inequality")}
@@ -7312,8 +7689,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               if (res.created?.[0]) setSelectedIds([res.created[0]]);
             }
             setMathSession(null);
+            resetToolAfterCreation();
           }}
-          onCancel={() => setMathSession(null)}
+          onCancel={() => {
+            setMathSession(null);
+            resetToolAfterCreation();
+          }}
+          onSolveEquation={(latex) => {
+            handleSolveMathLatex(latex);
+          }}
           onPlotFunction={(latex) => {
             const clean = latex.replace(/^[yY]\s*=\s*/, "").replace(/^f\(x\)\s*=\s*/, "").trim();
             handleSubmitPlot(clean || latex, []);
@@ -7362,6 +7746,33 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           }}
         />
       )}
+
+      {/* Equation / System of Equations Solver Modal */}
+      <EquationSolverModal
+        isOpen={equationModalOpen}
+        onClose={() => setEquationModalOpen(false)}
+        solution={equationSolution}
+        onInsertToCanvas={(latex) => {
+          const center = getViewCenter();
+          const res = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "MathText",
+              transform: {
+                x: center.x,
+                y: center.y - 1,
+                scale: 1,
+                rotation: 0,
+                z: 0,
+              },
+              style: { stroke: "#2563eb" },
+              props: { latex },
+            },
+          });
+          if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          setStatusHint("Đã chèn nghiệm phương trình lên bảng");
+        }}
+      />
 
       {/* M3 Config Dialogs */}
       <PlotConfigDialog
@@ -7602,6 +8013,113 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onCancel={() => setAxesVectorDialogOpen(false)}
       />
 
+      <Axes3DPointDialog
+        open={axes3DPointDialogOpen}
+        defaultName={getNextPointName(pageElements, ["M", "N", "P", "Q", "A", "B", "C"])}
+        onSubmit={(name, x, y, z) => {
+          const axesId = ensureAxes3D();
+          const axesEl = pageElements.find((e) => e.id === axesId);
+          const tr = axesEl?.transform ?? { x: 0, y: 0, scale: 1 };
+          const p2 = projectOxyzPoint(tr, { x, y, z });
+          const res = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "GeomPoint",
+              transform: { x: p2.x, y: p2.y, scale: 1, rotation: 0, z: 0 },
+              style: { stroke: "#2563eb", fill: "#2563eb" },
+              props: {
+                name: `${name}(${x}; ${y}; ${z})`,
+                constraint: { kind: "oxyz", axes: axesId, x, y, z },
+              },
+            },
+          });
+          if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          setAxes3DPointDialogOpen(false);
+        }}
+        onCancel={() => setAxes3DPointDialogOpen(false)}
+      />
+
+      <Axes3DVectorDialog
+        open={axes3DVectorDialogOpen}
+        onSubmit={(vx, vy, vz, x0, y0, z0) => {
+          const axesId = ensureAxes3D();
+          const axesEl = pageElements.find((e) => e.id === axesId);
+          const tr = axesEl?.transform ?? { x: 0, y: 0, scale: 1 };
+          const pA2 = projectOxyzPoint(tr, { x: x0, y: y0, z: z0 });
+          const pB2 = projectOxyzPoint(tr, { x: x0 + vx, y: y0 + vy, z: z0 + vz });
+          const pAId = newElId("pt");
+          const pBId = newElId("pt");
+          let vecId = "";
+          dispatcher.batch(() => {
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: pAId,
+                type: "GeomPoint",
+                transform: { x: pA2.x, y: pA2.y, scale: 1, rotation: 0, z: 0 },
+                props: {
+                  name: "",
+                  dot: "none",
+                  constraint: { kind: "oxyz", axes: axesId, x: x0, y: y0, z: z0 },
+                },
+              },
+            });
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: pBId,
+                type: "GeomPoint",
+                transform: { x: pB2.x, y: pB2.y, scale: 1, rotation: 0, z: 0 },
+                props: {
+                  name: `u⃗(${vx}; ${vy}; ${vz})`,
+                  dot: "none",
+                  constraint: { kind: "oxyz", axes: axesId, x: x0 + vx, y: y0 + vy, z: z0 + vz },
+                },
+              },
+            });
+            const vRes = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "GeomVector",
+                style: { stroke: "#0891b2", width: 2.2 },
+                props: { from: pAId, to: pBId },
+              },
+            });
+            vecId = vRes.created?.[0] ?? "";
+          });
+          if (vecId) setSelectedIds([vecId]);
+          setAxes3DVectorDialogOpen(false);
+        }}
+        onCancel={() => setAxes3DVectorDialogOpen(false)}
+      />
+
+      <Axes3DFigureDialog
+        open={axes3DFigureDialogKind !== null}
+        kind={axes3DFigureDialogKind ?? "plane"}
+        onSubmit={(def, name, color) => {
+          const axesId = ensureAxes3D();
+          const axesEl = pageElements.find((e) => e.id === axesId);
+          const tr = axesEl?.transform ?? { x: 0, y: 0, scale: 1, rotation: 0, z: 0 };
+          const res = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "SpaceFigure",
+              transform: { ...tr },
+              style: { stroke: color ?? "#7c3aed", width: 2 },
+              props: {
+                axes: axesId,
+                def,
+                name,
+                color,
+              },
+            },
+          });
+          if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          setAxes3DFigureDialogKind(null);
+        }}
+        onCancel={() => setAxes3DFigureDialogKind(null)}
+      />
+
       <Curve2DConfigDialog
         open={curve2dDialogMode !== null}
         mode={curve2dDialogMode ?? "equation"}
@@ -7664,6 +8182,16 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }}
         onCancel={() => setVarTableDialogMode(null)}
       />
+
+      {doc && (
+        <PageManagerModal
+          open={pageManagerOpen}
+          onClose={() => setPageManagerOpen(false)}
+          doc={doc}
+          currentPage={currentPage}
+          totalPages={pageCount}
+        />
+      )}
 
       <ChartConfigDialog
         open={chartDialogOpen}
@@ -7881,6 +8409,35 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onInsertLessonPreset={handleInsertLessonPreset}
       />
 
+      <HtmlSimModal
+        open={htmlSimModalOpen}
+        onClose={() => setHtmlSimModalOpen(false)}
+        onInsertToCanvas={(sim) => {
+          const center = getViewCenter();
+          const res = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "HtmlSim",
+              transform: {
+                x: center.x,
+                y: center.y,
+                scale: 1,
+                rotation: 0,
+                z: 0,
+              },
+              props: {
+                title: sim.title,
+                htmlContent: sim.htmlContent,
+                widthPx: sim.widthPx,
+                heightPx: sim.heightPx,
+              },
+            },
+          });
+          if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          setStatusHint(`✓ Đã nhúng mô phỏng HTML: ${sim.title}`);
+        }}
+      />
+
       {/* Searchable 100-item RealWorld Drawer */}
       <RealWorldDrawer
         open={realWorldDrawerOpen}
@@ -7957,6 +8514,71 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         page={currentPage}
         roomId={activeRoomId}
         onClose={() => setExportModalMode(null)}
+      />
+
+      {/* PDF Export Modal with Page Range & Filename Selection */}
+      <ExportPdfModal
+        open={exportPdfModalOpen}
+        doc={doc}
+        currentPage={currentPage}
+        totalPages={pageCount}
+        getBoardElement={() => containerRef.current}
+        onClose={() => setExportPdfModalOpen(false)}
+      />
+
+      {/* Laser Pointer Settings Modal */}
+      <LaserSettingsModal
+        open={laserSettingsOpen}
+        onClose={() => setLaserSettingsOpen(false)}
+        config={laserConfig}
+        onChangeConfig={handleUpdateLaserConfig}
+      />
+
+      {/* Main Settings Modal (Settings, Toolbar Customizer, Board Themes, Scales & Exports) */}
+      <SettingsModal
+        open={settingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+        toolbarConfig={toolbarConfig}
+        onChangeToolbarConfig={handleUpdateToolbarConfig}
+        autoSwitchTarget={autoSwitchTarget}
+        onChangeAutoSwitchTarget={(target) => {
+          setAutoSwitchTarget(target);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("physboard_auto_switch_target", target);
+          }
+        }}
+        inkToShape={inkToShape}
+        onChangeInkToShape={(val) => setInkToShape(val)}
+        penOnlyMode={penOnlyMode}
+        onChangePenOnlyMode={(val) => setPenOnlyMode(val)}
+        laserConfig={laserConfig}
+        onChangeLaserConfig={handleUpdateLaserConfig}
+        gridEnabled={gridEnabled}
+        onChangeGridEnabled={(val) => setGridEnabled(val)}
+        doc={doc}
+        page={currentPage}
+        totalPages={pageCount}
+        getBoardElement={() => containerRef.current}
+        hasPaper={hasPaper}
+        boardConfig={currentBoardConfig}
+        onChangeBoardConfig={(next: PageBoardConfig) => {
+          writePageBoardConfig(doc, currentPage, next);
+          if (next.pattern !== "none") setGridEnabled(true);
+        }}
+        onApplyBoardAllPages={(cfg: PageBoardConfig) => {
+          applyBoardConfigToAllPages(doc, pageCount, cfg);
+          setStatusHint("✓ Đã áp dụng loại bảng cho tất cả các trang");
+        }}
+        onScaleGeometry={(factor) => dispatcher.scaleGeometry(factor)}
+        labelScale={labelScale}
+        onChangeLabelScale={setLabelScale}
+        dotScale={dotScale}
+        onChangeDotScale={setDotScale}
+        onOpenExam={() => setExamOpen(true)}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onExportPdf={() => setExportPdfModalOpen(true)}
+        onExportTikz={() => setExportModalMode("tikz")}
+        onOpenJsonModal={() => setExportModalMode("json")}
       />
 
       {/* Share URL Modal */}

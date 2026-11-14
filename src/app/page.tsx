@@ -1,12 +1,13 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useState, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthDashboard } from "@/components/sites/mathvera/AuthDashboard";
 import { Whiteboard } from "@/components/sites/mathvera/Whiteboard";
 import { parseRoomFromUrl, sanitizeRoomId } from "@/lib/room";
 
 const ACTIVE_BOARD_STORAGE_KEY = "physboard_active_board";
+const emptySubscribe = () => () => {};
 
 function readInitialLocalBoard(): string | null {
   if (typeof window === "undefined") return null;
@@ -21,13 +22,8 @@ function readInitialLocalBoard(): string | null {
 function HomeRouter() {
   const searchParams = useSearchParams();
   const hasUrlRoom = searchParams.has("room");
-  const [mounted, setMounted] = useState(false);
-  const [localRoom, setLocalRoom] = useState<string | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-    setLocalRoom(readInitialLocalBoard());
-  }, []);
+  const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
+  const [localRoom, setLocalRoom] = useState<string | null>(() => readInitialLocalBoard());
 
   if (hasUrlRoom) {
     const rawRoom = searchParams.get("room");

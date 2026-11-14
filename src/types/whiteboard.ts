@@ -109,7 +109,8 @@ export type WhiteboardElementType =
   | "PhysicsSim"
   | "PhysicsDiagram"
   | "PhysicsInstrument"
-  | "PhysicsLabTable";
+  | "PhysicsLabTable"
+  | "HtmlSim";
 
 // --- Discriminated Element Interfaces ---
 export interface InkElement extends CanvasElement {

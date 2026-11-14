@@ -686,6 +686,94 @@ export async function exportPDF(
   return pdf.output("blob");
 }
 
+export async function exportMultiPagePDF(
+  svgOrRootElement: SVGSVGElement | HTMLElement | null,
+  doc: Y.Doc,
+  pages: number[],
+  options?: { whitePaper?: boolean; title?: string }
+): Promise<Blob> {
+  const whitePaper = options?.whitePaper ?? false;
+  const targetPages = pages.length > 0 ? pages : [1];
+
+  let pdf: jsPDF | null = null;
+
+  for (let idx = 0; idx < targetPages.length; idx++) {
+    const pageNum = targetPages[idx];
+    const elements = getVisiblePageElements(doc, pageNum);
+    const bbox = computePageContentBounds(elements);
+    const boardConfig = whitePaper
+      ? DEFAULT_PAGE_BOARD_CONFIG
+      : readPageBoardConfig(doc, pageNum);
+    const theme = resolveBoardColors(boardConfig);
+
+    let widthPt = 842;
+    let heightPt = 595;
+
+    if (bbox) {
+      const aspect = bbox.width / Math.max(0.5, bbox.height);
+      if (aspect >= 1) {
+        widthPt = 842;
+        heightPt = Math.max(360, Math.min(1190, Math.round(842 / aspect)));
+      } else {
+        heightPt = 842;
+        widthPt = Math.max(360, Math.min(1190, Math.round(842 * aspect)));
+      }
+    }
+
+    const orientation = widthPt >= heightPt ? "landscape" : "portrait";
+
+    if (!pdf) {
+      pdf = new jsPDF({
+        orientation,
+        unit: "pt",
+        format: [widthPt, heightPt],
+      });
+      pdf.setProperties({
+        title: options?.title || "PhysBoard Whiteboard Export",
+        creator: "PhysBoard",
+      });
+    } else {
+      pdf.addPage([widthPt, heightPt], orientation);
+    }
+
+    const hex = theme.bg.replace(/^#/, "");
+    if (!whitePaper && /^[0-9a-fA-F]{6}$/.test(hex)) {
+      pdf.setFillColor(
+        parseInt(hex.slice(0, 2), 16),
+        parseInt(hex.slice(2, 4), 16),
+        parseInt(hex.slice(4, 6), 16)
+      );
+    } else {
+      pdf.setFillColor(255, 255, 255);
+    }
+    pdf.rect(0, 0, widthPt, heightPt, "F");
+
+    if (elements.length > 0 || !whitePaper) {
+      try {
+        const pngBlob = await exportPNG(svgOrRootElement, doc, pageNum, {
+          whitePaper,
+        });
+        const pngDataUrl = await blobToDataUrl(pngBlob);
+        const pad = 16;
+        pdf.addImage(
+          pngDataUrl,
+          "PNG",
+          pad,
+          pad,
+          widthPt - pad * 2,
+          heightPt - pad * 2,
+          undefined,
+          "FAST"
+        );
+      } catch {
+        // Fallback gracefully
+      }
+    }
+  }
+
+  return pdf ? pdf.output("blob") : new Blob(["%PDF-1.4\n%%EOF"], { type: "application/pdf" });
+}
+
 function hexToTikzColor(hex: string | null | undefined, bw: boolean): string {
   if (bw || !hex || typeof hex !== "string") return "black";
   const clean = hex.trim().replace(/^#/, "");

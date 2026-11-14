@@ -6,6 +6,7 @@ import {
   getAllSimsFromDB,
   saveSimToDB,
   deleteSimFromDB,
+  clearAllSimsFromDB,
 } from "@/lib/sim-storage";
 
 export interface HtmlSimModalProps {
@@ -82,6 +83,15 @@ export const HtmlSimModal: React.FC<HtmlSimModalProps> = ({
       if (selectedSim?.id === id) {
         setSelectedSim(null);
       }
+      await loadSims();
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (sims.length === 0) return;
+    if (window.confirm(`Bạn có chắc chắn muốn xóa tất cả ${sims.length} thí nghiệm HTML cũ khỏi thư viện không?`)) {
+      await clearAllSimsFromDB();
+      setSelectedSim(null);
       await loadSims();
     }
   };
@@ -176,6 +186,30 @@ export const HtmlSimModal: React.FC<HtmlSimModalProps> = ({
             >
               <span>+ Nạp file HTML từ máy</span>
             </button>
+
+            {sims.length > 0 && (
+              <button
+                type="button"
+                data-action="clear-all-sims"
+                onClick={handleClearAll}
+                title="Xóa toàn bộ các thí nghiệm HTML đã lưu"
+                style={{
+                  background: "#fee2e2",
+                  color: "#dc2626",
+                  border: "1px solid #fecaca",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>🗑 Xóa hết ({sims.length})</span>
+              </button>
+            )}
 
             <button
               type="button"

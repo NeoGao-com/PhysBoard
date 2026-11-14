@@ -176,6 +176,7 @@ export interface MathEditorProps {
   onPlotFunction?: (latex: string) => void;
   onBuildVarTable?: (latex: string) => void;
   onShadeIntegral?: (latex: string) => void;
+  onSolveEquation?: (latex: string) => void;
 }
 
 /**
@@ -195,6 +196,7 @@ export const MathEditor: React.FC<MathEditorProps> = ({
   onPlotFunction,
   onBuildVarTable,
   onShadeIntegral,
+  onSolveEquation,
 }) => {
   const mfRef = useRef<MathfieldElementInstance | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -694,6 +696,33 @@ export const MathEditor: React.FC<MathEditorProps> = ({
               paddingTop: 6,
             }}
           >
+            {onSolveEquation && (
+              <button
+                type="button"
+                data-action="formula-quick-solve"
+                title="Giải phương trình hoặc hệ phương trình vừa nhập"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  const val = readFieldValue();
+                  if (val.trim()) onSolveEquation(val);
+                }}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #c7d2fe",
+                  background: "#eef2ff",
+                  color: "#4338ca",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                ⚡ Giải PT / Hệ PT
+              </button>
+            )}
             {onPlotFunction && (
               <button
                 type="button"

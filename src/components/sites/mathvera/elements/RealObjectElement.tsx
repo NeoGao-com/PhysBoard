@@ -85,6 +85,7 @@ function getBoxCorners(
 export interface RealObjectElementProps {
   element: CanvasElement;
   allElements?: CanvasElement[];
+  points?: Map<string, Point2D>;
   isSelected?: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
 }
@@ -95,6 +96,7 @@ export interface RealObjectElementProps {
 export const RealObjectElement: React.FC<RealObjectElementProps> = ({
   element,
   allElements = [],
+  points,
   isSelected = false,
   onPointerDown,
 }) => {
@@ -115,22 +117,22 @@ export const RealObjectElement: React.FC<RealObjectElementProps> = ({
     [src, ratio, item.box]
   );
 
-  const pointsMap = useMemo(
+  const fallbackPoints = useMemo(
     () => resolvePointCoords(allElements),
     [allElements]
   );
 
   const matrix = useMemo(() => {
-    const fromPt = pointsMap.get(fromId) ?? {
+    const fromPt = points?.get(fromId) ?? fallbackPoints.get(fromId) ?? {
       x: element.transform.x,
       y: element.transform.y,
     };
-    const toPt = pointsMap.get(toId) ?? {
+    const toPt = points?.get(toId) ?? fallbackPoints.get(toId) ?? {
       x: element.transform.x,
       y: element.transform.y + 3 * (element.transform.scale || 1),
     };
     return computeArtTransformMatrix(fromPt, toPt, box, widthScale, flip);
-  }, [pointsMap, fromId, toId, element.transform, box, widthScale, flip]);
+  }, [points, fallbackPoints, fromId, toId, element.transform, box, widthScale, flip]);
 
   if (!matrix) return null;
 
@@ -191,6 +193,7 @@ export const RealObjectElement: React.FC<RealObjectElementProps> = ({
 export interface LineDecorElementProps {
   element: CanvasElement;
   allElements?: CanvasElement[];
+  points?: Map<string, Point2D>;
   isSelected?: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
 }
@@ -213,6 +216,7 @@ function unitBasis(a: Point2D, b: Point2D, side: number) {
 export const LineDecorElement: React.FC<LineDecorElementProps> = ({
   element,
   allElements = [],
+  points,
   isSelected = false,
   onPointerDown,
 }) => {
@@ -231,19 +235,21 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
 
   const { a, b } = useMemo(() => {
     const seg = allElements.find(
-      (el) => el.id === targetId && el.type === "GeomSegment"
+      (el) => el.id === targetId && (el.type === "GeomSegment" || el.type === "GeomLine" || el.type === "GeomVector")
     );
     if (seg) {
       const pts = resolvePointCoords(allElements);
-      const pa = pts.get(String(seg.props?.from ?? ""));
-      const pb = pts.get(String(seg.props?.to ?? ""));
+      const fromId = String(seg.props?.from ?? "");
+      const toId = String(seg.props?.to ?? "");
+      const pa = points?.get(fromId) ?? pts.get(fromId);
+      const pb = points?.get(toId) ?? pts.get(toId);
       if (pa && pb) return { a: pa, b: pb };
     }
     return {
       a: { x: element.transform.x - 2, y: element.transform.y },
       b: { x: element.transform.x + 2, y: element.transform.y },
     };
-  }, [allElements, targetId, element.transform]);
+  }, [allElements, targetId, element.transform, points]);
 
   const basis = useMemo(() => unitBasis(a, b, side), [a, b, side]);
   if (!basis) return null;

@@ -54,6 +54,103 @@ export function addYjsPage(doc: Y.Doc): PageState {
 }
 
 /**
+ * Deletes specified pages (1-based indices) and cleans up objects & boardConfigs cleanly.
+ */
+export function deleteYjsPages(doc: Y.Doc, pagesToDelete: number[]): PageState {
+  const deleteSet = new Set(pagesToDelete.map((p) => Math.floor(p)).filter((p) => p >= 1));
+  if (deleteSet.size === 0) return getYjsPageState(doc);
+
+  const { count, current } = getYjsPageState(doc);
+  if (count <= 1) return { count: 1, current: 1 };
+
+  // Calculate new page mappings: for page k, what is its new index? (or 0 if deleted)
+  const newPageMap = new Map<number, number>();
+  let nextIdx = 1;
+  for (let p = 1; p <= count; p++) {
+    if (deleteSet.has(p)) {
+      newPageMap.set(p, 0);
+    } else {
+      newPageMap.set(p, nextIdx);
+      nextIdx++;
+    }
+  }
+
+  const finalCount = Math.max(1, nextIdx - 1);
+
+  // Compute what current page should become
+  let finalCur = current;
+  if (deleteSet.has(current)) {
+    // Find closest surviving page
+    let candidate = current - 1;
+    while (candidate >= 1 && deleteSet.has(candidate)) candidate--;
+    if (candidate < 1) {
+      candidate = current + 1;
+      while (candidate <= count && deleteSet.has(candidate)) candidate++;
+    }
+    const mapped = newPageMap.get(candidate);
+    finalCur = mapped && mapped > 0 ? mapped : 1;
+  } else {
+    finalCur = newPageMap.get(current) ?? 1;
+  }
+  finalCur = Math.max(1, Math.min(finalCount, finalCur));
+
+  doc.transact(() => {
+    // 1. Process objects array: delete objects on deleted pages; shift meta.page on surviving pages
+    const arr = doc.getArray<Y.Map<unknown>>("objects");
+    for (let i = arr.length - 1; i >= 0; i--) {
+      const yEl = arr.get(i);
+      const metaMap = yEl.get("meta");
+      let pageNum = 1;
+      if (metaMap instanceof Y.Map) {
+        const rawP = metaMap.get("page");
+        if (typeof rawP === "number" && rawP >= 1) pageNum = Math.floor(rawP);
+      } else if (metaMap && typeof metaMap === "object") {
+        const rawP = (metaMap as Record<string, unknown>).page;
+        if (typeof rawP === "number" && rawP >= 1) pageNum = Math.floor(rawP);
+      }
+
+      if (deleteSet.has(pageNum)) {
+        arr.delete(i, 1);
+      } else {
+        const mappedP = newPageMap.get(pageNum);
+        if (mappedP && mappedP !== pageNum) {
+          if (metaMap instanceof Y.Map) {
+            metaMap.set("page", mappedP);
+          } else if (metaMap && typeof metaMap === "object") {
+            const newMeta = { ...(metaMap as Record<string, unknown>), page: mappedP };
+            yEl.set("meta", newMeta);
+          }
+        }
+      }
+    }
+
+    // 2. Process boardPages YMap
+    const boardPagesMap = doc.getMap<unknown>("boardPages");
+    const survivingConfigs: Record<string, unknown> = {};
+    for (let p = 1; p <= count; p++) {
+      if (!deleteSet.has(p)) {
+        const mapped = newPageMap.get(p);
+        const existingCfg = boardPagesMap.get(String(p));
+        if (mapped && existingCfg !== undefined) {
+          survivingConfigs[String(mapped)] = existingCfg;
+        }
+      }
+    }
+    boardPagesMap.clear();
+    for (const [k, v] of Object.entries(survivingConfigs)) {
+      boardPagesMap.set(k, v);
+    }
+
+    // 3. Update pages map
+    const pagesMap = doc.getMap<number>("pages");
+    pagesMap.set("count", finalCount);
+    pagesMap.set("cur", finalCur);
+  });
+
+  return { current: finalCur, count: finalCount };
+}
+
+/**
  * Hook subscribing to `Y.Map("pages")` changes in a Y.Doc.
  */
 export function useYjsPages(doc?: Y.Doc | null): PageState {

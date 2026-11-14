@@ -94,34 +94,49 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
         className="wb-orbit-bar"
         style={{
           position: "fixed",
-          left: "50%",
-          bottom: 12,
-          transform: "translateX(-50%)",
+          right: 14,
+          top: "50%",
+          transform: "translateY(-50%)",
           zIndex: 56,
           display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          alignItems: "center",
+          flexDirection: "column",
+          alignItems: "stretch",
           gap: 10,
-          maxWidth: "calc(100vw - 24px)",
-          padding: "8px 12px 8px 14px",
-          borderRadius: 12,
-          background: "#0f172a",
+          width: 140,
+          padding: "12px 10px",
+          borderRadius: 14,
+          background: "rgba(15, 23, 42, 0.95)",
+          backdropFilter: "blur(8px)",
+          border: "1px solid rgba(255, 255, 255, 0.12)",
           color: "#ffffff",
           fontFamily: "system-ui, -apple-system, sans-serif",
-          fontSize: 13,
-          boxShadow: "0 6px 20px rgba(15,23,42,0.35)",
+          fontSize: 12,
+          boxShadow: "0 10px 25px rgba(15, 23, 42, 0.4)",
+          userSelect: "none",
         }}
       >
-        <span style={{ whiteSpace: "nowrap" }}>
-          ⟳ Kéo để xoay hình · hình trên bảng không đổi
-        </span>
+        <div
+          style={{
+            textAlign: "center",
+            fontWeight: 600,
+            fontSize: 12,
+            color: "#94a3b8",
+            paddingBottom: 4,
+            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 4,
+          }}
+        >
+          <span>⟳ Xoay hình</span>
+        </div>
 
         {/* Interactive orbital drag handle */}
         <button
           type="button"
           className="wb-orbit-handle"
-          title="Kéo để xoay góc nhìn 3D"
+          title="Kéo chuột / ngón tay để xoay góc nhìn 3D"
           aria-label="Kéo xoay góc nhìn 3D"
           onPointerDown={(e) => {
             e.stopPropagation();
@@ -146,26 +161,38 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           }}
           style={{
             ...PILL_BTN_STYLE,
-            background: draggingHandle ? "#1d4ed8" : "#1e293b",
-            border: "1px solid #475569",
+            width: "100%",
+            padding: "8px 6px",
+            background: draggingHandle ? "#2563eb" : "#1e293b",
+            border: "1px solid #3b82f6",
             cursor: draggingHandle ? "grabbing" : "grab",
             touchAction: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            fontWeight: 600,
+            boxShadow: draggingHandle ? "0 0 10px rgba(59, 130, 246, 0.5)" : "none",
           }}
         >
-          ⟲ Xoay
+          <span>⟲</span>
+          <span>Kéo xoay 3D</span>
         </button>
 
         {/* Azimuth range slider */}
-        <label
+        <div
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
+            fontSize: 11,
             color: "#cbd5e1",
           }}
         >
-          <span>Ngang</span>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>Ngang (Azimuth)</span>
+            <span style={{ color: "#38bdf8", fontWeight: 600 }}>{azimuth}°</span>
+          </div>
           <input
             type="range"
             min={-180}
@@ -175,21 +202,24 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             data-wb-orbit="azimuth"
             aria-label="Góc phương vị"
             onChange={(e) => onChangeAzimuth(Number(e.target.value))}
-            style={{ width: 92, accentColor: "#38bdf8", cursor: "pointer" }}
+            style={{ width: "100%", accentColor: "#38bdf8", cursor: "pointer" }}
           />
-        </label>
+        </div>
 
         {/* Elevation range slider */}
-        <label
+        <div
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 12,
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
+            fontSize: 11,
             color: "#cbd5e1",
           }}
         >
-          <span>Nghiêng</span>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>Nghiêng (Elevation)</span>
+            <span style={{ color: "#38bdf8", fontWeight: 600 }}>{elevation}°</span>
+          </div>
           <input
             type="range"
             min={-85}
@@ -199,14 +229,20 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             data-wb-orbit="elevation"
             aria-label="Góc nâng"
             onChange={(e) => onChangeElevation(Number(e.target.value))}
-            style={{ width: 84, accentColor: "#38bdf8", cursor: "pointer" }}
+            style={{ width: "100%", accentColor: "#38bdf8", cursor: "pointer" }}
           />
-        </label>
+        </div>
 
         <button
           type="button"
           onClick={onReset}
-          style={{ ...PILL_BTN_STYLE, background: "#334155" }}
+          style={{
+            ...PILL_BTN_STYLE,
+            width: "100%",
+            background: "#334155",
+            fontSize: 11.5,
+            padding: "5px 6px",
+          }}
         >
           Góc ban đầu
         </button>
@@ -219,10 +255,13 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             title="Hình tự quay chậm quanh trục đứng, kéo tay thì dừng"
             style={{
               ...PILL_BTN_STYLE,
+              width: "100%",
               background: isAutoSpin ? "#b45309" : "#334155",
+              fontSize: 11.5,
+              padding: "5px 6px",
             }}
           >
-            {isAutoSpin ? "⏸ Dừng" : "▶ Tự xoay"}
+            {isAutoSpin ? "⏸ Dừng quay" : "▶ Tự xoay"}
           </button>
         )}
 
@@ -230,9 +269,16 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           <button
             type="button"
             onClick={onDone}
-            style={{ ...PILL_BTN_STYLE, background: "#2563eb" }}
+            style={{
+              ...PILL_BTN_STYLE,
+              width: "100%",
+              background: "#2563eb",
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "6px 6px",
+            }}
           >
-            Xong
+            ✓ Xong
           </button>
         )}
       </div>

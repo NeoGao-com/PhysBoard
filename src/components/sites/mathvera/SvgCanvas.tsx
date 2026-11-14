@@ -31,6 +31,7 @@ export interface SvgCanvasProps {
   className?: string;
   totalPages?: number;
   currentPage?: number;
+  cursorOverride?: string;
 }
 
 export function SvgCanvas({
@@ -55,11 +56,13 @@ export function SvgCanvas({
   className = "",
   totalPages = 1,
   currentPage = 1,
+  cursorOverride,
 }: SvgCanvasProps) {
   const theme = useMemo(() => resolveBoardColors(boardConfig), [boardConfig]);
 
   // Cursor calculation matching Mathvera
   const cursorStyle = useMemo(() => {
+    if (cursorOverride) return cursorOverride;
     if (isPanning) return "grabbing";
     if (isSpacePressed || currentTool === "pan") return "grab";
     if (
