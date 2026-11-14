@@ -1866,7 +1866,6 @@ export function computeFlattenedFace(
     props: {
       vertices: embedded.map((v) => v.id),
       points: embedded,
-      label: "(Hình thật)",
     } satisfies GeomPolygonProps & Record<string, unknown>,
   };
 

@@ -97,7 +97,8 @@ const pillGroupStyle: React.CSSProperties = {
   border: "1px solid #cbd5e1",
   background: "#ffffff",
   color: "#1e293b",
-  font: "13.5px system-ui, -apple-system, sans-serif",
+  fontSize: 13.5,
+  fontFamily: "system-ui, -apple-system, sans-serif",
   boxShadow: "0 2px 8px rgba(15,23,42,0.12)",
 };
 
@@ -109,7 +110,8 @@ const pillMiniBtnStyle: React.CSSProperties = {
   cursor: "pointer",
   padding: "3px 6px",
   borderRadius: 6,
-  font: "13.5px system-ui, -apple-system, sans-serif",
+  fontSize: 13.5,
+  fontFamily: "system-ui, -apple-system, sans-serif",
   lineHeight: 1.2,
 };
 
@@ -230,7 +232,8 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               background: "#fef3c7",
               color: "#92400e",
               fontWeight: 700,
-              font: "14px system-ui, -apple-system, sans-serif",
+              fontSize: 14,
+              fontFamily: "system-ui, -apple-system, sans-serif",
               boxShadow: "0 2px 8px rgba(15,23,42,0.1)",
             }}
           >
@@ -442,7 +445,8 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
             color: "#ffffff",
             fontWeight: 700,
             cursor: "pointer",
-            font: "15px system-ui, -apple-system, sans-serif",
+            fontSize: 15,
+            fontFamily: "system-ui, -apple-system, sans-serif",
             boxShadow: "0 4px 16px rgba(220,38,38,0.45)",
           }}
         >
@@ -468,7 +472,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               title={allPointNamesHidden ? "Hiện lại tên điểm" : "Ẩn tên điểm khỏi bảng"}
               style={{
                 ...actionBtnStyle,
-                borderColor: allPointNamesHidden ? "#2563eb" : "#cbd5e1",
+                border: allPointNamesHidden ? "1px solid #2563eb" : "1px solid #cbd5e1",
                 background: allPointNamesHidden ? "#eff6ff" : "#ffffff",
                 color: allPointNamesHidden ? "#1d4ed8" : "#1e293b",
               }}
@@ -676,19 +680,19 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
           </button>
         )}
 
+        {/* Duplicate */}
+        <button
+          type="button"
+          data-action="duplicate"
+          onClick={onDuplicate}
+          title="Tạo một bản sao ngay bên cạnh (giữ nguyên cách dựng)"
+          style={actionBtnStyle}
+        >
+          ⧉ Nhân bản
+        </button>
+
         {!isPointsContext && (
           <>
-            {/* Duplicate */}
-            <button
-              type="button"
-              data-action="duplicate"
-              onClick={onDuplicate}
-              title="Tạo một bản sao ngay bên cạnh (giữ nguyên cách dựng)"
-              style={actionBtnStyle}
-            >
-              ⧉ Nhân bản
-            </button>
-
             {/* Copy */}
             <button
               type="button"

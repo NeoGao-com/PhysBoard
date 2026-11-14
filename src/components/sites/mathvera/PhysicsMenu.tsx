@@ -1,12 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export interface PhysicsMenuProps {
   open: boolean;
   onClose: () => void;
   onAction: (action: string) => void;
   onOpenDrawer: () => void;
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 const sectionHeaderStyle: React.CSSProperties = {
@@ -39,23 +41,43 @@ export const PhysicsMenu: React.FC<PhysicsMenuProps> = ({
   onClose,
   onAction,
   onOpenDrawer,
+  anchorRef,
 }) => {
-  if (!open) return null;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    if (anchorRef?.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      const menuHeight = 460;
+      const opensUpward =
+        typeof window !== "undefined" &&
+        rect.bottom + menuHeight > window.innerHeight &&
+        rect.top > menuHeight;
+      setPos({
+        top: opensUpward
+          ? Math.max(8, rect.top - menuHeight - 6)
+          : rect.bottom + 6,
+        left: Math.max(8, Math.min(rect.left, (typeof window !== "undefined" ? window.innerWidth : 1280) - 320)),
+      });
+    }
+  }, [open, anchorRef]);
+
+  if (!open || typeof document === "undefined") return null;
 
   const trigger = (action: string) => {
     onAction(action);
     onClose();
   };
 
-  return (
+  return createPortal(
     <div
       role="menu"
       data-wb-physics-menu="true"
       style={{
-        position: "absolute",
-        top: "100%",
-        left: 0,
-        marginTop: 4,
+        position: "fixed",
+        top: pos?.top ?? 50,
+        left: pos?.left ?? 100,
         width: 310,
         maxHeight: "calc(100vh - 64px)",
         overflowY: "auto",
@@ -64,7 +86,7 @@ export const PhysicsMenu: React.FC<PhysicsMenuProps> = ({
         borderRadius: 10,
         boxShadow: "0 12px 30px rgba(15, 23, 42, 0.16)",
         padding: "6px 0",
-        zIndex: 110,
+        zIndex: 5200,
       }}
     >
       <div style={sectionHeaderStyle}>THÍ NGHIỆM NHANH (10–11–12)</div>
@@ -152,6 +174,7 @@ export const PhysicsMenu: React.FC<PhysicsMenuProps> = ({
           ⚛ Thư viện Vật lý (15 TN, Công thức, Bài giảng)...
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

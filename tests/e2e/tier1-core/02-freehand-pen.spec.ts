@@ -201,4 +201,138 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
 
     expect(solidDash === 'none' || !solidDash || solidDash === '').toBe(true);
   });
+
+  test('TC-02-06: Additional pen variants (highlighter, pencil, brush, dashed) render with distinct nibs', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const initialCount = await canvas.getObjectCount();
+
+    const nibs = [
+      { tool: 'ink:highlighter', nib: 'highlighter', y: 200 },
+      { tool: 'ink:pencil', nib: 'pencil', y: 240 },
+      { tool: 'ink:brush', nib: 'brush', y: 280 },
+      { tool: 'ink:dashed', nib: 'dashed', y: 320 },
+    ] as const;
+
+    for (let i = 0; i < nibs.length; i++) {
+      const item = nibs[i];
+      await page.locator('[aria-label^="Chọn loại bút"]').click();
+      await page.locator(`[data-menu-item="${item.tool}"]`).click();
+      await canvas.drawStroke([
+        { x: 260, y: item.y },
+        { x: 420, y: item.y + 15 },
+      ]);
+      await canvas.waitForObjectCount(initialCount + i + 1);
+      const latest = canvas.getLatestObject();
+      await expect(latest).toHaveAttribute('data-nib', item.nib);
+    }
+  });
+
+  test('TC-02-07: Custom hex stroke color picker applies arbitrary color', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+    await toolbar.selectTool('ink');
+
+    await page.locator('[data-popover="style"]').click();
+    const hexInput = page.getByTestId('custom-color-hex');
+    await hexInput.fill('#7c3aed');
+    await hexInput.press('Enter');
+
+    await canvas.drawStroke([
+      { x: 280, y: 260 },
+      { x: 420, y: 260 },
+    ]);
+
+    const latest = canvas.getLatestObject();
+    const color = await latest.evaluate((el) => {
+      const target = el.tagName.toLowerCase() === 'path' ? el : el.querySelector('path') || el;
+      return target.getAttribute('stroke') || window.getComputedStyle(target).stroke;
+    });
+    expect(color.toLowerCase()).toMatch(/(#7c3aed|rgb\(\s*124,\s*58,\s*237\s*\))/);
+  });
+
+  test('TC-02-08: Floating toolbar supports scaling, dragging, and layout reset', async ({ page }) => {
+    const header = page.locator('[data-wb-toolbar="true"]');
+    await expect(header).toBeVisible();
+
+    const initialBox = await header.boundingBox();
+    expect(initialBox).not.toBeNull();
+
+    // Scale up toolbar via + button
+    await page.locator('[data-wb-toolbar-scale-inc="true"]').click();
+    await expect(page.locator('[data-wb-toolbar-scale-reset="true"]')).toHaveText('110%');
+
+    // Drag toolbar via grip handle
+    const grip = page.locator('[data-wb-toolbar-drag="true"]');
+    const gripBox = await grip.boundingBox();
+    expect(gripBox).not.toBeNull();
+    if (gripBox) {
+      await page.mouse.move(gripBox.x + gripBox.width / 2, gripBox.y + gripBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(gripBox.x + 80, gripBox.y + 70, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    const movedBox = await header.boundingBox();
+    expect(movedBox).not.toBeNull();
+    if (initialBox && movedBox) {
+      expect(movedBox.y).toBeGreaterThan(initialBox.y + 30);
+    }
+
+    // Reset position & scale
+    await page.locator('[data-wb-toolbar-scale-reset="true"]').click();
+    await expect(page.locator('[data-wb-toolbar-scale-reset="true"]')).toHaveText('100%');
+  });
+
+  test('TC-02-09: Pen-only mode blocks touch drawing and allows stylus/mouse drawing', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+
+    await toolbar.selectTool('ink');
+    const initialCount = await canvas.getObjectCount();
+
+    // Toggle Pen-Only Mode ON via quick button
+    const penOnlyBtn = page.locator('[data-action="toggle-pen-only"]');
+    await expect(penOnlyBtn).toBeVisible();
+    await penOnlyBtn.click();
+    await expect(penOnlyBtn).toHaveAttribute('data-active', 'true');
+
+    // Simulate touch stroke (pointerType === 'touch')
+    const svg = page.locator('svg[data-wb-canvas="true"], svg.wb-canvas');
+    await svg.dispatchEvent('pointerdown', {
+      clientX: 300,
+      clientY: 300,
+      pointerType: 'touch',
+      pointerId: 1,
+      bubbles: true,
+    });
+    await svg.dispatchEvent('pointermove', {
+      clientX: 350,
+      clientY: 350,
+      pointerType: 'touch',
+      pointerId: 1,
+      bubbles: true,
+    });
+    await svg.dispatchEvent('pointerup', {
+      clientX: 350,
+      clientY: 350,
+      pointerType: 'touch',
+      pointerId: 1,
+      bubbles: true,
+    });
+
+    // Touch input must NOT create a stroke
+    const countAfterTouch = await canvas.getObjectCount();
+    expect(countAfterTouch).toBe(initialCount);
+
+    // Mouse or Pen input (pointerType === 'mouse' or 'pen') DOES create a stroke
+    await canvas.drawStroke([
+      { x: 400, y: 400 },
+      { x: 450, y: 450 },
+    ]);
+    await canvas.waitForObjectCount(initialCount + 1);
+
+    // Toggle Pen-Only Mode OFF
+    await penOnlyBtn.click();
+    await expect(penOnlyBtn).toHaveAttribute('data-active', 'false');
+  });
 });

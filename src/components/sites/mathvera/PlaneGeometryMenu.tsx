@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { IconTriangle2D } from "./ToolbarIcons";
 import {
   getConstructMarksEnabled,
   setConstructMarksEnabled,
@@ -101,23 +103,50 @@ export const PlaneGeometryMenu: React.FC<PlaneGeometryMenuProps> = ({
   activeTriggerStyle,
 }) => {
   const [internalOpen, setInternalOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [marksEnabled, setMarksEnabled] = useState<boolean>(() =>
     getConstructMarksEnabled()
   );
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const isOpen = controlledOpen ?? internalOpen;
-  const setOpen = (next: boolean) => {
-    if (controlledOpen === undefined) setInternalOpen(next);
-    onOpenChange?.(next);
-  };
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (next && rootRef.current) {
+        const rect = rootRef.current.getBoundingClientRect();
+        const menuHeight = 420;
+        const opensUpward =
+          typeof window !== "undefined" &&
+          rect.bottom + menuHeight > window.innerHeight &&
+          rect.top > menuHeight;
+        setPos({
+          top: opensUpward
+            ? Math.max(8, rect.top - menuHeight - 6)
+            : rect.bottom + 6,
+          left: Math.max(
+            8,
+            Math.min(
+              rect.left,
+              (typeof window !== "undefined" ? window.innerWidth : 1280) - 280
+            )
+          ),
+        });
+      }
+      if (controlledOpen === undefined) setInternalOpen(next);
+      onOpenChange?.(next);
+    },
+    [controlledOpen, onOpenChange]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
     const handlePointerDown = (e: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -130,7 +159,7 @@ export const PlaneGeometryMenu: React.FC<PlaneGeometryMenuProps> = ({
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  });
+  }, [isOpen, setOpen]);
 
   const isToolActive = Boolean(activeTool && PLANE_TOOL_SET.has(activeTool));
 
@@ -173,22 +202,26 @@ export const PlaneGeometryMenu: React.FC<PlaneGeometryMenuProps> = ({
         style={defaultTriggerStyle}
         title="Dựng đường cao, trung tuyến, phân giác, trung trực…"
       >
-        📐 Hình phẳng ▾
+        <IconTriangle2D size={14} />
+        <span>Hình phẳng</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
       </button>
 
-      {isOpen && (
-        <div
-          role="menu"
-          data-wb-plane-menu="true"
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            marginTop: 4,
-            width: 272,
-            maxHeight: "calc(100vh - 64px)",
-            overflowY: "auto",
-            background: "#ffffff",
+      {isOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            data-wb-plane-menu="true"
+            style={{
+              position: "fixed",
+              top: pos?.top ?? 50,
+              left: pos?.left ?? 100,
+              width: 272,
+              maxHeight: "calc(100vh - 64px)",
+              overflowY: "auto",
+              background: "#ffffff",
             border: "1px solid #e2e8f0",
             borderRadius: 8,
             boxShadow: "0 10px 28px rgba(15, 23, 42, 0.14)",
@@ -271,7 +304,8 @@ export const PlaneGeometryMenu: React.FC<PlaneGeometryMenuProps> = ({
             />
             <span>Tự vẽ ký hiệu (ô vuông, gạch bằng nhau)</span>
           </label>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
