@@ -1,4 +1,4 @@
-export const MAX_PDF_PAGES = 10;
+export const MAX_PDF_PAGES = 100;
 
 export interface ImportedImageResult {
   src: string;

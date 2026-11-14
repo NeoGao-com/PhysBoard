@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { IconInsert } from "./ToolbarIcons";
 import {
   importPdfPages,
   ImportedImageResult,
@@ -157,7 +158,9 @@ export const InsertMenu: React.FC<InsertMenuProps> = ({
         title="Chèn bảng, ảnh hoặc PDF"
         style={defaultBtnStyle}
       >
-        ＋ Chèn ▾
+        <IconInsert size={14} />
+        <span>Chèn</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
       </button>
 
       {/* Hidden File Inputs */}
@@ -301,7 +304,7 @@ export const InsertMenu: React.FC<InsertMenuProps> = ({
                 }}
               >
                 <span>📄</span>
-                <span>PDF (tối đa 10 trang)</span>
+                <span>Tải file PDF (tất cả các trang)</span>
               </button>
             </div>
 

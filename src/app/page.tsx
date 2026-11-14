@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AuthDashboard } from "@/components/sites/mathvera/AuthDashboard";
 import { Whiteboard } from "@/components/sites/mathvera/Whiteboard";
@@ -21,9 +21,13 @@ function readInitialLocalBoard(): string | null {
 function HomeRouter() {
   const searchParams = useSearchParams();
   const hasUrlRoom = searchParams.has("room");
-  const [localRoom, setLocalRoom] = useState<string | null>(() =>
-    readInitialLocalBoard()
-  );
+  const [mounted, setMounted] = useState(false);
+  const [localRoom, setLocalRoom] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    setLocalRoom(readInitialLocalBoard());
+  }, []);
 
   if (hasUrlRoom) {
     const rawRoom = searchParams.get("room");
@@ -50,6 +54,10 @@ function HomeRouter() {
         }}
       />
     );
+  }
+
+  if (!mounted) {
+    return <div className="w-full h-full bg-[#FBFBFD]" />;
   }
 
   if (localRoom) {

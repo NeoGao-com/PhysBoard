@@ -201,4 +201,216 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
 
     expect(solidDash === 'none' || !solidDash || solidDash === '').toBe(true);
   });
+
+  test('TC-02-06: Additional pen variants (highlighter, pencil, brush, dashed) render with distinct nibs', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const initialCount = await canvas.getObjectCount();
+
+    const nibs = [
+      { tool: 'ink:highlighter', nib: 'highlighter', y: 200 },
+      { tool: 'ink:pencil', nib: 'pencil', y: 240 },
+      { tool: 'ink:brush', nib: 'brush', y: 280 },
+      { tool: 'ink:dashed', nib: 'dashed', y: 320 },
+    ] as const;
+
+    for (let i = 0; i < nibs.length; i++) {
+      const item = nibs[i];
+      await page.locator('[aria-label^="Chọn loại bút"]').click();
+      await page.locator(`[data-menu-item="${item.tool}"]`).click();
+      await canvas.drawStroke([
+        { x: 260, y: item.y },
+        { x: 420, y: item.y + 15 },
+      ]);
+      await canvas.waitForObjectCount(initialCount + i + 1);
+      const latest = canvas.getLatestObject();
+      await expect(latest).toHaveAttribute('data-nib', item.nib);
+    }
+  });
+
+  test('TC-02-07: Custom hex stroke color picker applies arbitrary color', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+    await toolbar.selectTool('ink');
+
+    await page.locator('[data-popover="style"]').click();
+    const hexInput = page.getByTestId('custom-color-hex');
+    await hexInput.fill('#7c3aed');
+    await hexInput.press('Enter');
+
+    await canvas.drawStroke([
+      { x: 280, y: 260 },
+      { x: 420, y: 260 },
+    ]);
+
+    const latest = canvas.getLatestObject();
+    const color = await latest.evaluate((el) => {
+      const target = el.tagName.toLowerCase() === 'path' ? el : el.querySelector('path') || el;
+      return target.getAttribute('stroke') || window.getComputedStyle(target).stroke;
+    });
+    expect(color.toLowerCase()).toMatch(/(#7c3aed|rgb\(\s*124,\s*58,\s*237\s*\))/);
+  });
+
+  test('TC-02-08: Floating toolbar supports scaling, dragging, and layout reset', async ({ page }) => {
+    const header = page.locator('[data-wb-toolbar="true"]');
+    await expect(header).toBeVisible();
+
+    const initialBox = await header.boundingBox();
+    expect(initialBox).not.toBeNull();
+
+    // Scale up toolbar via + button
+    await page.locator('[data-wb-toolbar-scale-inc="true"]').click();
+    await expect(page.locator('[data-wb-toolbar-scale-reset="true"]')).toHaveText('110%');
+
+    // Drag toolbar via grip handle
+    const grip = page.locator('[data-wb-toolbar-drag="true"]');
+    const gripBox = await grip.boundingBox();
+    expect(gripBox).not.toBeNull();
+    if (gripBox) {
+      await page.mouse.move(gripBox.x + gripBox.width / 2, gripBox.y + gripBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(gripBox.x + 80, gripBox.y + 70, { steps: 5 });
+      await page.mouse.up();
+    }
+
+    const movedBox = await header.boundingBox();
+    expect(movedBox).not.toBeNull();
+    if (initialBox && movedBox) {
+      expect(movedBox.y).toBeGreaterThan(initialBox.y + 30);
+    }
+
+    // Reset position & scale
+    await page.locator('[data-wb-toolbar-scale-reset="true"]').click();
+    await expect(page.locator('[data-wb-toolbar-scale-reset="true"]')).toHaveText('100%');
+  });
+
+  test('TC-02-09: Pen-only mode blocks touch drawing and allows stylus/mouse drawing', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+
+    await toolbar.selectTool('ink');
+    const initialCount = await canvas.getObjectCount();
+
+    // Toggle Pen-Only Mode ON via quick button
+    const penOnlyBtn = page.locator('[data-action="toggle-pen-only"]');
+    await expect(penOnlyBtn).toBeVisible();
+    await penOnlyBtn.click();
+    await expect(penOnlyBtn).toHaveAttribute('data-active', 'true');
+
+    // Simulate touch stroke (pointerType === 'touch')
+    const svg = page.locator('svg[data-wb-canvas="true"], svg.wb-canvas');
+    await svg.dispatchEvent('pointerdown', {
+      clientX: 300,
+      clientY: 300,
+      pointerType: 'touch',
+      pointerId: 1,
+      bubbles: true,
+    });
+    await svg.dispatchEvent('pointermove', {
+      clientX: 350,
+      clientY: 350,
+      pointerType: 'touch',
+      pointerId: 1,
+      bubbles: true,
+    });
+    await svg.dispatchEvent('pointerup', {
+      clientX: 350,
+      clientY: 350,
+      pointerType: 'touch',
+      pointerId: 1,
+      bubbles: true,
+    });
+
+    // Touch input must NOT create a stroke
+    const countAfterTouch = await canvas.getObjectCount();
+    expect(countAfterTouch).toBe(initialCount);
+
+    // Mouse or Pen input (pointerType === 'mouse' or 'pen') DOES create a stroke
+    await canvas.drawStroke([
+      { x: 400, y: 400 },
+      { x: 450, y: 450 },
+    ]);
+    await canvas.waitForObjectCount(initialCount + 1);
+
+    // Toggle Pen-Only Mode OFF
+    await penOnlyBtn.click();
+    await expect(penOnlyBtn).toHaveAttribute('data-active', 'false');
+  });
+
+  test('TC-02-10: Laser pointer draws glowing stroke and automatically fades out after 1.5s', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const initialCount = await canvas.getObjectCount();
+
+    // Select Laser Pointer tool
+    const laserBtn = page.locator('button[data-tool="ink:laser"]');
+    await expect(laserBtn).toBeVisible();
+    await laserBtn.click();
+    await expect(laserBtn).toHaveAttribute('data-active', 'true');
+
+    // Draw with laser pointer
+    await canvas.drawStroke([
+      { x: 300, y: 300 },
+      { x: 350, y: 320 },
+      { x: 400, y: 300 },
+    ]);
+
+    // Laser stroke should render with data-laser-stroke="true"
+    const laserStroke = page.locator('[data-laser-stroke="true"]');
+    await expect(laserStroke).toBeVisible();
+
+    // The persistent whiteboard element count should NOT increase (laser does not persist in Yjs)
+    const countDuringLaser = await canvas.getObjectCount();
+    expect(countDuringLaser).toBe(initialCount);
+
+    // Wait 1.6s for complete fade out
+    await page.waitForTimeout(1600);
+    await expect(laserStroke).toHaveCount(0);
+  });
+
+  test('TC-02-11: Ink-to-Shape automatically snaps rough drawn strokes to geometric primitives', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+    await toolbar.selectTool('ink');
+
+    const initialCount = await canvas.getObjectCount();
+
+    // 1. Draw a rough straight line segment -> snaps to GeomSegment
+    await canvas.drawStroke([
+      { x: 200, y: 200 },
+      { x: 250, y: 201 },
+      { x: 300, y: 200 },
+      { x: 350, y: 202 },
+      { x: 400, y: 200 },
+    ]);
+    await canvas.waitForObjectCount(initialCount + 1);
+    const latestSegment = canvas.getLatestObject();
+    await expect(latestSegment).toHaveAttribute('data-element-type', 'GeomSegment');
+
+    // 2. Draw a rough circle -> snaps to GeomCircle
+    const center = { x: 500, y: 300 };
+    const radius = 60;
+    const circlePoints: Array<{ x: number; y: number }> = [];
+    const steps = 16;
+    for (let i = 0; i <= steps; i++) {
+      const angle = (i / steps) * 2 * Math.PI;
+      circlePoints.push({
+        x: center.x + radius * Math.cos(angle) + (Math.random() * 4 - 2),
+        y: center.y + radius * Math.sin(angle) + (Math.random() * 4 - 2),
+      });
+    }
+    await canvas.drawStroke(circlePoints);
+    await canvas.waitForObjectCount(initialCount + 2);
+    const latestCircle = canvas.getLatestObject();
+    await expect(latestCircle).toHaveAttribute('data-element-type', 'GeomCircle');
+
+    // 3. Draw a rough triangle -> snaps to GeomPolygon
+    await canvas.drawStroke([
+      { x: 250, y: 400 },
+      { x: 350, y: 400 },
+      { x: 300, y: 480 },
+      { x: 250, y: 400 },
+    ]);
+    await canvas.waitForObjectCount(initialCount + 3);
+    const latestPoly = canvas.getLatestObject();
+    await expect(latestPoly).toHaveAttribute('data-element-type', 'GeomPolygon');
+  });
 });

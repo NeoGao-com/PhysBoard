@@ -211,6 +211,10 @@ export const PlotElement: React.FC<PlotElementProps> = ({
     allElements.some((el) => el.type === "Slider" && el.props?.name === p.name)
   );
 
+  const clipId = `wb-plot-clip-${element.id}`;
+  const clipWidth = axes.xNeg + axes.xPos;
+  const clipHeight = axes.yNeg + axes.yPos;
+
   return (
     <g
       data-id={element.id}
@@ -227,63 +231,77 @@ export const PlotElement: React.FC<PlotElementProps> = ({
       }}
       style={{ cursor: "pointer" }}
     >
-      {/* Optional integral shade */}
-      {shadePathD && <path d={shadePathD} fill={color} fillOpacity={0.2} stroke="none" />}
+      <defs>
+        <clipPath id={clipId}>
+          <rect
+            x={-axes.xNeg}
+            y={-axes.yPos}
+            width={clipWidth}
+            height={clipHeight}
+          />
+        </clipPath>
+      </defs>
 
-      {/* Asymptotes */}
-      {marks.asymptotes &&
-        analysis?.verticalAsymptotes.map((ax) => (
+      {/* Cliped Curves and Shading */}
+      <g clipPath={`url(#${clipId})`}>
+        {/* Optional integral shade */}
+        {shadePathD && <path d={shadePathD} fill={color} fillOpacity={0.2} stroke="none" />}
+
+        {/* Asymptotes */}
+        {marks.asymptotes &&
+          analysis?.verticalAsymptotes.map((ax) => (
+            <line
+              key={`va-${ax.toFixed(3)}`}
+              x1={ax}
+              y1={-axes.yPos}
+              x2={ax}
+              y2={axes.yNeg}
+              stroke="#94a3b8"
+              strokeWidth={1.2}
+              strokeDasharray="5 4"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        {marks.asymptotes && analysis?.horizontalAsymptote !== null && analysis && (
           <line
-            key={`va-${ax.toFixed(3)}`}
-            x1={ax}
-            y1={-axes.yPos}
-            x2={ax}
-            y2={axes.yNeg}
+            x1={-axes.xNeg}
+            y1={-analysis.horizontalAsymptote}
+            x2={axes.xPos}
+            y2={-analysis.horizontalAsymptote}
             stroke="#94a3b8"
             strokeWidth={1.2}
             strokeDasharray="5 4"
             vectorEffect="non-scaling-stroke"
           />
-        ))}
-      {marks.asymptotes && analysis?.horizontalAsymptote !== null && analysis && (
-        <line
-          x1={-axes.xNeg}
-          y1={-analysis.horizontalAsymptote}
-          x2={axes.xPos}
-          y2={-analysis.horizontalAsymptote}
-          stroke="#94a3b8"
-          strokeWidth={1.2}
-          strokeDasharray="5 4"
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
+        )}
 
-      {/* Wide transparent hit target */}
-      {curveD && (
-        <path
-          d={curveD}
-          fill="none"
-          stroke="rgba(0,0,0,0.001)"
-          strokeWidth={14}
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
+        {/* Wide transparent hit target */}
+        {curveD && (
+          <path
+            d={curveD}
+            fill="none"
+            stroke="rgba(0,0,0,0.001)"
+            strokeWidth={14}
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
 
-      {/* Visible Function Curve */}
-      {curveD && (
-        <path
-          data-wb-plot="curve"
-          className="wb-plot-curve curve"
-          d={curveD}
-          fill="none"
-          stroke={isSelected ? "#f59e0b" : color}
-          strokeWidth={strokeWidth}
-          strokeDasharray={element.style?.dash ? "6 4" : undefined}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      )}
+        {/* Visible Function Curve */}
+        {curveD && (
+          <path
+            data-wb-plot="curve"
+            className="wb-plot-curve curve"
+            d={curveD}
+            fill="none"
+            stroke={isSelected ? "#f59e0b" : color}
+            strokeWidth={strokeWidth}
+            strokeDasharray={element.style?.dash ? "6 4" : undefined}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+      </g>
 
       {/* Critical Point Marks */}
       {marks.roots &&

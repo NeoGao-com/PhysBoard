@@ -3,11 +3,21 @@ import { jsPDF } from "jspdf";
 import { toBlob } from "html-to-image";
 import { BoundingBox, CanvasElement, CanvasElementSchema } from "@/types/whiteboard";
 import { readElement } from "@/lib/dispatcher";
+import {
+  DEFAULT_PAGE_BOARD_CONFIG,
+  type PageBoardConfig,
+  adaptStrokeForBoard,
+  readAllPageBoardConfigs,
+  readPageBoardConfig,
+  resolveBoardColors,
+  writeAllPageBoardConfigs,
+} from "@/lib/board-themes";
 
 export interface SerializedBoardState {
   version: 2;
   roomId?: string;
   pages: { cur: number; count: number };
+  boardPages?: Record<string, PageBoardConfig>;
   objects: CanvasElement[];
 }
 
@@ -208,7 +218,8 @@ function hexToRgba(hex: string | null | undefined, fallback: string): string {
 export function renderElementsToCanvas2D(
   elements: CanvasElement[],
   widthPx = 1200,
-  heightPx = 760
+  heightPx = 760,
+  boardConfig: PageBoardConfig = DEFAULT_PAGE_BOARD_CONFIG
 ): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = widthPx;
@@ -216,17 +227,66 @@ export function renderElementsToCanvas2D(
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
-  ctx.fillStyle = "#ffffff";
+  const theme = resolveBoardColors(boardConfig);
+  ctx.fillStyle = theme.bg;
   ctx.fillRect(0, 0, widthPx, heightPx);
 
-  if (elements.length === 0) {
-    // Draw subtle light grid dots for crisp empty whiteboard appearance
-    ctx.fillStyle = "#e6e8ee";
-    for (let x = 24; x < widthPx; x += 24) {
-      for (let y = 24; y < heightPx; y += 24) {
-        ctx.fillRect(x, y, 1.5, 1.5);
+  if (boardConfig.pattern !== "none") {
+    const sp = theme.spacingPx;
+    if (boardConfig.pattern === "dots") {
+      ctx.fillStyle = theme.dotFill;
+      for (let x = sp / 2; x < widthPx; x += sp) {
+        for (let y = sp / 2; y < heightPx; y += sp) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1.35, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else if (boardConfig.pattern === "ruled") {
+      ctx.strokeStyle = theme.ruledStroke;
+      ctx.lineWidth = 1;
+      for (let y = sp; y < heightPx; y += sp) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(widthPx, y);
+        ctx.stroke();
+      }
+    } else {
+      ctx.strokeStyle =
+        boardConfig.pattern === "graph" ? theme.subGridStroke : theme.gridStroke;
+      ctx.lineWidth = 1;
+      for (let x = 0; x < widthPx; x += sp) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, heightPx);
+        ctx.stroke();
+      }
+      for (let y = 0; y < heightPx; y += sp) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(widthPx, y);
+        ctx.stroke();
+      }
+      if (boardConfig.pattern === "graph") {
+        ctx.strokeStyle = theme.gridStroke;
+        ctx.lineWidth = 1.4;
+        for (let x = 0; x < widthPx; x += sp * 5) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, heightPx);
+          ctx.stroke();
+        }
+        for (let y = 0; y < heightPx; y += sp * 5) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(widthPx, y);
+          ctx.stroke();
+        }
       }
     }
+  }
+
+  if (elements.length === 0) {
     return canvas;
   }
 
@@ -251,7 +311,9 @@ export function renderElementsToCanvas2D(
   const pts = buildPointLookup(elements);
 
   for (const el of elements) {
-    const stroke = hexToRgba(el.style?.stroke, "#1e293b");
+    const stroke =
+      adaptStrokeForBoard(el.style?.stroke, theme.isDark) ??
+      hexToRgba(el.style?.stroke, theme.defaultInkColor);
     const width = asNumber(el.style?.width, 2);
     ctx.save();
     ctx.strokeStyle = stroke;
@@ -442,13 +504,23 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 export async function exportPNG(
   svgOrRootElement: SVGSVGElement | HTMLElement | null,
   doc: Y.Doc,
-  page?: number
+  page?: number,
+  options?: { whitePaper?: boolean }
 ): Promise<Blob> {
   const elements = getVisiblePageElements(doc, page);
+  const boardConfig = options?.whitePaper
+    ? DEFAULT_PAGE_BOARD_CONFIG
+    : readPageBoardConfig(doc, page ?? 1);
+  const theme = resolveBoardColors(boardConfig);
 
-  // Empty board or non-DOM context: crisp Canvas2D PNG directly
-  if (elements.length === 0 || !svgOrRootElement) {
-    const fallbackCanvas = renderElementsToCanvas2D(elements, 1200, 760);
+  // Empty board or non-DOM context or forced white paper: crisp Canvas2D PNG directly
+  if (elements.length === 0 || !svgOrRootElement || options?.whitePaper) {
+    const fallbackCanvas = renderElementsToCanvas2D(
+      elements,
+      1200,
+      760,
+      boardConfig
+    );
     return canvasToPngBlob(fallbackCanvas);
   }
 
@@ -484,7 +556,7 @@ export async function exportPNG(
                 resolve(null);
                 return;
               }
-              ctx.fillStyle = "#ffffff";
+              ctx.fillStyle = theme.bg;
               ctx.fillRect(0, 0, canvas.width, canvas.height);
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
               canvasToPngBlob(canvas).then(resolve).catch(() => resolve(null));
@@ -512,7 +584,7 @@ export async function exportPNG(
       const rect = htmlTarget.getBoundingClientRect();
       if (rect.width > 10 && rect.height > 10) {
         const captured = await toBlob(htmlTarget, {
-          backgroundColor: "#ffffff",
+          backgroundColor: theme.bg,
           pixelRatio: 2,
           skipFonts: true,
           filter: (node) =>
@@ -527,7 +599,12 @@ export async function exportPNG(
     // Fall back cleanly to deterministic Canvas2D vector renderer
   }
 
-  const fallbackCanvas = renderElementsToCanvas2D(elements, 1600, 1000);
+  const fallbackCanvas = renderElementsToCanvas2D(
+    elements,
+    1600,
+    1000,
+    boardConfig
+  );
   return canvasToPngBlob(fallbackCanvas);
 }
 
@@ -538,10 +615,16 @@ export async function exportPNG(
 export async function exportPDF(
   svgOrRootElement: SVGSVGElement | HTMLElement | null,
   doc: Y.Doc,
-  page?: number
+  page?: number,
+  options?: { whitePaper?: boolean }
 ): Promise<Blob> {
   const elements = getVisiblePageElements(doc, page);
   const bbox = computePageContentBounds(elements);
+  const whitePaper = options?.whitePaper ?? false;
+  const boardConfig = whitePaper
+    ? DEFAULT_PAGE_BOARD_CONFIG
+    : readPageBoardConfig(doc, page ?? 1);
+  const theme = resolveBoardColors(boardConfig);
 
   let widthPt = 842; // A4 landscape pt
   let heightPt = 595;
@@ -566,12 +649,23 @@ export async function exportPDF(
     title: "PhysBoard Whiteboard Export",
     creator: "PhysBoard",
   });
-  pdf.setFillColor(255, 255, 255);
+  const hex = theme.bg.replace(/^#/, "");
+  if (!whitePaper && /^[0-9a-fA-F]{6}$/.test(hex)) {
+    pdf.setFillColor(
+      parseInt(hex.slice(0, 2), 16),
+      parseInt(hex.slice(2, 4), 16),
+      parseInt(hex.slice(4, 6), 16)
+    );
+  } else {
+    pdf.setFillColor(255, 255, 255);
+  }
   pdf.rect(0, 0, widthPt, heightPt, "F");
 
-  if (elements.length > 0) {
+  if (elements.length > 0 || !whitePaper) {
     try {
-      const pngBlob = await exportPNG(svgOrRootElement, doc, page);
+      const pngBlob = await exportPNG(svgOrRootElement, doc, page, {
+        whitePaper,
+      });
       const pngDataUrl = await blobToDataUrl(pngBlob);
       const pad = 16;
       pdf.addImage(
@@ -854,6 +948,7 @@ export function serializeState(doc: Y.Doc, roomId?: string): string {
 
   const cur = pagesMap.get("cur") ?? 1;
   const count = pagesMap.get("count") ?? 1;
+  const boardPages = readAllPageBoardConfigs(doc);
 
   const payload: SerializedBoardState = {
     version: 2,
@@ -862,6 +957,7 @@ export function serializeState(doc: Y.Doc, roomId?: string): string {
       cur: typeof cur === "number" && cur >= 1 ? cur : 1,
       count: typeof count === "number" && count >= 1 ? count : 1,
     },
+    ...(Object.keys(boardPages).length > 0 ? { boardPages } : {}),
     objects,
   };
 
@@ -940,6 +1036,12 @@ export function loadState(
       } else {
         pagesMap.set("count", 1);
         pagesMap.set("cur", 1);
+      }
+
+      if (isRecord(parsed.boardPages)) {
+        writeAllPageBoardConfigs(doc, parsed.boardPages);
+      } else {
+        writeAllPageBoardConfigs(doc, undefined);
       }
     });
 

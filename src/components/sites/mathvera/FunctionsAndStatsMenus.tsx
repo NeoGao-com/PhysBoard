@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   buildSignTableFromExpr,
   buildVarTableFromExpr,
@@ -28,10 +29,7 @@ export type M3MenuAction =
   | { kind: "open-decor-help" };
 
 const dropdownPanelStyle: React.CSSProperties = {
-  position: "absolute",
-  top: "100%",
-  left: 0,
-  marginTop: 6,
+  position: "fixed",
   background: "#ffffff",
   border: "1px solid #cbd5e1",
   borderRadius: 12,
@@ -40,7 +38,7 @@ const dropdownPanelStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 2,
-  zIndex: 100,
+  zIndex: 5200,
   fontFamily: "system-ui, -apple-system, sans-serif",
 };
 
@@ -88,26 +86,53 @@ export interface FunctionsMenuProps {
   open: boolean;
   onClose: () => void;
   onAction: (action: M3MenuAction) => void;
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const FunctionsMenu: React.FC<FunctionsMenuProps> = ({
   open,
   onClose,
   onAction,
+  anchorRef,
 }) => {
-  if (!open) return null;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    if (anchorRef?.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      const menuHeight = 360;
+      const opensUpward =
+        typeof window !== "undefined" &&
+        rect.bottom + menuHeight > window.innerHeight &&
+        rect.top > menuHeight;
+      setPos({
+        top: opensUpward
+          ? Math.max(8, rect.top - menuHeight - 6)
+          : rect.bottom + 6,
+        left: Math.max(8, Math.min(rect.left, (typeof window !== "undefined" ? window.innerWidth : 1280) - 300)),
+      });
+    }
+  }, [open, anchorRef]);
+
+  if (!open || typeof document === "undefined") return null;
 
   const fire = (action: M3MenuAction) => {
     onAction(action);
     onClose();
   };
 
-  return (
+  return createPortal(
     <div
       role="menu"
       aria-label="Hàm số"
       data-wb-menu="functions"
-      style={{ ...dropdownPanelStyle, minWidth: 288 }}
+      style={{
+        ...dropdownPanelStyle,
+        minWidth: 288,
+        top: pos?.top ?? 50,
+        left: pos?.left ?? 100,
+      }}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div style={sectionHeadingStyle}>HỆ TRỤC TOẠ ĐỘ</div>
@@ -223,7 +248,8 @@ export const FunctionsMenu: React.FC<FunctionsMenuProps> = ({
         <span>◯</span>
         <span>Đường tròn lượng giác</span>
       </button>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -235,26 +261,53 @@ export interface StatsMenuProps {
   open: boolean;
   onClose: () => void;
   onAction: (action: M3MenuAction) => void;
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const StatsMenu: React.FC<StatsMenuProps> = ({
   open,
   onClose,
   onAction,
+  anchorRef,
 }) => {
-  if (!open) return null;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    if (anchorRef?.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      const menuHeight = 440;
+      const opensUpward =
+        typeof window !== "undefined" &&
+        rect.bottom + menuHeight > window.innerHeight &&
+        rect.top > menuHeight;
+      setPos({
+        top: opensUpward
+          ? Math.max(8, rect.top - menuHeight - 6)
+          : rect.bottom + 6,
+        left: Math.max(8, Math.min(rect.left, (typeof window !== "undefined" ? window.innerWidth : 1280) - 290)),
+      });
+    }
+  }, [open, anchorRef]);
+
+  if (!open || typeof document === "undefined") return null;
 
   const fire = (action: M3MenuAction) => {
     onAction(action);
     onClose();
   };
 
-  return (
+  return createPortal(
     <div
       role="menu"
       aria-label="Thống kê"
       data-wb-menu="statistics"
-      style={{ ...dropdownPanelStyle, minWidth: 278 }}
+      style={{
+        ...dropdownPanelStyle,
+        minWidth: 278,
+        top: pos?.top ?? 50,
+        left: pos?.left ?? 100,
+      }}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div style={sectionHeadingStyle}>THỐNG KÊ</div>
@@ -355,7 +408,8 @@ export const StatsMenu: React.FC<StatsMenuProps> = ({
         <span>⬡</span>
         <span>Đồ thị (đỉnh – cạnh)</span>
       </button>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -369,6 +423,7 @@ export interface RealWorldMenuProps {
   onSelectQuickItem: (item: RealWorldArtItem) => void;
   onOpenDrawer: () => void;
   onOpenDecorHelp: () => void;
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const RealWorldMenu: React.FC<RealWorldMenuProps> = ({
@@ -377,15 +432,41 @@ export const RealWorldMenu: React.FC<RealWorldMenuProps> = ({
   onSelectQuickItem,
   onOpenDrawer,
   onOpenDecorHelp,
+  anchorRef,
 }) => {
-  if (!open) return null;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  return (
+  useEffect(() => {
+    if (!open) return;
+    if (anchorRef?.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      const menuHeight = 420;
+      const opensUpward =
+        typeof window !== "undefined" &&
+        rect.bottom + menuHeight > window.innerHeight &&
+        rect.top > menuHeight;
+      setPos({
+        top: opensUpward
+          ? Math.max(8, rect.top - menuHeight - 6)
+          : rect.bottom + 6,
+        left: Math.max(8, Math.min(rect.left, (typeof window !== "undefined" ? window.innerWidth : 1280) - 280)),
+      });
+    }
+  }, [open, anchorRef]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       role="menu"
       aria-label="Thực tế"
       data-wb-menu="realworld"
-      style={{ ...dropdownPanelStyle, minWidth: 270 }}
+      style={{
+        ...dropdownPanelStyle,
+        minWidth: 270,
+        top: pos?.top ?? 50,
+        left: pos?.left ?? 100,
+      }}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div style={sectionHeadingStyle}>VẬT</div>
@@ -435,7 +516,8 @@ export const RealWorldMenu: React.FC<RealWorldMenuProps> = ({
         <span>📏</span>
         <span>Kích thước, mặt đất, mặt nước, chữ…</span>
       </button>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -461,8 +543,8 @@ const PlotConfigDialogInner: React.FC<PlotConfigDialogProps> = ({
   onCancel,
 }) => {
   const [expr, setExpr] = useState(initialExpr);
-  const [domA, setDomA] = useState("");
-  const [domB, setDomB] = useState("");
+  const [domA, setDomA] = useState("-5");
+  const [domB, setDomB] = useState("5");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -482,12 +564,12 @@ const PlotConfigDialogInner: React.FC<PlotConfigDialogProps> = ({
       value: 1,
     }));
     let domain: [number, number] | undefined;
-    if (domA.trim() && domB.trim()) {
-      const a = Number(domA.replace(",", "."));
-      const b = Number(domB.replace(",", "."));
-      if (Number.isFinite(a) && Number.isFinite(b) && a < b) {
-        domain = [a, b];
-      }
+    const a = Number(domA.replace(",", "."));
+    const b = Number(domB.replace(",", "."));
+    if (Number.isFinite(a) && Number.isFinite(b) && a < b) {
+      domain = [a, b];
+    } else {
+      domain = [-5, 5];
     }
     onSubmit(clean, params, domain);
   };
