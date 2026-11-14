@@ -162,6 +162,7 @@ export interface Axes2DElementData extends CanvasElement {
     grid?: boolean;
     ticks?: "int" | "pi";
     legend?: boolean;
+    linkedSimId?: string;
   };
 }
 

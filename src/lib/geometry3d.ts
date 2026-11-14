@@ -1873,6 +1873,236 @@ export function computeFlattenedFace(
   return { anchor, vertices2D: ordered, segments, polygonElement };
 }
 
+export interface UnfoldedPolyhedronNetResult {
+  solidId: string;
+  polygons: CanvasElement[];
+  tabLines?: Array<{ from: Point2D; to: Point2D }>;
+}
+
+/**
+ * Computes a 2D printable net (trải phẳng đa diện) for a 3D solid (pyramid, prism, box, cube, frustum).
+ * Unfolds all faces of the solid onto a shared 2D plane beside the solid with glue tabs/printable border.
+ */
+export function computeUnfoldedPolyhedronNet(
+  solidId: string,
+  scene: Solved3DScene,
+  elements: CanvasElement[],
+  targetOffset: Point2D = { x: 5.5, y: 0 }
+): UnfoldedPolyhedronNetResult | null {
+  const solidEl = elements.find((e) => e.id === solidId);
+  if (!solidEl || solidEl.type !== "Solid3D") return null;
+  const lift = scene.lifts.get(solidId);
+  if (!lift || !lift.faces || lift.faces.length < 4) return null;
+
+  const ptIds = Array.isArray(solidEl.props.points) ? (solidEl.props.points as string[]) : [];
+  const vertexNames = Array.isArray(solidEl.props.vertexNames)
+    ? (solidEl.props.vertexNames as string[])
+    : [];
+
+  const solidPts3D = lift.p3;
+  if (!solidPts3D || solidPts3D.length < 4) return null;
+
+  // Find 2D placement anchor beside the solid
+  const pts2 = ptIds.map((id) => scene.pts.get(id)).filter((p): p is Point2D => Boolean(p));
+  const maxX = pts2.length > 0 ? Math.max(...pts2.map((p) => p.x)) : (solidEl.transform?.x ?? 0);
+  const avgY = pts2.length > 0 ? pts2.reduce((s, p) => s + p.y, 0) / pts2.length : (solidEl.transform?.y ?? 0);
+  const origin: Point2D = { x: maxX + targetOffset.x, y: avgY + targetOffset.y };
+
+  // Select base face: for pyramid face[0], for prism face[0], for box face[0]
+  const baseFaceIdx = 0;
+  const baseFace = lift.faces[baseFaceIdx];
+  if (!baseFace || baseFace.length < 3) return null;
+
+  const baseP3 = baseFace.map((idx) => solidPts3D[idx]);
+  const pA = baseP3[0];
+  const pB = baseP3[1];
+  const pC = baseP3[2];
+  if (!pA || !pB || !pC) return null;
+
+  // Project base face into local 2D UV
+  const baseUVs = baseP3.map((pt) => projectPointToPlaneBasis(pt, pA, pB, pC));
+  if (baseUVs.some((uv) => uv === null)) return null;
+
+  const validBaseUVs = baseUVs as Array<{ u: number; v: number }>;
+  const avgU = validBaseUVs.reduce((s, uv) => s + uv.u, 0) / validBaseUVs.length;
+  const avgV = validBaseUVs.reduce((s, uv) => s + uv.v, 0) / validBaseUVs.length;
+
+  const basePoly2D: Point2D[] = validBaseUVs.map((uv) => ({
+    x: origin.x + (uv.u - avgU),
+    y: origin.y + (uv.v - avgV),
+  }));
+
+  const createdPolygons: CanvasElement[] = [];
+
+  const makePolygonElement = (
+    pts: Point2D[],
+    labels: string[],
+    color = "#2563eb",
+    fill = "rgba(37, 99, 235, 0.08)"
+  ): CanvasElement => {
+    const polyId = `net_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const embedded: EmbeddedVertex[] = pts.map((pt, idx) => ({
+      id: `${polyId}_v${idx}`,
+      name: labels[idx] ?? "",
+      x: pt.x,
+      y: pt.y,
+    }));
+    return {
+      id: polyId,
+      type: "GeomPolygon",
+      transform: { x: 0, y: 0, scale: 1, rotation: 0, z: 0 },
+      style: { stroke: color, fill, width: 2 },
+      meta: { createdBy: "local", createdAtSeq: 0, page: 1 },
+      props: {
+        vertices: embedded.map((v) => v.id),
+        points: embedded,
+      } satisfies GeomPolygonProps & Record<string, unknown>,
+    };
+  };
+
+  const getLabel = (vIdx: number) => {
+    const custom = vertexNames[vIdx];
+    if (custom && custom.trim()) return custom;
+    return `${vIdx + 1}`;
+  };
+
+  // 1. Add base face polygon
+  createdPolygons.push(
+    makePolygonElement(
+      basePoly2D,
+      baseFace.map((idx) => getLabel(idx)),
+      "#1e40af",
+      "rgba(30, 64, 175, 0.12)"
+    )
+  );
+
+  // 2. Unfold adjacent lateral faces around each edge of the base face
+  const nBaseEdges = baseFace.length;
+  for (let e = 0; e < nBaseEdges; e++) {
+    const i1 = baseFace[e];
+    const i2 = baseFace[(e + 1) % nBaseEdges];
+    const edgeP1 = basePoly2D[e];
+    const edgeP2 = basePoly2D[(e + 1) % nBaseEdges];
+
+    // Find lateral face that contains this edge [i1, i2]
+    const adjFaceIdx = lift.faces.findIndex(
+      (f, fIdx) => fIdx !== baseFaceIdx && f.includes(i1) && f.includes(i2)
+    );
+    if (adjFaceIdx < 0) continue;
+    const adjFace = lift.faces[adjFaceIdx];
+
+    // True 3D side edge lengths for rigid 2D unfolding
+    const p1_3D = solidPts3D[i1];
+    const p2_3D = solidPts3D[i2];
+    const edgeLen2D = Math.hypot(edgeP2.x - edgeP1.x, edgeP2.y - edgeP1.y);
+
+    // Vector along the edge on 2D plane: ex
+    const ex = {
+      x: (edgeP2.x - edgeP1.x) / (edgeLen2D || 1),
+      y: (edgeP2.y - edgeP1.y) / (edgeLen2D || 1),
+    };
+    // Normal vector pointing outwards from base face center
+    const centerBase = {
+      x: basePoly2D.reduce((s, p) => s + p.x, 0) / basePoly2D.length,
+      y: basePoly2D.reduce((s, p) => s + p.y, 0) / basePoly2D.length,
+    };
+    const midEdge = { x: (edgeP1.x + edgeP2.x) / 2, y: (edgeP1.y + edgeP2.y) / 2 };
+    let ey = { x: -ex.y, y: ex.x };
+    const dotOut = (midEdge.x - centerBase.x) * ey.x + (midEdge.y - centerBase.y) * ey.y;
+    if (dotOut < 0) {
+      ey = { x: -ey.x, y: -ey.y };
+    }
+
+    // For pyramid triangular lateral faces: apex + i1 + i2
+    if (adjFace.length === 3) {
+      const apexIdx = adjFace.find((idx) => idx !== i1 && idx !== i2);
+      if (apexIdx === undefined) continue;
+      const apexP3 = solidPts3D[apexIdx];
+      const d1 = dist3(p1_3D, apexP3);
+      const d2 = dist3(p2_3D, apexP3);
+
+      // Solve 2D triangle given side lengths: edgeLen2D, d1, d2
+      const uApex = (edgeLen2D * edgeLen2D + d1 * d1 - d2 * d2) / (2 * (edgeLen2D || 1));
+      const vApex = Math.sqrt(Math.max(0, d1 * d1 - uApex * uApex));
+
+      const apex2D: Point2D = {
+        x: edgeP1.x + uApex * ex.x + vApex * ey.x,
+        y: edgeP1.y + uApex * ex.y + vApex * ey.y,
+      };
+
+      createdPolygons.push(
+        makePolygonElement(
+          [edgeP1, edgeP2, apex2D],
+          [getLabel(i1), getLabel(i2), getLabel(apexIdx)],
+          "#0284c7",
+          "rgba(2, 132, 199, 0.08)"
+        )
+      );
+    } else if (adjFace.length === 4) {
+      // Quad lateral face (box, prism, frustum): [i1, i2, j2, j1]
+      // Find opposite vertices j1 (connected to i1) and j2 (connected to i2)
+      const remaining = adjFace.filter((idx) => idx !== i1 && idx !== i2);
+      if (remaining.length === 2) {
+        const j1 = remaining[0];
+        const j2 = remaining[1];
+        const h1 = dist3(p1_3D, solidPts3D[j1]);
+        const h2 = dist3(p2_3D, solidPts3D[j2]);
+        const pJ1_2D: Point2D = {
+          x: edgeP1.x + h1 * ey.x,
+          y: edgeP1.y + h1 * ey.y,
+        };
+        const pJ2_2D: Point2D = {
+          x: edgeP2.x + h2 * ey.x,
+          y: edgeP2.y + h2 * ey.y,
+        };
+
+        createdPolygons.push(
+          makePolygonElement(
+            [edgeP1, edgeP2, pJ2_2D, pJ1_2D],
+            [getLabel(i1), getLabel(i2), getLabel(j2), getLabel(j1)],
+            "#059669",
+            "rgba(5, 150, 105, 0.08)"
+          )
+        );
+
+        // If this is face e === 0 for prism/box, attach top cap face to pJ1_2D, pJ2_2D
+        if (e === 0 && lift.faces.length > 2) {
+          const topFaceIdx = 1;
+          const topFace = lift.faces[topFaceIdx];
+          if (topFace && topFace.includes(j1) && topFace.includes(j2)) {
+            const topP3 = topFace.map((idx) => solidPts3D[idx]);
+            const topUVs = topP3.map((pt) =>
+              projectPointToPlaneBasis(pt, solidPts3D[j1], solidPts3D[j2], topP3[2] ?? topP3[0])
+            );
+            if (!topUVs.some((uv) => uv === null)) {
+              const validTopUVs = topUVs as Array<{ u: number; v: number }>;
+              const topEx = {
+                x: (pJ2_2D.x - pJ1_2D.x) / (Math.hypot(pJ2_2D.x - pJ1_2D.x, pJ2_2D.y - pJ1_2D.y) || 1),
+                y: (pJ2_2D.y - pJ1_2D.y) / (Math.hypot(pJ2_2D.x - pJ1_2D.x, pJ2_2D.y - pJ1_2D.y) || 1),
+              };
+              const topEy = ey;
+              const topPoly2D = validTopUVs.map((uv) => ({
+                x: pJ1_2D.x + uv.u * topEx.x + uv.v * topEy.x,
+                y: pJ1_2D.y + uv.u * topEx.y + uv.v * topEy.y,
+              }));
+              createdPolygons.push(
+                makePolygonElement(
+                  topPoly2D,
+                  topFace.map((idx) => getLabel(idx)),
+                  "#1e40af",
+                  "rgba(30, 64, 175, 0.12)"
+                )
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return { solidId, polygons: createdPolygons };
+}
+
 export type SolidSubSelection =
   | {
       kind: "face";

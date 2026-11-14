@@ -102,6 +102,11 @@ export const SPACE_GEOMETRY_SECTIONS: SpaceGeometrySection[] = [
         label: "⧉ Tách mặt phẳng (hình thật)",
         title: "Bấm 3 điểm của một mặt (vd S, A, B) → hình thật hiện ngay bên cạnh khối",
       },
+      {
+        tool: "c:unfold",
+        label: "◫ Trải phẳng đa diện (Net 2D)",
+        title: "Bấm vào khối 3D chóp/lăng trụ/hộp → trải phẳng toàn bộ các mặt thành bản vẽ 2D",
+      },
       { tool: "c:footplane", label: "⊥ Hình chiếu của điểm lên mặt phẳng" },
       { tool: "c:distplane", label: "📏 Khoảng cách từ điểm đến mặt phẳng" },
       { tool: "c:commonperp", label: "⟂ Đoạn vuông góc chung" },
