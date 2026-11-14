@@ -302,3 +302,19 @@ export const IconCompassTool: React.FC<IconProps> = ({ size = 15, color }) => (
     <path d="M12 7l-5 14M12 7l5 14M9 14h6" />
   </svg>
 );
+
+export const IconCalculator: React.FC<IconProps> = ({ size = 15, color }) => (
+  <svg {...base(size, color)}>
+    <rect x="4" y="2" width="16" height="20" rx="3" />
+    <line x1="8" y1="6" x2="16" y2="6" strokeWidth="2" />
+    <line x1="16" y1="11" x2="16" y2="11.01" strokeWidth="2.5" />
+    <line x1="12" y1="11" x2="12" y2="11.01" strokeWidth="2.5" />
+    <line x1="8" y1="11" x2="8" y2="11.01" strokeWidth="2.5" />
+    <line x1="16" y1="15" x2="16" y2="15.01" strokeWidth="2.5" />
+    <line x1="12" y1="15" x2="12" y2="15.01" strokeWidth="2.5" />
+    <line x1="8" y1="15" x2="8" y2="15.01" strokeWidth="2.5" />
+    <line x1="16" y1="19" x2="16" y2="19.01" strokeWidth="2.5" />
+    <line x1="12" y1="19" x2="12" y2="19.01" strokeWidth="2.5" />
+    <line x1="8" y1="19" x2="8" y2="19.01" strokeWidth="2.5" />
+  </svg>
+);

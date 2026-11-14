@@ -141,6 +141,7 @@ import { OrbitBar } from "./OrbitBar";
 import { MathEditor, ensureMathLiveRegistered } from "./MathEditor";
 import { RealWorldDrawer } from "./RealWorldDrawer";
 import { PhysicsDrawer } from "./PhysicsDrawer";
+import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportModal } from "./ExportModal";
 import { ExamEditor } from "./ExamEditor";
 import type {
@@ -500,6 +501,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [numberLineDialogOpen, setNumberLineDialogOpen] = useState(false);
   const [realWorldDrawerOpen, setRealWorldDrawerOpen] = useState(false);
   const [physicsDrawerOpen, setPhysicsDrawerOpen] = useState(false);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [exportModalMode, setExportModalMode] = useState<"tikz" | "json" | null>(
     null
   );
@@ -2114,6 +2116,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           setRealWorldDrawerOpen(false);
         } else if (physicsDrawerOpen) {
           setPhysicsDrawerOpen(false);
+        } else if (calculatorOpen) {
+          setCalculatorOpen(false);
         } else if (draftTwoPtRef.current || draftPolygonPts.length > 0 || pickedItems.length > 0) {
           draftTwoPtRef.current = null;
           setDraftPreviewLine(null);
@@ -6419,6 +6423,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onPhysicsAction={handlePhysicsAction}
       onOpenPhysicsDrawer={() => setPhysicsDrawerOpen(true)}
       onSelectInstrument={handleSelectTeachingInstrument}
+      onOpenCalculator={() => setCalculatorOpen((prev) => !prev)}
+      isCalculatorOpen={calculatorOpen}
       onGoHome={onGoHome}
       onSaveFile={() => {
         if (!doc) return;
@@ -7818,6 +7824,32 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        }}
+      />
+
+      {/* Floating Scientific & Casio Calculator Widget */}
+      <CalculatorWidget
+        open={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
+        onInsertLatex={(latex) => {
+          const center = getViewCenter();
+          const res = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "MathText",
+              transform: {
+                x: center.x,
+                y: center.y,
+                scale: 1,
+                rotation: 0,
+                z: 0,
+              },
+              style: { stroke: currentStyle.stroke ?? "#0f172a" },
+              props: { latex },
+            },
+          });
+          if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          setStatusHint(`✓ Đã chèn công thức "${latex}" vào bảng`);
         }}
       />
 

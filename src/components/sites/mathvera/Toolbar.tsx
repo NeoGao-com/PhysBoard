@@ -26,6 +26,7 @@ import { WhiteboardTool, SelectionStyleState } from "@/types/whiteboard";
 import {
   IconBrush,
   IconBucket,
+  IconCalculator,
   IconChart,
   IconCircle,
   IconCommand,
@@ -164,6 +165,8 @@ export interface ToolbarProps {
   onChangeLabelScale?: (nextScale: number) => void;
   onChangeDotScale?: (nextScale: number) => void;
   onOpenExam?: () => void;
+  onOpenCalculator?: () => void;
+  isCalculatorOpen?: boolean;
   onOpenCommandPalette?: () => void;
   onExportTikz?: () => void;
   onOpenJsonModal?: () => void;
@@ -233,6 +236,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onChangeLabelScale,
   onChangeDotScale,
   onOpenExam,
+  onOpenCalculator,
+  isCalculatorOpen,
   onOpenCommandPalette,
   onExportTikz,
   onOpenJsonModal,
@@ -852,6 +857,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           onInsertTable={(r, c) => onInsertTable?.(r, c)}
           onInsertImage={(img) => onInsertImage?.(img)}
           onInsertPdfPages={(pages) => onInsertPdfPages?.(pages)}
+          onOpenCalculator={onOpenCalculator}
           buttonStyle={btnBaseStyle}
           activeButtonStyle={activeStyle}
         />
@@ -1188,6 +1194,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             anchorRef={instrumentsWrapRef}
           />
         </div>
+
+        {/* Quick Calculator Tool */}
+        {onOpenCalculator && (
+          <button
+            type="button"
+            data-tool="calculator"
+            data-action="open-calculator"
+            data-active={isCalculatorOpen ? "true" : undefined}
+            aria-pressed={isCalculatorOpen}
+            onClick={onOpenCalculator}
+            style={isCalculatorOpen ? activeStyle : btnBaseStyle}
+            title="Máy tính học tập (Casio / Khoa học & Chèn kết quả vào bảng)"
+          >
+            <IconCalculator size={14} />
+            <span>Máy tính</span>
+          </button>
+        )}
       </div>
 
       {/* --- Pinned Right Controls --- */}

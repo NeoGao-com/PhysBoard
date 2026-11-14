@@ -15,6 +15,7 @@ export interface InsertMenuProps {
   onInsertTable: (rows: number, cols: number) => void;
   onInsertImage: (img: ImportedImageResult) => void;
   onInsertPdfPages: (pages: ImportedPdfPage[]) => void;
+  onOpenCalculator?: () => void;
   buttonStyle?: React.CSSProperties;
   activeButtonStyle?: React.CSSProperties;
 }
@@ -26,6 +27,7 @@ export const InsertMenu: React.FC<InsertMenuProps> = ({
   onInsertTable,
   onInsertImage,
   onInsertPdfPages,
+  onOpenCalculator,
   buttonStyle,
   activeButtonStyle,
 }) => {
@@ -306,6 +308,29 @@ export const InsertMenu: React.FC<InsertMenuProps> = ({
                 <span>📄</span>
                 <span>Tải file PDF (tất cả các trang)</span>
               </button>
+
+              {onOpenCalculator && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-menu-item="calculator"
+                  data-wb-insert-calculator="true"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenCalculator();
+                  }}
+                  style={menuItemStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#f1f5f9";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <span>🧮</span>
+                  <span>Máy tính học tập (Casio)</span>
+                </button>
+              )}
             </div>
 
             {pdfProgress && (
