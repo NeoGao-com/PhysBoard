@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { IconInsert } from "./ToolbarIcons";
 import {
   importPdfPages,
   ImportedImageResult,
@@ -14,6 +15,7 @@ export interface InsertMenuProps {
   onInsertTable: (rows: number, cols: number) => void;
   onInsertImage: (img: ImportedImageResult) => void;
   onInsertPdfPages: (pages: ImportedPdfPage[]) => void;
+  onOpenCalculator?: () => void;
   buttonStyle?: React.CSSProperties;
   activeButtonStyle?: React.CSSProperties;
 }
@@ -25,6 +27,7 @@ export const InsertMenu: React.FC<InsertMenuProps> = ({
   onInsertTable,
   onInsertImage,
   onInsertPdfPages,
+  onOpenCalculator,
   buttonStyle,
   activeButtonStyle,
 }) => {
@@ -157,7 +160,9 @@ export const InsertMenu: React.FC<InsertMenuProps> = ({
         title="Chèn bảng, ảnh hoặc PDF"
         style={defaultBtnStyle}
       >
-        ＋ Chèn ▾
+        <IconInsert size={14} />
+        <span>Chèn</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
       </button>
 
       {/* Hidden File Inputs */}
@@ -301,8 +306,31 @@ export const InsertMenu: React.FC<InsertMenuProps> = ({
                 }}
               >
                 <span>📄</span>
-                <span>PDF (tối đa 10 trang)</span>
+                <span>Tải file PDF (tất cả các trang)</span>
               </button>
+
+              {onOpenCalculator && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-menu-item="calculator"
+                  data-wb-insert-calculator="true"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenCalculator();
+                  }}
+                  style={menuItemStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#f1f5f9";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <span>🧮</span>
+                  <span>Máy tính học tập (Casio)</span>
+                </button>
+              )}
             </div>
 
             {pdfProgress && (

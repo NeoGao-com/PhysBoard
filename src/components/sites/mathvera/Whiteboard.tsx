@@ -109,6 +109,16 @@ import {
   serializeState,
 } from "@/lib/export";
 import {
+  BOARD_PAGES_YMAP,
+  type PageBoardConfig,
+  adaptElementForBoard,
+  adaptStrokeForBoard,
+  applyBoardConfigToAllPages,
+  readPageBoardConfig,
+  resolveBoardColors,
+  writePageBoardConfig,
+} from "@/lib/board-themes";
+import {
   getShortcutMap,
   matchCommandForKeyEvent,
   type ShortcutMap,
@@ -128,6 +138,7 @@ import { OrbitBar } from "./OrbitBar";
 import { MathEditor, ensureMathLiveRegistered } from "./MathEditor";
 import { RealWorldDrawer } from "./RealWorldDrawer";
 import { PhysicsDrawer } from "./PhysicsDrawer";
+import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportModal } from "./ExportModal";
 import { ExamEditor } from "./ExamEditor";
 import type {
@@ -270,6 +281,31 @@ function normalizeToolId(tool: WhiteboardTool): WhiteboardTool {
   return tool;
 }
 
+function resolvePenNib(tool: WhiteboardTool): InkProps["nib"] | null {
+  switch (tool) {
+    case "ink":
+      return undefined;
+    case "ink:fountain":
+      return "fountain";
+    case "ink:pencil":
+      return "pencil";
+    case "ink:highlighter":
+      return "highlighter";
+    case "ink:brush":
+      return "brush";
+    case "ink:dashed":
+      return "dashed";
+    default:
+      return null;
+  }
+}
+
+const PEN_ONLY_MODE_STORAGE_KEY = "physboard_pen_only_mode";
+
+function isPenTool(tool: WhiteboardTool): boolean {
+  return resolvePenNib(tool) !== null;
+}
+
 function isEditableTarget(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName?.toLowerCase();
@@ -332,6 +368,26 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     dispatcher.setPage(currentPage);
   }, [dispatcher, currentPage]);
 
+  const [boardTick, setBoardTick] = useState(0);
+  useEffect(() => {
+    const map = doc.getMap<unknown>(BOARD_PAGES_YMAP);
+    const onBoardChange = () => setBoardTick((t) => t + 1);
+    map.observe(onBoardChange);
+    return () => map.unobserve(onBoardChange);
+  }, [doc]);
+
+  const currentBoardConfig = useMemo(
+    () => {
+      void boardTick;
+      return readPageBoardConfig(doc, currentPage);
+    },
+    [doc, currentPage, boardTick]
+  );
+  const currentBoardTheme = useMemo(
+    () => resolveBoardColors(currentBoardConfig),
+    [currentBoardConfig]
+  );
+
   // 2. Tool, Style & Global Display State
   const [activeTool, setActiveTool] = useState<WhiteboardTool>("ink");
   const [currentStyle, setCurrentStyle] = useState<Style>(() => {
@@ -347,6 +403,30 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [dotScale, setDotScale] = useState<number>(DEFAULT_DOT_SCALE);
   const [, setConstructMarksTick] = useState<number>(0);
   const [gridEnabled, setGridEnabled] = useState<boolean>(true);
+  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem(PEN_ONLY_MODE_STORAGE_KEY);
+      if (saved !== null) {
+        setPenOnlyMode(saved === "true");
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, []);
+
+  const handleTogglePenOnly = useCallback((enabled: boolean) => {
+    setPenOnlyMode(enabled);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(PEN_ONLY_MODE_STORAGE_KEY, enabled ? "true" : "false");
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
   const [statusHint, setStatusHint] = useState<string | null>(null);
   const [shortcutMap, setShortcutMap] = useState<ShortcutMap>(() =>
     getShortcutMap()
@@ -384,6 +464,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [numberLineDialogOpen, setNumberLineDialogOpen] = useState(false);
   const [realWorldDrawerOpen, setRealWorldDrawerOpen] = useState(false);
   const [physicsDrawerOpen, setPhysicsDrawerOpen] = useState(false);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [exportModalMode, setExportModalMode] = useState<"tikz" | "json" | null>(
     null
   );
@@ -414,7 +495,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [liveStroke, setLiveStroke] = useState<{
     points: number[];
     pressures?: number[];
-    nib?: "fountain";
+    nib?: InkProps["nib"];
     style: Style;
   } | null>(null);
 
@@ -1905,6 +1986,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           setRealWorldDrawerOpen(false);
         } else if (physicsDrawerOpen) {
           setPhysicsDrawerOpen(false);
+        } else if (calculatorOpen) {
+          setCalculatorOpen(false);
         } else if (draftTwoPtRef.current || draftPolygonPts.length > 0 || pickedItems.length > 0) {
           draftTwoPtRef.current = null;
           setDraftPreviewLine(null);
@@ -2410,7 +2493,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const handleInsertPdfPages = useCallback(
     (pages: ImportedPdfPage[]) => {
       if (pages.length === 0) return;
-      const center = getViewCenter();
+      // When A4 format is active, center is (0, 0), otherwise use current view center
+      const isA4 = currentBoardConfig?.format === "a4_portrait" || currentBoardConfig?.format === "a4_landscape";
+      const targetPos = isA4 ? { x: 0, y: 0 } : getViewCenter();
       const startPage = currentPage;
       let targetCount = pageCount;
 
@@ -2420,6 +2505,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           while (targetCount < pageNum) {
             const added = addYjsPage(doc);
             targetCount = added.count;
+            // Inherit the board configuration (e.g. A4 format, surface theme) to the newly created pages
+            if (currentBoardConfig) {
+              writePageBoardConfig(doc, pageNum, currentBoardConfig);
+            }
+          }
+          // If inserting into current or existing page, also ensure its board format is consistent
+          if (currentBoardConfig && pageNum <= targetCount) {
+            writePageBoardConfig(doc, pageNum, currentBoardConfig);
           }
           dispatcher.dispatch({
             type: "object.create",
@@ -2427,8 +2520,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               type: "Image",
               page: pageNum,
               transform: {
-                x: center.x,
-                y: center.y,
+                x: targetPos.x,
+                y: targetPos.y,
                 scale: 1,
                 rotation: 0,
                 z: 0,
@@ -2439,8 +2532,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         });
       });
       setYjsCurrentPage(doc, startPage);
+      setStatusHint(`✓ Đã nhập thành công ${pages.length} trang PDF vào các trang bảng`);
     },
-    [dispatcher, doc, currentPage, pageCount, getViewCenter]
+    [dispatcher, doc, currentPage, pageCount, getViewCenter, currentBoardConfig]
   );
 
   const handleM3Action = useCallback(
@@ -4063,6 +4157,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   // --- Root Canvas Pointer Down ---
   const handleCanvasPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
+      // If Pen-Only mode is enabled: touches from fingers are routed to panning & navigation
+      if (penOnlyMode && e.pointerType === "touch") {
+        navPointerDown(e);
+        return;
+      }
+
       const rect = containerRef.current?.getBoundingClientRect();
       const worldPos = screenToWorld(
         e.clientX,
@@ -4715,26 +4815,34 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }
       }
 
-      // Ink / Fountain Pen
-      if (activeTool === "ink" || activeTool === "ink:fountain") {
+      // Ink / Multi-nib Pens
+      if (isPenTool(activeTool)) {
         dispatcher.gesture(true);
-        const isFountain = activeTool === "ink:fountain";
+        const nib = resolvePenNib(activeTool) ?? undefined;
+        const smooth = nib === "fountain" || nib === "brush";
         filterXRef.current.reset();
         filterYRef.current.reset();
         const ts = performance.now();
-        const x = isFountain
+        const x = smooth
           ? filterXRef.current.filter(worldPos.x, ts)
           : worldPos.x;
-        const y = isFountain
+        const y = smooth
           ? filterYRef.current.filter(worldPos.y, ts)
           : worldPos.y;
+        const effectiveStyle: Style =
+          nib === "highlighter" &&
+          (!currentStyle.stroke || currentStyle.stroke.toLowerCase() === "#111827")
+            ? { ...currentStyle, stroke: "#facc15" }
+            : nib === "dashed"
+            ? { ...currentStyle, dash: true }
+            : currentStyle;
         liveStrokePointsRef.current = [x, y];
         liveStrokePressuresRef.current = [e.pressure || 0.5];
         setLiveStroke({
           points: [x, y],
           pressures: [e.pressure || 0.5],
-          nib: isFountain ? "fountain" : undefined,
-          style: currentStyle,
+          nib,
+          style: effectiveStyle,
         });
       }
     },
@@ -4757,6 +4865,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       solved3D.p3,
       handleSelectTool,
       handleConstructionClick,
+      penOnlyMode,
     ]
   );
 
@@ -5122,18 +5231,19 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return;
       }
 
-      // 6. Ink / Fountain Pen
+      // 6. Ink / Multi-nib Pens
       if (
-        (activeTool === "ink" || activeTool === "ink:fountain") &&
+        isPenTool(activeTool) &&
         e.buttons === 1 &&
         liveStroke
       ) {
-        const isFountain = activeTool === "ink:fountain";
+        const nib = resolvePenNib(activeTool) ?? undefined;
+        const smooth = nib === "fountain" || nib === "brush";
         const ts = performance.now();
-        const x = isFountain
+        const x = smooth
           ? filterXRef.current.filter(worldPos.x, ts)
           : worldPos.x;
-        const y = isFountain
+        const y = smooth
           ? filterYRef.current.filter(worldPos.y, ts)
           : worldPos.y;
         liveStrokePointsRef.current.push(x, y);
@@ -5141,8 +5251,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setLiveStroke({
           points: [...liveStrokePointsRef.current],
           pressures: [...liveStrokePressuresRef.current],
-          nib: isFountain ? "fountain" : undefined,
-          style: currentStyle,
+          nib,
+          style: liveStroke.style,
         });
       }
     },
@@ -5154,7 +5264,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       activeTool,
       pageElements,
       liveStroke,
-      currentStyle,
     ]
   );
 
@@ -5240,7 +5349,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               points: pts,
               pressures,
               nib: liveStroke.nib,
-              style: currentStyle,
+              style: liveStroke.style,
             },
           });
         }
@@ -5259,7 +5368,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       findNearestPoint,
       commitTwoPointShape,
       liveStroke,
-      currentStyle,
     ]
   );
 
@@ -5329,8 +5437,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   );
 
   // --- Shared Renderers (used in both Fullscreen Whiteboard & 50/50 Split Exam Mode) ---
-  const renderBoardElement = (el: CanvasElement) => {
-    if (el.style?.hidden) return null;
+  const renderBoardElement = (rawEl: CanvasElement) => {
+    if (rawEl.style?.hidden) return null;
+    const el = adaptElementForBoard(rawEl, currentBoardTheme.isDark);
     const isSel = selectedIds.includes(el.id);
 
     switch (el.type) {
@@ -5824,6 +5933,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       isPanning={isPanning}
       isSpacePressed={isSpacePressed}
       contained={contained}
+      boardConfig={currentBoardConfig}
       onPointerDown={handleCanvasPointerDown}
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
@@ -5909,7 +6019,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         <InkElement
           id="live-in-progress-stroke"
           transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
-          style={liveStroke.style}
+          style={{
+            ...liveStroke.style,
+            stroke: adaptStrokeForBoard(
+              liveStroke.style?.stroke,
+              currentBoardTheme.isDark
+            ),
+          }}
           props={{
             points: liveStroke.points,
             pressures: liveStroke.pressures,
@@ -5966,6 +6082,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onOpenRealWorldDrawer={() => setRealWorldDrawerOpen(true)}
       onPhysicsAction={handlePhysicsAction}
       onOpenPhysicsDrawer={() => setPhysicsDrawerOpen(true)}
+      onOpenCalculator={() => setCalculatorOpen((prev) => !prev)}
+      isCalculatorOpen={calculatorOpen}
       onGoHome={onGoHome}
       onSaveFile={() => {
         if (!doc) return;
@@ -5993,6 +6111,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       hasPaper={hasPaper}
       labelScale={labelScale}
       dotScale={dotScale}
+      boardConfig={currentBoardConfig}
+      onChangeBoardConfig={(next: PageBoardConfig) => {
+        writePageBoardConfig(doc, currentPage, next);
+        if (next.pattern !== "none") setGridEnabled(true);
+      }}
+      onApplyBoardAllPages={(cfg: PageBoardConfig) => {
+        applyBoardConfigToAllPages(doc, pageCount, cfg);
+        setStatusHint("✓ Đã áp dụng loại bảng cho tất cả các trang");
+      }}
       onScaleGeometry={(factor) => dispatcher.scaleGeometry(factor)}
       onChangeLabelScale={setLabelScale}
       onChangeDotScale={setDotScale}
@@ -6001,6 +6128,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onExportTikz={() => setExportModalMode("tikz")}
       onOpenJsonModal={() => setExportModalMode("json")}
       shortcutMap={shortcutMap}
+      penOnlyMode={penOnlyMode}
+      onTogglePenOnly={handleTogglePenOnly}
     />
   );
 
@@ -7306,6 +7435,32 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        }}
+      />
+
+      {/* Floating Scientific & Casio Calculator Widget */}
+      <CalculatorWidget
+        open={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
+        onInsertLatex={(latex) => {
+          const center = getViewCenter();
+          const res = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "MathText",
+              transform: {
+                x: center.x,
+                y: center.y,
+                scale: 1,
+                rotation: 0,
+                z: 0,
+              },
+              style: { stroke: currentStyle.stroke ?? "#0f172a" },
+              props: { latex },
+            },
+          });
+          if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          setStatusHint(`✓ Đã chèn công thức "${latex}" vào bảng`);
         }}
       />
 
