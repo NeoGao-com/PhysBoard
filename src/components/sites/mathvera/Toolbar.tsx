@@ -1768,7 +1768,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       {/* --- Pinned Right Controls --- */}
-      {!modularConfig.blocks.system.isFloating ? (
       <div
         data-wb-toolbar-pinned="true"
         style={{
@@ -1784,70 +1783,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           flexShrink: 0,
         }}
       >
-        {renderModuleGrip("system", "Hệ thống")}
-
-        {/* Delete */}
-        {vis.groupSelection && vis.toolTrash && (
-        <button
-          type="button"
-          data-tool="delete"
-          data-action="delete"
-          onClick={onDeleteSelected}
-          disabled={selectedCount === 0}
-          title="Xoá (Delete)"
-          aria-label="Xoá phần tử đang chọn"
-          style={{
-            ...btnBaseStyle,
-            padding: "0 5px",
-            color: selectedCount > 0 ? "#dc2626" : "#cbd5e1",
-            cursor: selectedCount > 0 ? "pointer" : "default",
-          }}
-        >
-          <IconTrash size={14} />
-        </button>
-        )}
-
-        {/* Undo & Redo */}
-        {vis.groupSelection && vis.toolUndoRedo && (
-        <>
-        <button
-          type="button"
-          data-tool="undo"
-          data-action="undo"
-          onClick={onUndo}
-          disabled={!canUndo}
-          title="Hoàn tác (Ctrl+Z)"
-          aria-label="Hoàn tác"
-          style={{
-            ...btnBaseStyle,
-            padding: "0 5px",
-            color: canUndo ? "#334155" : "#cbd5e1",
-            cursor: canUndo ? "pointer" : "default",
-          }}
-        >
-          <IconUndo size={14} />
-        </button>
-
-        <button
-          type="button"
-          data-tool="redo"
-          data-action="redo"
-          onClick={onRedo}
-          disabled={!canRedo}
-          title="Làm lại (Ctrl+Shift+Z)"
-          aria-label="Làm lại"
-          style={{
-            ...btnBaseStyle,
-            padding: "0 5px",
-            color: canRedo ? "#334155" : "#cbd5e1",
-            cursor: canRedo ? "pointer" : "default",
-          }}
-        >
-          <IconRedo size={14} />
-        </button>
-        </>
-        )}
-
         {/* Local Offline Save & Open File */}
         {onSaveFile && (
           <button
@@ -1916,10 +1851,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <IconFullscreen exit={isFullscreen} size={14} />
         </button>
 
-        {/* Stylus-only vs Hand-drawing quick toggle (also configurable in Settings) */}
-        {/* Ink-to-Shape quick toggle (also configurable in Settings) */}
-
-        {/* Toolbar Zoom / Size Pill + Right-edge Resize Handle */}
+        {/* Toolbar Zoom / Size Pill */}
         {!embedded && (
           <div
             data-wb-toolbar-scale="true"
@@ -2004,27 +1936,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         )}
 
-        {/* Nút Cài đặt Hệ thống & Thanh công cụ (đã gộp toàn bộ tính năng menu ⋯) */}
-        <button
-          type="button"
-          data-action="more"
-          onClick={onOpenSettings}
-          title="Cài đặt hệ thống, khổ bảng, tỉ lệ hình & ẩn/hiện thanh công cụ"
-          aria-label="Cài đặt hệ thống & thanh công cụ"
-          style={{
-            ...btnBaseStyle,
-            padding: "0 8px",
-            color: "#1e293b",
-            background: "#eff6ff",
-            border: "1px solid #bfdbfe",
-            fontWeight: 600,
-            gap: 5,
-          }}
-        >
-          <IconSettings size={15} color="#2563eb" />
-          <span>Cài đặt</span>
-        </button>
-
         {/* Minimize / Collapse Toolbar Button */}
         {!embedded && (
           <button
@@ -2050,7 +1961,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </button>
         )}
       </div>
-      ) : null}
 
       {/* Portal Dropdowns: Select, Pen, Segment, Fill */}
       {typeof document !== "undefined" &&
@@ -2590,52 +2500,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <IconCalculator size={14} /> <span>Máy tính</span>
             </button>
           )}
-        </FloatingDock>
-      )}
-
-      {modularConfig.blocks.system.isFloating && (
-        <FloatingDock
-          id="system"
-          title="Hệ thống"
-          position={modularConfig.blocks.system.position}
-          onMove={(pos) => handleMoveFloatingBlock("system", pos)}
-          onDock={() => handleDockBlock("system")}
-        >
-          <button
-            type="button"
-            onClick={onDeleteSelected}
-            disabled={selectedCount === 0}
-            title="Xoá"
-            style={{ ...btnBaseStyle, padding: "0 5px", color: selectedCount > 0 ? "#dc2626" : "#cbd5e1" }}
-          >
-            <IconTrash size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onUndo}
-            disabled={!canUndo}
-            title="Hoàn tác"
-            style={{ ...btnBaseStyle, padding: "0 5px", color: canUndo ? "#334155" : "#cbd5e1" }}
-          >
-            <IconUndo size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onRedo}
-            disabled={!canRedo}
-            title="Làm lại"
-            style={{ ...btnBaseStyle, padding: "0 5px", color: canRedo ? "#334155" : "#cbd5e1" }}
-          >
-            <IconRedo size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            title="Cài đặt"
-            style={{ ...btnBaseStyle, padding: "0 8px", background: "#eff6ff", color: "#1e293b", fontWeight: 600, gap: 4 }}
-          >
-            <IconSettings size={14} color="#2563eb" /> <span>Cài đặt</span>
-          </button>
         </FloatingDock>
       )}
     </header>
