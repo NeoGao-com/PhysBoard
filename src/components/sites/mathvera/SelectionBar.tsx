@@ -47,10 +47,6 @@ export interface SelectionBarProps {
   onAxesOpenInequality?: () => void;
   onAxesOpenParametric?: () => void;
   onAxesOpenSequence?: () => void;
-  onPhysicsTogglePlay?: () => void;
-  onPhysicsReset?: () => void;
-  onPhysicsExportGraph?: () => void;
-  onPhysicsRecordData?: () => void;
   onPhysicsRotateInstrument?: (deltaDeg: number) => void;
   onPhysicsPlotRegression?: () => void;
   onUpdateInstrumentProps?: (id: string, patch: Record<string, unknown>) => void;
@@ -175,10 +171,6 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onAxesOpenInequality,
   onAxesOpenParametric,
   onAxesOpenSequence,
-  onPhysicsTogglePlay,
-  onPhysicsReset,
-  onPhysicsExportGraph,
-  onPhysicsRecordData,
   onPhysicsRotateInstrument,
   onPhysicsPlotRegression,
   onUpdateInstrumentProps,
@@ -772,49 +764,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
         )}
 
         {/* Contextual Physics Element Actions */}
-        {selectedPhysicsEl?.type === "PhysicsSim" && (
-          <>
-            <button
-              type="button"
-              data-action="phys-toggle-play"
-              onClick={onPhysicsTogglePlay}
-              style={{
-                ...actionBtnStyle,
-                border: "none",
-                background: selectedPhysicsEl.props.playing ? "#ea580c" : "#2563eb",
-                color: "#ffffff",
-                fontWeight: 700,
-              }}
-            >
-              {selectedPhysicsEl.props.playing ? "❚❚ Dừng TN" : "▶ Chạy TN"}
-            </button>
-            <button
-              type="button"
-              data-action="phys-reset"
-              onClick={onPhysicsReset}
-              style={actionBtnStyle}
-            >
-              ↺ Đặt lại
-            </button>
-            <button
-              type="button"
-              data-action="phys-export-graph"
-              onClick={onPhysicsExportGraph}
-              style={actionBtnStyle}
-            >
-              📊 Xuất đồ thị Oxy
-            </button>
-            <button
-              type="button"
-              data-action="phys-record"
-              onClick={onPhysicsRecordData}
-              style={actionBtnStyle}
-            >
-              📝 Ghi số đo
-            </button>
-          </>
-        )}
-
+        
         {selectedPhysicsEl?.type === "PhysicsInstrument" &&
           selectedPhysicsEl.props.instrumentKind !== "stopwatch" && (
             <>

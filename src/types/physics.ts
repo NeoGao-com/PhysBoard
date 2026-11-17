@@ -6,64 +6,7 @@
 
 export type PhysicsGrade = 10 | 11 | 12 | "optics";
 
-export type PhysicsSimKind =
-  | "kinematics_rect"
-  | "projectile"
-  | "incline_newton"
-  | "collision_momentum"
-  | "circular_motion"
-  | "spring_pendulum"
-  | "simple_pendulum"
-  | "harmonic_phasor"
-  | "standing_wave"
-  | "wave_interference"
-  | "young_double_slit"
-  | "ideal_gas"
-  | "em_induction"
-  | "rlc_ac_osc"
-  | "photoelectric_nuclear";
 
-export interface PhysicsParamSpec {
-  key: string;
-  label: string;
-  symbol: string;
-  unit: string;
-  min: number;
-  max: number;
-  step: number;
-  defaultValue: number;
-}
-
-export interface PhysicsSimMeta {
-  kind: PhysicsSimKind;
-  grade: PhysicsGrade;
-  title: string;
-  shortTitle: string;
-  icon: string;
-  description: string;
-  keywords: string[];
-  params: PhysicsParamSpec[];
-  defaultModeOptions?: Array<{ value: string; label: string }>;
-  graphAxesLabel: { xLabel: string; yLabel: string; title: string };
-  relatedFormulas: string[];
-}
-
-export interface PhysicsSimProps {
-  kind: PhysicsSimKind;
-  playing: boolean;
-  speed: 0.25 | 0.5 | 1 | 2;
-  simTime: number;
-  /** Epoch timestamp (ms) when `playing` last started/resumed, paired with `simTime` anchor. */
-  anchorEpoch?: number;
-  params: Record<string, number>;
-  mode?: string;
-  showVectors?: boolean;
-  showGraph?: boolean;
-  width?: number;
-  height?: number;
-  /** Optional linked Axes2D element id for realtime oscilloscope curve streaming. */
-  linkedAxesId?: string;
-}
 
 export type CircuitComponentKind =
   | "battery"
@@ -214,14 +157,4 @@ export interface PhysicsConstantItem {
   keywords: string[];
 }
 
-export interface PhysicsLessonPreset {
-  id: string;
-  grade: 10 | 11 | 12;
-  title: string;
-  subtitle: string;
-  simKind?: PhysicsSimKind;
-  diagramKind?: "circuit" | "fbd" | "optics";
-  formulaLatexList: string[];
-  questionPrompt: string;
-  keywords: string[];
-}
+

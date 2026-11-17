@@ -1,43 +1,28 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import type { PhysicsLessonPreset, PhysicsSimKind } from "@/types/physics";
-import { PHYSICS_SIM_CATALOG } from "@/lib/physics-sim";
 import {
   filterPhysicsFormulas,
   normalizeVietnameseQuery,
   PHYSICS_CONSTANTS,
   PHYSICS_UNIT_CONVERSIONS,
 } from "@/lib/physics-formulas";
-import { PHYSICS_LESSON_PRESETS } from "@/lib/physics-lessons";
 import { KaTeXFormula } from "./elements/MathElement";
 
-export type PhysicsDrawerTab =
-  | "sim10"
-  | "sim11"
-  | "sim12"
-  | "diagrams"
-  | "formulas"
-  | "units"
-  | "lessons";
+export type PhysicsDrawerTab = "diagrams" | "formulas" | "units";
 
 export interface PhysicsDrawerProps {
   open: boolean;
   onClose: () => void;
-  onInsertSim: (kind: PhysicsSimKind) => void;
   onInsertAction: (action: string) => void;
   onInsertFormulaLatex: (latex: string) => void;
-  onInsertLessonPreset: (preset: PhysicsLessonPreset) => void;
+  onOpenHtmlSimModal?: () => void;
 }
 
 const TABS: Array<{ id: PhysicsDrawerTab; label: string }> = [
-  { id: "sim10", label: "Lớp 10" },
-  { id: "sim11", label: "Lớp 11" },
-  { id: "sim12", label: "Lớp 12" },
-  { id: "diagrams", label: "Sơ đồ & Đo" },
-  { id: "formulas", label: "Công thức" },
+  { id: "diagrams", label: "Sơ đồ & Đo đạc" },
+  { id: "formulas", label: "Bảng Công thức" },
   { id: "units", label: "Đổi đơn vị" },
-  { id: "lessons", label: "Bài giảng" },
 ];
 
 export const PhysicsDrawer: React.FC<PhysicsDrawerProps> = (props) => {
@@ -47,28 +32,17 @@ export const PhysicsDrawer: React.FC<PhysicsDrawerProps> = (props) => {
 
 const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
   onClose,
-  onInsertSim,
   onInsertAction,
   onInsertFormulaLatex,
-  onInsertLessonPreset,
+  onOpenHtmlSimModal,
 }) => {
-  const [tab, setTab] = useState<PhysicsDrawerTab>("sim11");
+  const [tab, setTab] = useState<PhysicsDrawerTab>("diagrams");
   const [query, setQuery] = useState("");
   const [convId, setConvId] = useState(PHYSICS_UNIT_CONVERSIONS[0].id);
   const [convInput, setConvInput] = useState("72");
   const [convReverse, setConvReverse] = useState(false);
 
   const nq = normalizeVietnameseQuery(query);
-
-  const filteredSims = useMemo(() => {
-    const gradeNum = tab === "sim10" ? 10 : tab === "sim11" ? 11 : tab === "sim12" ? 12 : null;
-    return PHYSICS_SIM_CATALOG.filter((s) => {
-      if (!nq && gradeNum !== null && s.grade !== gradeNum) return false;
-      if (!nq) return true;
-      const hay = normalizeVietnameseQuery(`${s.title} ${s.description} ${s.keywords.join(" ")}`);
-      return hay.includes(nq);
-    });
-  }, [tab, nq]);
 
   const filteredFormulas = useMemo(
     () => filterPhysicsFormulas(query, "all"),
@@ -79,13 +53,6 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
     if (!nq) return PHYSICS_CONSTANTS;
     return PHYSICS_CONSTANTS.filter((c) =>
       normalizeVietnameseQuery(`${c.name} ${c.symbol} ${c.keywords.join(" ")}`).includes(nq)
-    );
-  }, [nq]);
-
-  const filteredLessons = useMemo(() => {
-    if (!nq) return PHYSICS_LESSON_PRESETS;
-    return PHYSICS_LESSON_PRESETS.filter((l) =>
-      normalizeVietnameseQuery(`${l.title} ${l.subtitle} ${l.keywords.join(" ")}`).includes(nq)
     );
   }, [nq]);
 
@@ -143,10 +110,10 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
       >
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
-            ⚛ Thư viện Vật lý THPT (GDPT 2018)
+            ⚛ Công cụ Vật lý &amp; Sơ đồ
           </div>
           <div style={{ fontSize: 11.5, color: "#64748b" }}>
-            15 mô phỏng tương tác • Sơ đồ mạch/lực/quang • Công thức &amp; Bài giảng
+            Sơ đồ mạch điện/lực/quang • Thước &amp; Đo đạc • Bảng tra cứu &amp; Đổi đơn vị
           </div>
         </div>
         <button
@@ -168,13 +135,54 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
         </button>
       </div>
 
+      {/* HTML Simulation Callout */}
+      {onOpenHtmlSimModal && (
+        <div
+          style={{
+            margin: "8px 12px 2px",
+            padding: "8px 10px",
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
+            borderRadius: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <div style={{ fontSize: 11.5, color: "#166534" }}>
+            💡 Cần mô phỏng? Nạp file <strong>HTML</strong> thí nghiệm riêng của bạn.
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenHtmlSimModal();
+            }}
+            style={{
+              padding: "4px 8px",
+              background: "#16a34a",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Nạp HTML...
+          </button>
+        </div>
+      )}
+
       {/* Search */}
       <div style={{ padding: "8px 12px 4px" }}>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm nhanh (vd: con lac, nem xien, mach dien, thau kinh...)"
+          placeholder="Tìm công thức / dụng cụ (vd: mach dien, thau kinh, newton...)"
           style={{
             width: "100%",
             padding: "7px 10px",
@@ -220,53 +228,6 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
 
       {/* Scrollable Body */}
       <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-        {(tab === "sim10" || tab === "sim11" || tab === "sim12" || (nq && tab !== "formulas" && tab !== "lessons")) &&
-          filteredSims.map((sim) => (
-            <div
-              key={sim.kind}
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: 10,
-                padding: 10,
-                background: "#ffffff",
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>
-                  {sim.icon} {sim.title}
-                </span>
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#2563eb", background: "#eff6ff", padding: "2px 6px", borderRadius: 999 }}>
-                  Lớp {sim.grade}
-                </span>
-              </div>
-              <div style={{ fontSize: 11.5, color: "#475569" }}>{sim.description}</div>
-              <button
-                type="button"
-                data-physics-insert-sim={sim.kind}
-                onClick={() => {
-                  onInsertSim(sim.kind);
-                  onClose();
-                }}
-                style={{
-                  alignSelf: "flex-start",
-                  padding: "4px 10px",
-                  borderRadius: 7,
-                  border: "none",
-                  background: "#2563eb",
-                  color: "#ffffff",
-                  fontSize: 11.5,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                + Chèn thí nghiệm
-              </button>
-            </div>
-          ))}
-
         {tab === "diagrams" && (
           <>
             {[
@@ -276,44 +237,46 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
               { id: "phys:diag:optics", title: "🔍 Quang hình học (3 Tia sáng & Dựng ảnh)", desc: "Thấu kính hội tụ/phân kỳ & gương cầu; kéo d, |f| xem ảnh thật/ảo A'B' và độ phóng đại k." },
               { id: "phys:inst:ruler", title: "📏 Thước đo tỉ lệ (cm / mm)", desc: "Đặt lên hình để đo trực tiếp hoặc xoay góc theo mặt nghiêng." },
               { id: "phys:inst:protractor", title: "📐 Thước đo góc 0°–180°", desc: "Đo góc tới/khúc xạ hoặc góc nghiêng α ngay trên canvas." },
-              { id: "phys:inst:stopwatch", title: "⏱ Đồng hồ bấm giây", desc: "Đo thời gian thực hoặc bấm Lap khi chạy thí nghiệm." },
-              { id: "phys:labtable", title: "📝 Bảng số liệu thực hành & Hồi quy Oxy", desc: "Ghi cặp (x, y) từ thí nghiệm và vẽ đường hồi quy y = ax + b lên Oxy." },
-            ].map((it) => (
-              <div
-                key={it.id}
-                style={{
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 10,
-                  padding: 10,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 5,
-                }}
-              >
-                <div style={{ fontWeight: 700, fontSize: 13 }}>{it.title}</div>
-                <div style={{ fontSize: 11.5, color: "#475569" }}>{it.desc}</div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onInsertAction(it.id);
-                    onClose();
-                  }}
+              { id: "phys:inst:stopwatch", title: "⏱ Đồng hồ bấm giây", desc: "Đo thời gian thực hoặc bấm Lap khi thực hành." },
+              { id: "phys:labtable", title: "📝 Bảng số liệu thực hành & Hồi quy Oxy", desc: "Ghi cặp (x, y) từ số đo thực tế và vẽ đường hồi quy y = ax + b lên Oxy." },
+            ]
+              .filter((it) => !nq || normalizeVietnameseQuery(`${it.title} ${it.desc}`).includes(nq))
+              .map((it) => (
+                <div
+                  key={it.id}
                   style={{
-                    alignSelf: "flex-start",
-                    padding: "4px 10px",
-                    borderRadius: 7,
-                    border: "none",
-                    background: "#0284c7",
-                    color: "#ffffff",
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    cursor: "pointer",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 10,
+                    padding: 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 5,
                   }}
                 >
-                  + Chèn lên bảng
-                </button>
-              </div>
-            ))}
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{it.title}</div>
+                  <div style={{ fontSize: 11.5, color: "#475569" }}>{it.desc}</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onInsertAction(it.id);
+                      onClose();
+                    }}
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "4px 10px",
+                      borderRadius: 7,
+                      border: "none",
+                      background: "#0284c7",
+                      color: "#ffffff",
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    + Chèn lên bảng
+                  </button>
+                </div>
+              ))}
           </>
         )}
 
@@ -474,53 +437,6 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
             </button>
           </div>
         )}
-
-        {tab === "lessons" &&
-          filteredLessons.map((lesson) => (
-            <div
-              key={lesson.id}
-              style={{
-                border: "1px solid #cbd5e1",
-                borderRadius: 10,
-                padding: 10,
-                background: "#f8fafc",
-                display: "flex",
-                flexDirection: "column",
-                gap: 5,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 700, fontSize: 13, color: "#0f172a" }}>
-                  {lesson.title}
-                </span>
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: "#0f766e" }}>
-                  Lớp {lesson.grade}
-                </span>
-              </div>
-              <div style={{ fontSize: 11.5, color: "#475569" }}>{lesson.subtitle}</div>
-              <button
-                type="button"
-                data-physics-lesson={lesson.id}
-                onClick={() => {
-                  onInsertLessonPreset(lesson);
-                  onClose();
-                }}
-                style={{
-                  alignSelf: "flex-start",
-                  padding: "5px 11px",
-                  borderRadius: 7,
-                  border: "none",
-                  background: "#0f766e",
-                  color: "#ffffff",
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                ✨ Dựng trọn trang bài giảng
-              </button>
-            </div>
-          ))}
       </div>
     </aside>
   );

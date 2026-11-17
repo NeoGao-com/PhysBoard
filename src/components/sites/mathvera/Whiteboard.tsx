@@ -151,16 +151,7 @@ import type {
   PhysicsInstrumentKind,
   PhysicsInstrumentProps,
   PhysicsLabTableProps,
-  PhysicsLessonPreset,
-  PhysicsSimKind,
-  PhysicsSimProps,
 } from "@/types/physics";
-import {
-  createDefaultPhysicsSimProps,
-  evaluatePhysicsSim,
-  getEffectiveSimTime,
-  getPhysicsSimMeta,
-} from "@/lib/physics-sim";
 import { createDefaultCircuitDiagramProps } from "@/lib/physics-circuit";
 import { createDefaultFbdDiagramProps } from "@/lib/physics-forces";
 import { createDefaultOpticsDiagramProps } from "@/lib/physics-optics";
@@ -196,7 +187,6 @@ import { CircleElement } from "./elements/CircleElement";
 import { PolygonElement } from "./elements/PolygonElement";
 import { GeometryConstructionElement } from "./elements/GeometryConstructionElement";
 import { Solid3DElement } from "./elements/Solid3DElement";
-import { PhysicsSimElement } from "./elements/PhysicsSimElement";
 import { PhysicsDiagramElement } from "./elements/PhysicsDiagramElement";
 import { PhysicsInstrumentElement } from "./elements/PhysicsInstrumentElement";
 import {
@@ -777,8 +767,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const selectedPhysicsEl = useMemo(
     () =>
       selectedElements.length === 1 &&
-      (selectedElements[0].type === "PhysicsSim" ||
-        selectedElements[0].type === "PhysicsDiagram" ||
+      (selectedElements[0].type === "PhysicsDiagram" ||
         selectedElements[0].type === "PhysicsInstrument" ||
         selectedElements[0].type === "PhysicsLabTable")
         ? selectedElements[0]
@@ -1564,33 +1553,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   }, [doc]);
 
   // --- Physics Teaching Suite Handlers ---
-  const handleInsertPhysicsSim = useCallback(
-    (kind: PhysicsSimKind) => {
-      const center = getViewCenter();
-      const props = createDefaultPhysicsSimProps(kind);
-      const res = dispatcher.dispatch({
-        type: "object.create",
-        params: {
-          type: "PhysicsSim",
-          transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-          props: { ...props },
-        },
-      });
-      if (res.created?.[0]) setSelectedIds([res.created[0]]);
-      handleSelectTool("select");
-      setStatusHint(`Đã chèn thí nghiệm: ${getPhysicsSimMeta(kind).shortTitle}`);
-    },
-    [getViewCenter, dispatcher, handleSelectTool]
-  );
-
   const handlePhysicsAction = useCallback(
     (action: string) => {
       if (action === "phys:drawer") {
         setPhysicsDrawerOpen(true);
-        return;
-      }
-      if (action.startsWith("phys:sim:")) {
-        handleInsertPhysicsSim(action.slice(9) as PhysicsSimKind);
         return;
       }
       const center = getViewCenter();
@@ -1669,7 +1635,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
       handleSelectTool("select");
     },
-    [getViewCenter, dispatcher, handleInsertPhysicsSim, handleSelectTool]
+    [getViewCenter, dispatcher, handleSelectTool]
   );
 
   const handleSelectTeachingInstrument = useCallback(
@@ -1742,109 +1708,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [dispatcher]
   );
 
-  const handleExportPhysicsGraph = useCallback(
-    (simId: string) => {
-      const simEl = byId.get(simId);
-      if (!simEl || simEl.type !== "PhysicsSim") return;
-      const p = simEl.props as unknown as PhysicsSimProps;
-      const meta = getPhysicsSimMeta(p.kind);
-      const t = getEffectiveSimTime(p);
-      const ev = evaluatePhysicsSim(p.kind, t, p.params ?? {}, p.mode);
-      if (ev.series.length < 2) return;
-
-      let minX = Infinity;
-      let maxX = -Infinity;
-      let minY = Infinity;
-      let maxY = -Infinity;
-      for (const s of ev.series) {
-        if (s.x < minX) minX = s.x;
-        if (s.x > maxX) maxX = s.x;
-        if (s.y < minY) minY = s.y;
-        if (s.y > maxY) maxY = s.y;
-      }
-      const spanX = Math.max(1e-6, maxX - minX);
-      const spanY = Math.max(1e-6, maxY - minY);
-      const axesId = newElId("axes");
-      const axX = simEl.transform.x + 11.2;
-      const axY = simEl.transform.y;
-
-      dispatcher.batch(() => {
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            id: axesId,
-            type: "Axes2D",
-            transform: { x: axX, y: axY, scale: 1, rotation: 0, z: 0 },
-            style: { stroke: "#475569", width: 1.5 },
-            props: { size: 5, grid: true, ticks: "int", legend: true, linkedSimId: simId },
-          },
-        });
-        dispatcher.dispatch({
-          type: "object.update",
-          params: {
-            id: simId,
-            props: { ...simEl.props, linkedAxesId: axesId },
-          },
-        });
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "MathText",
-            transform: { x: axX, y: axY + 5.4, scale: 1, rotation: 0, z: 0 },
-            style: { stroke: "#1d4ed8" },
-            props: {
-              latex: `\\text{${meta.graphAxesLabel.title} (${meta.graphAxesLabel.xLabel} ; ${meta.graphAxesLabel.yLabel})}`,
-            },
-          },
-        });
-        const step = Math.max(1, Math.floor(ev.series.length / 28));
-        const ptIds: string[] = [];
-        for (let i = 0; i < ev.series.length; i += step) {
-          const s = ev.series[i];
-          const nx = -4 + ((s.x - minX) / spanX) * 8;
-          const ny = -3.5 + ((s.y - minY) / spanY) * 7;
-          const pid = newElId("pt");
-          ptIds.push(pid);
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              id: pid,
-              type: "GeomPoint",
-              transform: { x: axX + nx, y: axY + ny, scale: 1, rotation: 0, z: 0 },
-              props: {
-                name: "",
-                dot: "none",
-                constraint: { kind: "oxy", axes: axesId, x: nx, y: ny },
-              },
-            },
-          });
-        }
-        for (let i = 0; i + 1 < ptIds.length; i++) {
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomSegment",
-              style: { stroke: "#2563eb", width: 2.4 },
-              props: { from: ptIds[i], to: ptIds[i + 1] },
-            },
-          });
-        }
-      });
-      setStatusHint(`Đã xuất đồ thị ${meta.graphAxesLabel.title} sang hệ trục Oxy`);
-    },
-    [byId, dispatcher]
-  );
-
   const handleRecordPhysicsSample = useCallback(
-    (simId: string, sample: { x: number; y: number }) => {
-      const simEl = byId.get(simId);
-      const simKind = simEl?.type === "PhysicsSim" ? (simEl.props.kind as PhysicsSimKind) : undefined;
-      const meta = simKind ? getPhysicsSimMeta(simKind) : null;
+    (sourceId: string, sample: { x: number; y: number }) => {
       const existing = pageElements.find(
         (el) =>
           !el.style?.hidden &&
           el.type === "PhysicsLabTable" &&
-          (el.props.linkedSimId === simId || !el.props.linkedSimId)
+          (el.props.linkedSimId === sourceId || !el.props.linkedSimId)
       );
       const newRow = { id: newElId("row"), x: sample.x, y: sample.y };
       if (existing) {
@@ -1857,29 +1727,29 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             id: existing.id,
             props: {
               ...existing.props,
-              linkedSimId: existing.props.linkedSimId ?? simId,
+              linkedSimId: existing.props.linkedSimId ?? sourceId,
               rows: [...curRows, newRow],
             },
           },
         });
       } else {
-        const basePos = simEl ? simEl.transform : getViewCenter();
+        const center = getViewCenter();
         dispatcher.dispatch({
           type: "object.create",
           params: {
             type: "PhysicsLabTable",
             transform: {
-              x: basePos.x + 10.0,
-              y: basePos.y - 1.5,
+              x: center.x + 10.0,
+              y: center.y - 1.5,
               scale: 1,
               rotation: 0,
               z: 0,
             },
             props: {
-              title: meta ? `Số liệu: ${meta.shortTitle}` : "Bảng số liệu thực hành",
-              xLabel: meta?.graphAxesLabel.xLabel ?? "x",
-              yLabel: meta?.graphAxesLabel.yLabel ?? "y",
-              linkedSimId: simId,
+              title: "Bảng số liệu thực hành",
+              xLabel: "x",
+              yLabel: "y",
+              linkedSimId: sourceId,
               rows: [newRow],
             },
           },
@@ -1887,7 +1757,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
       setStatusHint(`Đã ghi số đo (${sample.x}; ${sample.y}) vào bảng thực hành`);
     },
-    [byId, pageElements, dispatcher, getViewCenter]
+    [pageElements, dispatcher, getViewCenter]
   );
 
   const handlePlotLabRegression = useCallback(
@@ -1904,8 +1774,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       const axX = tableEl.transform.x + 8.8;
       const axY = tableEl.transform.y;
       const reg = computeLinearRegression(rows);
-      const linkedSimId = tProps.linkedSimId;
-      const simEl = linkedSimId ? byId.get(linkedSimId) : undefined;
 
       dispatcher.batch(() => {
         dispatcher.dispatch({
@@ -1915,18 +1783,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             type: "Axes2D",
             transform: { x: axX, y: axY, scale: 1, rotation: 0, z: 0 },
             style: { stroke: "#475569", width: 1.5 },
-            props: { size: 5, grid: true, ticks: "int", legend: true, ...(linkedSimId ? { linkedSimId } : {}) },
+            props: { size: 5, grid: true, ticks: "int", legend: true },
           },
         });
-        if (linkedSimId && simEl) {
-          dispatcher.dispatch({
-            type: "object.update",
-            params: {
-              id: linkedSimId,
-              props: { ...simEl.props, linkedAxesId: axesId },
-            },
-          });
-        }
         rows.forEach((r, idx) => {
           const sx = Number((r.x * scaleFactor).toFixed(3));
           const sy = Number((r.y * scaleFactor).toFixed(3));
@@ -1977,78 +1836,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       setStatusHint("Đã vẽ điểm thực nghiệm & đường hồi quy trên hệ trục Oxy");
     },
     [byId, dispatcher]
-  );
-
-  const handleInsertLessonPreset = useCallback(
-    (lesson: PhysicsLessonPreset) => {
-      const center = getViewCenter();
-      const created: string[] = [];
-      dispatcher.batch(() => {
-        if (lesson.simKind) {
-          const r = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "PhysicsSim",
-              transform: { x: center.x - 2.6, y: center.y, scale: 1, rotation: 0, z: 0 },
-              props: { ...createDefaultPhysicsSimProps(lesson.simKind) },
-            },
-          });
-          if (r.created?.[0]) created.push(r.created[0]);
-        } else if (lesson.diagramKind) {
-          const props =
-            lesson.diagramKind === "circuit"
-              ? createDefaultCircuitDiagramProps("series")
-              : lesson.diagramKind === "fbd"
-                ? createDefaultFbdDiagramProps()
-                : createDefaultOpticsDiagramProps("converging_lens");
-          const r = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "PhysicsDiagram",
-              transform: { x: center.x - 2.6, y: center.y, scale: 1, rotation: 0, z: 0 },
-              props: { ...props },
-            },
-          });
-          if (r.created?.[0]) created.push(r.created[0]);
-        }
-
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "MathText",
-            transform: { x: center.x - 2.6, y: center.y + 4.4, scale: 1, rotation: 0, z: 0 },
-            style: { stroke: "#1e3a8a" },
-            props: { latex: `\\textbf{${lesson.title}}` },
-          },
-        });
-
-        lesson.formulaLatexList.forEach((latex, idx) => {
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "MathText",
-              transform: { x: center.x + 6.8, y: center.y + 2.4 - idx * 1.4, scale: 1, rotation: 0, z: 0 },
-              style: { stroke: "#0f766e" },
-              props: { latex },
-            },
-          });
-        });
-
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "MathText",
-            transform: { x: center.x + 6.8, y: center.y - 1.5, scale: 1, rotation: 0, z: 0 },
-            style: { stroke: "#334155" },
-            props: { latex: `\\text{Câu hỏi: ${lesson.questionPrompt}}` },
-          },
-        });
-      });
-      if (created.length > 0) setSelectedIds(created);
-      handleSelectTool("select");
-      setStatusHint(`Đã dựng trọn trang: ${lesson.title}`);
-    },
-    [getViewCenter, dispatcher, handleSelectTool]
   );
 
   // Execute any registered command from Command Palette or Keyboard Shortcut
@@ -5531,7 +5318,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 },
               });
             } else if (
-              initEl.type === "PhysicsSim" ||
               initEl.type === "PhysicsDiagram" ||
               initEl.type === "PhysicsInstrument" ||
               initEl.type === "PhysicsLabTable" ||
@@ -6443,19 +6229,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             points={hydratedPts}
             isSelected={isSel}
             onPointerDown={(e) => handleElementPointerDown(e, el.id)}
-          />
-        );
-
-      case "PhysicsSim":
-        return (
-          <PhysicsSimElement
-            key={el.id}
-            element={el}
-            isSelected={isSel}
-            onPointerDown={(e) => handleElementPointerDown(e, el.id)}
-            onUpdateProps={handleUpdateElementProps}
-            onExportGraph={handleExportPhysicsGraph}
-            onRecordData={handleRecordPhysicsSample}
           />
         );
 
@@ -7593,35 +7366,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           onAxesOpenInequality={() => setCurve2dDialogMode("inequality")}
           onAxesOpenParametric={() => setCurve2dDialogMode("parametric")}
           onAxesOpenSequence={() => setCurve2dDialogMode("sequence")}
-          onPhysicsTogglePlay={() => {
-            if (selectedPhysicsEl?.type !== "PhysicsSim") return;
-            const p = selectedPhysicsEl.props as unknown as PhysicsSimProps;
-            const eff = getEffectiveSimTime(p);
-            handleUpdateElementProps(selectedPhysicsEl.id, {
-              playing: !p.playing,
-              simTime: eff,
-              anchorEpoch: !p.playing ? Date.now() : undefined,
-            });
-          }}
-          onPhysicsReset={() => {
-            if (selectedPhysicsEl?.type !== "PhysicsSim") return;
-            handleUpdateElementProps(selectedPhysicsEl.id, {
-              playing: false,
-              simTime: 0,
-              anchorEpoch: undefined,
-            });
-          }}
-          onPhysicsExportGraph={() => {
-            if (selectedPhysicsEl?.type === "PhysicsSim") {
-              handleExportPhysicsGraph(selectedPhysicsEl.id);
-            }
-          }}
-          onPhysicsRecordData={() => {
-            if (selectedPhysicsEl?.type !== "PhysicsSim") return;
-            const p = selectedPhysicsEl.props as unknown as PhysicsSimProps;
-            const ev = evaluatePhysicsSim(p.kind, getEffectiveSimTime(p), p.params ?? {}, p.mode);
-            handleRecordPhysicsSample(selectedPhysicsEl.id, ev.recordPoint);
-          }}
           onPhysicsRotateInstrument={(deltaDeg) => {
             if (selectedPhysicsEl?.type !== "PhysicsInstrument") return;
             dispatcher.dispatch({
@@ -8420,7 +8164,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       <PhysicsDrawer
         open={physicsDrawerOpen}
         onClose={() => setPhysicsDrawerOpen(false)}
-        onInsertSim={handleInsertPhysicsSim}
         onInsertAction={handlePhysicsAction}
         onInsertFormulaLatex={(latex) => {
           const center = getViewCenter();
@@ -8441,7 +8184,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
         }}
-        onInsertLessonPreset={handleInsertLessonPreset}
+        onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
       />
 
       <HtmlSimModal

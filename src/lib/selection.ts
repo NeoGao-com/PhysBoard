@@ -526,7 +526,6 @@ export function getElementBoundingBox(
   }
 
   if (
-    el.type === "PhysicsSim" ||
     el.type === "PhysicsDiagram" ||
     el.type === "PhysicsInstrument" ||
     el.type === "PhysicsLabTable" ||
@@ -535,8 +534,6 @@ export function getElementBoundingBox(
     const defaultW =
       el.type === "HtmlSim"
         ? (typeof el.props?.widthPx === "number" ? el.props.widthPx / 45 : 19.1)
-        : el.type === "PhysicsSim"
-        ? 11.2
         : el.type === "PhysicsDiagram"
           ? 10.0
           : el.type === "PhysicsLabTable"
@@ -553,8 +550,6 @@ export function getElementBoundingBox(
     const defaultH =
       el.type === "HtmlSim"
         ? (typeof el.props?.heightPx === "number" ? (el.props.heightPx + 38) / 45 : 13.3)
-        : el.type === "PhysicsSim"
-        ? 7.2
         : el.type === "PhysicsDiagram"
           ? 6.4
           : el.type === "PhysicsLabTable"
