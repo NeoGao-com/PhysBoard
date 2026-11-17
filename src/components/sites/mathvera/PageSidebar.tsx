@@ -36,7 +36,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           position: "fixed",
           top: 60,
           left: 12,
-          zIndex: 45,
+          zIndex: 80,
         }}
       >
         <button
@@ -77,7 +77,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
         width: 140,
         background: "#f1f5f9",
         borderRight: "1px solid #cbd5e1",
-        zIndex: 50,
+        zIndex: 80,
         display: "flex",
         flexDirection: "column",
         boxShadow: "2px 0 12px rgba(15,23,42,0.06)",
