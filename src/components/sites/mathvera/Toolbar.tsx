@@ -1783,32 +1783,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           flexShrink: 0,
         }}
       >
-        {/* Local Offline Save & Open File */}
-        {onSaveFile && (
-          <button
-            type="button"
-            data-action="save-file"
-            onClick={onSaveFile}
-            title="Lưu bài vẽ ra file (.phys.json)"
-            style={{ ...btnBaseStyle, padding: "0 5px" }}
-          >
-            <IconSave size={14} />
-            <span className="sr-only">Lưu file</span>
-          </button>
-        )}
-        {onOpenFile && (
-          <button
-            type="button"
-            data-action="open-file"
-            onClick={onOpenFile}
-            title="Mở file bài vẽ (.json)"
-            style={{ ...btnBaseStyle, padding: "0 5px" }}
-          >
-            <IconOpenFile size={14} />
-            <span className="sr-only">Mở file</span>
-          </button>
-        )}
-
         {/* Share (LAN Sync mode only if enabled) */}
         {onShare && process.env.NEXT_PUBLIC_ENABLE_SYNC === "1" && (
           <button
@@ -1820,20 +1794,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           >
             <span aria-hidden="true">🔗</span>
             <span className="sr-only">Chia sẻ</span>
-          </button>
-        )}
-
-        {/* Command Palette / Shortcuts */}
-        {onOpenCommandPalette && (
-          <button
-            type="button"
-            data-action="command-palette"
-            onClick={onOpenCommandPalette}
-            title={withShortcut("Cửa sổ lệnh & Phím tắt", "action:openCommands")}
-            aria-label="Cửa sổ lệnh & Phím tắt"
-            style={{ ...btnBaseStyle, padding: "0 5px" }}
-          >
-            <IconCommand size={14} />
           </button>
         )}
 

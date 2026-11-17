@@ -6919,6 +6919,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             selectedCount={selectedIds.length}
             onDeleteSelected={handleDeleteSelected}
             onOpenSettings={() => setSettingsModalOpen(true)}
+            onSaveFile={() => {
+              if (!doc) return;
+              const json = serializeState(doc, activeRoomId);
+              downloadText(
+                json,
+                `${activeRoomId || "physboard"}.phys.json`,
+                "application/json;charset=utf-8"
+              );
+              setStatusHint("✓ Đã lưu bài vẽ ra file (.phys.json)");
+            }}
+            onOpenFile={() => openFileInputRef.current?.click()}
+            onOpenCommandPalette={() => setCommandPaletteOpen(true)}
             onSelectPage={(p) => {
               setYjsCurrentPage(doc, p);
               if (isA4Format) {
