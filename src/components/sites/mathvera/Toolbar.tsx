@@ -1632,6 +1632,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
         )}
 
+        {/* Physics Drawer Button (Mở thư viện Thí nghiệm Vật lý) */}
+        {vis.toolPhysics && onOpenPhysicsDrawer && (
+          <button
+            type="button"
+            data-tool="physics"
+            data-action="open-physics-drawer"
+            onClick={onOpenPhysicsDrawer}
+            style={btnBaseStyle}
+            title="Thư viện thí nghiệm Vật lý 10–11–12, Công thức & Mô phỏng"
+          >
+            <IconPhysics size={14} color="#7c3aed" />
+            <span>Vật lý</span>
+          </button>
+        )}
+
         {/* Quick Calculator Tool */}
         {vis.toolCalculator && onOpenCalculator && (
           <button
@@ -2316,6 +2331,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               anchorRef={realworldWrapRef}
             />
           </div>
+
+          {onOpenPhysicsDrawer && (
+            <button
+              type="button"
+              onClick={onOpenPhysicsDrawer}
+              style={btnBaseStyle}
+              title="Vật lý"
+            >
+              <IconPhysics size={14} color="#7c3aed" /> <span>Vật lý</span>
+            </button>
+          )}
 
           {onOpenCalculator && (
             <button
