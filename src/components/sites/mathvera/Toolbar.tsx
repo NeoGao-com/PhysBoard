@@ -1283,7 +1283,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               penOnlyMode
                 ? {
                     ...activeStyle,
-                    borderColor: "#3b82f6",
+                    border: "1px solid #3b82f6",
                     background: "#eff6ff",
                     color: "#1d4ed8",
                   }
