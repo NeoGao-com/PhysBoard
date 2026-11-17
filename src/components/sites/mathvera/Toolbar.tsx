@@ -725,7 +725,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   const sidebarOffset = !embedded && isSidebarOpen ? 148 : 28;
-  const computedScale = !embedded && isSidebarOpen ? Math.min(toolbarScale, 0.88) : toolbarScale;
 
   if (isCollapsed && !embedded) {
     return (
@@ -741,7 +740,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           left: toolbarPos
             ? `max(${sidebarOffset}px, ${toolbarPos.x}px)`
             : isSidebarOpen
-            ? `calc(50% + 64px)`
+            ? `calc(50% + 70px)`
             : "50%",
           transform: toolbarPos ? undefined : "translateX(-50%)",
           zIndex: 100,
@@ -905,15 +904,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           : toolbarPos
           ? `max(${sidebarOffset}px, ${toolbarPos.x}px)`
           : isSidebarOpen
-          ? `calc(50% + 64px)`
+          ? `calc(50% + 70px)`
           : "50%",
         transform: embedded ? undefined : toolbarPos ? undefined : "translateX(-50%)",
         width: "max-content",
         maxWidth: embedded
           ? undefined
-          : `calc((100vw - ${sidebarOffset + 16}px) / ${computedScale || 1})`,
-        zoom: embedded ? undefined : computedScale,
-        transition: "zoom 0.22s ease, left 0.22s ease, max-width 0.22s ease",
+          : `calc(100vw - ${sidebarOffset + 16}px)`,
+        zoom: embedded ? undefined : toolbarScale,
+        transition: "left 0.22s ease, max-width 0.22s ease",
         minHeight: 36,
         zIndex: 100,
         display: "flex",
