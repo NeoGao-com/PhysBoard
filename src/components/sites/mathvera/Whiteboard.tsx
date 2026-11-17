@@ -213,6 +213,11 @@ import {
   saveToolbarVisibilityConfig,
 } from "@/lib/toolbar-config";
 import {
+  ModularLayoutConfig,
+  loadModularLayoutConfig,
+  saveModularLayoutConfig,
+} from "@/lib/modular-toolbar";
+import {
   LaserConfig,
   DEFAULT_LASER_CONFIG,
   loadLaserConfig,
@@ -489,6 +494,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [laserSettingsOpen, setLaserSettingsOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [toolbarConfig, setToolbarConfig] = useState<ToolbarVisibilityConfig>(() => loadToolbarVisibilityConfig());
+  const [modularConfig, setModularConfig] = useState<ModularLayoutConfig>(() => loadModularLayoutConfig());
+
+  const handleUpdateModularConfig = useCallback((cfg: ModularLayoutConfig) => {
+    setModularConfig(cfg);
+    saveModularLayoutConfig(cfg);
+  }, []);
 
   const handleUpdateToolbarConfig = useCallback((cfg: ToolbarVisibilityConfig) => {
     setToolbarConfig(cfg);
@@ -6835,6 +6846,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       laserConfig={laserConfig}
       onOpenLaserSettings={() => setLaserSettingsOpen(true)}
       toolbarVisibility={toolbarConfig}
+      modularConfig={modularConfig}
+      onChangeModularConfig={handleUpdateModularConfig}
       onOpenSettings={() => setSettingsModalOpen(true)}
     />
   );
@@ -8539,6 +8552,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       <SettingsModal
         open={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
+        modularConfig={modularConfig}
+        onChangeModularConfig={handleUpdateModularConfig}
         toolbarConfig={toolbarConfig}
         onChangeToolbarConfig={handleUpdateToolbarConfig}
         autoSwitchTarget={autoSwitchTarget}

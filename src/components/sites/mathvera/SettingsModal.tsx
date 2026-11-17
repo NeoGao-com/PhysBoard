@@ -8,6 +8,12 @@ import {
 } from "@/lib/toolbar-config";
 import { LaserConfig, DEFAULT_LASER_CONFIG } from "@/lib/laser-config";
 import {
+  ModularLayoutConfig,
+  DEFAULT_MODULAR_LAYOUT,
+  MODULAR_BLOCK_DEFS,
+  type ModularBlockId,
+} from "@/lib/modular-toolbar";
+import {
   BOARD_FORMAT_OPTIONS,
   BOARD_GRID_SIZE_OPTIONS,
   BOARD_PATTERN_OPTIONS,
@@ -20,6 +26,9 @@ import { exportPNG, downloadBlob } from "@/lib/export";
 export interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
+  // Modular Toolbar Config
+  modularConfig?: ModularLayoutConfig;
+  onChangeModularConfig?: (cfg: ModularLayoutConfig) => void;
   // Toolbar Visibility Config
   toolbarConfig: ToolbarVisibilityConfig;
   onChangeToolbarConfig: (cfg: ToolbarVisibilityConfig) => void;
@@ -95,6 +104,8 @@ const CHECKBOX_LABEL_STYLE: React.CSSProperties = {
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   open,
   onClose,
+  modularConfig = DEFAULT_MODULAR_LAYOUT,
+  onChangeModularConfig,
   toolbarConfig,
   onChangeToolbarConfig,
   autoSwitchTarget,
@@ -126,7 +137,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenJsonModal,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    "general" | "board" | "scale" | "toolbar" | "laser" | "export"
+    "general" | "board" | "scale" | "modular" | "toolbar" | "laser" | "export"
   >("general");
   const [busyPng, setBusyPng] = useState(false);
 
@@ -271,6 +282,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         >
           {[
             { id: "general", label: "Chung & Thao tác" },
+            { id: "modular", label: "Bố cục Mô-đun (Lego)" },
             { id: "board", label: "Khổ & Nền bảng" },
             { id: "scale", label: "Tỉ lệ & Cỡ chữ" },
             { id: "toolbar", label: "Ẩn/Hiện Công cụ" },
@@ -430,6 +442,105 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   >
                     Xem phím tắt (Ctrl+K)
                   </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* TAB 1.5: BỐ CỤC MÔ-ĐUN (LEGO TOOLBAR) */}
+          {activeTab === "modular" && (
+            <>
+              <div style={SECTION_BOX_STYLE}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={SECTION_TITLE_STYLE}>
+                    <span>🧩</span>
+                    <span>Thanh Công Cụ Mô-đun (Lego)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChangeModularConfig?.(DEFAULT_MODULAR_LAYOUT);
+                    }}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: 11.5,
+                      background: "#f1f5f9",
+                      color: "#334155",
+                      border: "1px solid #cbd5e1",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ↺ Đặt lại mặc định
+                  </button>
+                </div>
+                <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>
+                  Cho phép tách từng nhóm công cụ ra khỏi thanh chính thành <b>bảng con nổi (Floating Dock)</b> để đặt ở bất kỳ vị trí nào trên canvas. Thanh công cụ chính sẽ tự động co gọn lại.
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+                  {(Object.keys(MODULAR_BLOCK_DEFS) as ModularBlockId[]).map((blockId) => {
+                    const block = modularConfig.blocks[blockId];
+                    const isFloating = block?.isFloating ?? false;
+                    return (
+                      <div
+                        key={blockId}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "10px 12px",
+                          background: isFloating ? "#eff6ff" : "#f8fafc",
+                          border: isFloating ? "1px solid #bfdbfe" : "1px solid #e2e8f0",
+                          borderRadius: 8,
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: "#0f172a" }}>
+                            {MODULAR_BLOCK_DEFS[blockId].name}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>
+                            Trạng thái:{" "}
+                            <span style={{ fontWeight: 600, color: isFloating ? "#2563eb" : "#059669" }}>
+                              {isFloating ? "Đang nổi (Floating Dock)" : "Đang ghim trên thanh chính"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!onChangeModularConfig) return;
+                            const next = {
+                              ...modularConfig,
+                              blocks: {
+                                ...modularConfig.blocks,
+                                [blockId]: {
+                                  ...block,
+                                  isFloating: !isFloating,
+                                  position: block.position || MODULAR_BLOCK_DEFS[blockId].defaultPos,
+                                },
+                              },
+                            };
+                            onChangeModularConfig(next);
+                          }}
+                          style={{
+                            padding: "5px 12px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            border: isFloating ? "1px solid #0284c7" : "1px solid #cbd5e1",
+                            background: isFloating ? "#0284c7" : "#ffffff",
+                            color: isFloating ? "#ffffff" : "#1e293b",
+                          }}
+                        >
+                          {isFloating ? "⤓ Ghim lại thanh chính" : "↗ Tách ra dạng nổi"}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </>

@@ -22,6 +22,12 @@ import type { PageBoardConfig } from "@/lib/board-themes";
 import { WhiteboardTool, SelectionStyleState } from "@/types/whiteboard";
 import { LaserConfig } from "@/lib/laser-config";
 import { ToolbarVisibilityConfig } from "@/lib/toolbar-config";
+import {
+  ModularLayoutConfig,
+  DEFAULT_MODULAR_LAYOUT,
+  type ModularBlockId,
+} from "@/lib/modular-toolbar";
+import { FloatingDock } from "./FloatingDock";
 import { importPdfPages } from "@/lib/pdf-import";
 import {
   IconBrush,
@@ -185,6 +191,8 @@ export interface ToolbarProps {
   laserConfig?: LaserConfig;
   onOpenLaserSettings?: () => void;
   toolbarVisibility?: ToolbarVisibilityConfig;
+  modularConfig?: ModularLayoutConfig;
+  onChangeModularConfig?: (cfg: ModularLayoutConfig) => void;
   onOpenSettings?: () => void;
 }
 
@@ -264,6 +272,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   laserConfig,
   onOpenLaserSettings,
   toolbarVisibility,
+  modularConfig = DEFAULT_MODULAR_LAYOUT,
+  onChangeModularConfig,
   onOpenSettings,
 }) => {
   const withShortcut = (label: string, cmdId: string): string => {
@@ -391,6 +401,107 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     const clamped = Math.max(0.75, Math.min(1.3, Number(nextScale.toFixed(2))));
     setToolbarScale(clamped);
     persistToolbarLayout(toolbarPos, clamped);
+  };
+
+  const handleDockBlock = (blockId: ModularBlockId) => {
+    if (!onChangeModularConfig) return;
+    const next: ModularLayoutConfig = {
+      ...modularConfig,
+      blocks: {
+        ...modularConfig.blocks,
+        [blockId]: {
+          ...modularConfig.blocks[blockId],
+          isFloating: false,
+        },
+      },
+    };
+    onChangeModularConfig(next);
+  };
+
+  const handleFloatBlock = (blockId: ModularBlockId, initialPos?: { x: number; y: number }) => {
+    if (!onChangeModularConfig) return;
+    const pos = initialPos || modularConfig.blocks[blockId]?.position || { x: 100, y: 100 };
+    const next: ModularLayoutConfig = {
+      ...modularConfig,
+      blocks: {
+        ...modularConfig.blocks,
+        [blockId]: {
+          ...modularConfig.blocks[blockId],
+          isFloating: true,
+          position: pos,
+        },
+      },
+    };
+    onChangeModularConfig(next);
+  };
+
+  const handleMoveFloatingBlock = (blockId: ModularBlockId, pos: { x: number; y: number }) => {
+    if (!onChangeModularConfig) return;
+    const next: ModularLayoutConfig = {
+      ...modularConfig,
+      blocks: {
+        ...modularConfig.blocks,
+        [blockId]: {
+          ...modularConfig.blocks[blockId],
+          position: pos,
+        },
+      },
+    };
+    onChangeModularConfig(next);
+  };
+
+  const renderModuleGrip = (blockId: ModularBlockId, title: string) => {
+    if (embedded) return null;
+    return (
+      <div
+        data-wb-module-drag={blockId}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const startX = e.clientX;
+          const startY = e.clientY;
+          let movedFar = false;
+
+          const onMove = (ev: PointerEvent) => {
+            const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+            if (dist > 15 && !movedFar) {
+              movedFar = true;
+              window.removeEventListener("pointermove", onMove);
+              window.removeEventListener("pointerup", onUp);
+              handleFloatBlock(blockId, { x: Math.max(10, ev.clientX - 60), y: Math.max(10, ev.clientY - 20) });
+            }
+          };
+
+          const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+            if (!movedFar) {
+              handleFloatBlock(blockId, { x: Math.max(10, startX - 40), y: Math.max(10, startY + 25) });
+            }
+          };
+
+          window.addEventListener("pointermove", onMove);
+          window.addEventListener("pointerup", onUp);
+        }}
+        title={`Kéo để tách "${title}" thành bảng nổi riêng (Floating Dock)`}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 9,
+          height: 22,
+          cursor: "grab",
+          color: "#94a3b8",
+          fontSize: 10,
+          userSelect: "none",
+          padding: "0 1px",
+          borderRadius: 3,
+          marginRight: 1,
+        }}
+      >
+        ⋮
+      </div>
+    );
   };
 
   const selectBtnRef = useRef<HTMLDivElement>(null);
@@ -887,6 +998,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* --- GROUP 1: Chọn, Bút, Tẩy | Màu & Nét | Công thức & Chèn --- */}
+        {!modularConfig.blocks.ink.isFloating && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+          {renderModuleGrip("ink", "Thao tác & Viết vẽ")}
         {/* Select Split */}
         {vis.groupSelection && vis.toolSelect && (
         <div
@@ -1185,8 +1299,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {dividerV}
+        </div>
+        )}
 
         {/* --- GROUP 2: Hình học phẳng & Tô màu --- */}
+        {!modularConfig.blocks.geometry2d.isFloating && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+          {renderModuleGrip("geometry2d", "Hình học phẳng")}
         {/* Point */}
         <button
           type="button"
@@ -1355,9 +1474,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
 
         {dividerV}
+        </div>
+        )}
 
         {/* --- GROUP 3: Không gian, Giải tích & Thí nghiệm --- */}
-        {vis.groupSpaceGeometry && (
+        {!modularConfig.blocks.space3d.isFloating && vis.groupSpaceGeometry && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+          {renderModuleGrip("space3d", "Không gian & Hàm số")}
         <>
         {vis.toolSpaceMenu && (
         <SpaceGeometryMenu
@@ -1432,10 +1555,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
         )}
         </>
+        </div>
         )}
 
         {/* --- GROUP 4: Vật lý & Dụng cụ --- */}
-        {vis.groupPhysics && (
+        {!modularConfig.blocks.physics.isFloating && vis.groupPhysics && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+          {renderModuleGrip("physics", "Vật lý & Dụng cụ")}
         <>
         {/* Real-World Menu */}
         {vis.toolRealWorld && (
@@ -1522,10 +1648,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </button>
         )}
         </>
+        </div>
         )}
       </div>
 
       {/* --- Pinned Right Controls --- */}
+      {!modularConfig.blocks.system.isFloating ? (
       <div
         data-wb-toolbar-pinned="true"
         style={{
@@ -1541,6 +1669,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           flexShrink: 0,
         }}
       >
+        {renderModuleGrip("system", "Trang & Hệ thống")}
         <PageBar
           doc={doc}
           current={page.current}
@@ -1817,6 +1946,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </button>
         )}
       </div>
+      ) : null}
 
       {/* Portal Dropdowns: Select, Pen, Segment, Fill */}
       {typeof document !== "undefined" &&
@@ -2127,6 +2257,287 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>,
           document.body
         )}
+
+      {/* Floating Docks for unpinned blocks */}
+      {modularConfig.blocks.ink.isFloating && (
+        <FloatingDock
+          id="ink"
+          title="Thao tác & Viết vẽ"
+          position={modularConfig.blocks.ink.position}
+          onMove={(pos) => handleMoveFloatingBlock("ink", pos)}
+          onDock={() => handleDockBlock("ink")}
+        >
+          {vis.groupSelection && vis.toolSelect && (
+            <div style={{ display: "inline-flex", alignItems: "center", borderRadius: 6, background: isSelectActive ? "#e8f0fe" : "transparent" }}>
+              <button
+                type="button"
+                onClick={() => onSelectTool("select")}
+                style={isSelectActive ? { ...activeStyle, background: "transparent" } : btnBaseStyle}
+                title="Chọn"
+              >
+                <IconCursor size={14} /> <span>Chọn</span>
+              </button>
+            </div>
+          )}
+
+          {vis.groupDrawing && vis.toolPen && (
+            <button
+              type="button"
+              onClick={() => onSelectTool(lastPenTool)}
+              style={isPenActive && activeTool !== "ink:fountain" ? activeStyle : btnBaseStyle}
+              title="Bút vẽ"
+            >
+              {renderPenIcon(activePenVariant.tool, 14)} <span>{activePenVariant.short}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onSelectTool("ink:laser")}
+            style={activeTool === "ink:laser" ? { ...activeStyle, background: "#fee2e2", color: "#b91c1c" } : btnBaseStyle}
+            title="Laser"
+          >
+            <IconLaser size={14} color="#ef4444" /> <span>Laser</span>
+          </button>
+
+          {vis.groupSelection && vis.toolEraser && (
+            <button
+              type="button"
+              onClick={() => onSelectTool("erase")}
+              style={activeTool === "erase" ? activeStyle : btnBaseStyle}
+              title="Tẩy"
+            >
+              <IconEraser size={14} /> <span>Tẩy</span>
+            </button>
+          )}
+
+          <StylePicker
+            current={styleState.current}
+            selection={styleState.selection}
+            onPick={onPickStyle}
+            buttonStyle={btnBaseStyle}
+          />
+        </FloatingDock>
+      )}
+
+      {modularConfig.blocks.geometry2d.isFloating && (
+        <FloatingDock
+          id="geometry2d"
+          title="Hình học phẳng"
+          position={modularConfig.blocks.geometry2d.position}
+          onMove={(pos) => handleMoveFloatingBlock("geometry2d", pos)}
+          onDock={() => handleDockBlock("geometry2d")}
+        >
+          <button
+            type="button"
+            onClick={() => onSelectTool("point")}
+            style={isPointActive ? activeStyle : btnBaseStyle}
+            title="Điểm"
+          >
+            <IconPoint size={13} /> <span>Điểm</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectTool("c:segment")}
+            style={isSegmentActive ? activeStyle : btnBaseStyle}
+            title="Đoạn thẳng"
+          >
+            <IconSegment size={14} /> <span>Đoạn</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectTool("circle")}
+            style={activeTool === "circle" ? activeStyle : btnBaseStyle}
+            title="Đường tròn"
+          >
+            <IconCircle size={14} /> <span>Tròn</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSelectTool("polygon")}
+            style={activeTool === "polygon" ? activeStyle : btnBaseStyle}
+            title="Đa giác"
+          >
+            <IconPolygon size={14} /> <span>Đa giác</span>
+          </button>
+
+          <PlaneGeometryMenu
+            activeTool={typeof activeTool === "string" ? activeTool : null}
+            onSelectTool={(t) => onSelectTool(t)}
+            triggerStyle={btnBaseStyle}
+            activeTriggerStyle={activeStyle}
+          />
+        </FloatingDock>
+      )}
+
+      {modularConfig.blocks.space3d.isFloating && (
+        <FloatingDock
+          id="space3d"
+          title="Không gian & Hàm số"
+          position={modularConfig.blocks.space3d.position}
+          onMove={(pos) => handleMoveFloatingBlock("space3d", pos)}
+          onDock={() => handleDockBlock("space3d")}
+        >
+          <SpaceGeometryMenu
+            activeTool={typeof activeTool === "string" ? activeTool : null}
+            onSelectTool={(t) => onSelectTool(t)}
+            triggerStyle={btnBaseStyle}
+            activeTriggerStyle={activeStyle}
+          />
+
+          <div ref={functionsWrapRef} style={{ position: "relative", display: "inline-flex" }}>
+            <button
+              type="button"
+              onClick={() => setOpenMenu((p) => (p === "functions" ? null : "functions"))}
+              style={openMenu === "functions" ? activeStyle : btnBaseStyle}
+              title="Hàm số"
+            >
+              <IconFunction size={14} /> <span>Hàm số ▾</span>
+            </button>
+            <FunctionsMenu
+              open={openMenu === "functions"}
+              onClose={() => setOpenMenu(null)}
+              onAction={(act) => onM3Action?.(act)}
+              anchorRef={functionsWrapRef}
+            />
+          </div>
+
+          <div ref={statsWrapRef} style={{ position: "relative", display: "inline-flex" }}>
+            <button
+              type="button"
+              onClick={() => setOpenMenu((p) => (p === "statistics" ? null : "statistics"))}
+              style={openMenu === "statistics" ? activeStyle : btnBaseStyle}
+              title="Thống kê"
+            >
+              <IconChart size={14} /> <span>Thống kê ▾</span>
+            </button>
+            <StatsMenu
+              open={openMenu === "statistics"}
+              onClose={() => setOpenMenu(null)}
+              onAction={(act) => onM3Action?.(act)}
+              anchorRef={statsWrapRef}
+            />
+          </div>
+        </FloatingDock>
+      )}
+
+      {modularConfig.blocks.physics.isFloating && (
+        <FloatingDock
+          id="physics"
+          title="Vật lý & Dụng cụ"
+          position={modularConfig.blocks.physics.position}
+          onMove={(pos) => handleMoveFloatingBlock("physics", pos)}
+          onDock={() => handleDockBlock("physics")}
+        >
+          <div ref={realworldWrapRef} style={{ position: "relative", display: "inline-flex" }}>
+            <button
+              type="button"
+              onClick={() => setOpenMenu((p) => (p === "realworld" ? null : "realworld"))}
+              style={openMenu === "realworld" ? activeStyle : btnBaseStyle}
+              title="Thực tế"
+            >
+              <IconRealWorld size={14} /> <span>Thực tế ▾</span>
+            </button>
+            <RealWorldMenu
+              open={openMenu === "realworld"}
+              onClose={() => setOpenMenu(null)}
+              onSelectQuickItem={(item) => onSelectQuickRealWorld?.(item)}
+              onOpenDrawer={() => onOpenRealWorldDrawer?.()}
+              onOpenDecorHelp={() => onOpenDecorHelp?.()}
+              anchorRef={realworldWrapRef}
+            />
+          </div>
+
+          <div ref={physicsWrapRef} style={{ position: "relative", display: "inline-flex" }}>
+            <button
+              type="button"
+              onClick={() => setOpenMenu((p) => (p === "physics" ? null : "physics"))}
+              style={openMenu === "physics" ? activeStyle : btnBaseStyle}
+              title="Vật lý"
+            >
+              <IconPhysics size={14} /> <span>Vật lý ▾</span>
+            </button>
+            <PhysicsMenu
+              open={openMenu === "physics"}
+              onClose={() => setOpenMenu(null)}
+              onAction={(act) => onPhysicsAction?.(act)}
+              onOpenDrawer={() => onOpenPhysicsDrawer?.()}
+              onOpenHtmlSimModal={() => onOpenHtmlSimModal?.()}
+              anchorRef={physicsWrapRef}
+            />
+          </div>
+
+          {onOpenCalculator && (
+            <button
+              type="button"
+              onClick={onOpenCalculator}
+              style={isCalculatorOpen ? activeStyle : btnBaseStyle}
+              title="Máy tính"
+            >
+              <IconCalculator size={14} /> <span>Máy tính</span>
+            </button>
+          )}
+        </FloatingDock>
+      )}
+
+      {modularConfig.blocks.system.isFloating && (
+        <FloatingDock
+          id="system"
+          title="Trang & Hệ thống"
+          position={modularConfig.blocks.system.position}
+          onMove={(pos) => handleMoveFloatingBlock("system", pos)}
+          onDock={() => handleDockBlock("system")}
+        >
+          <PageBar
+            doc={doc}
+            current={page.current}
+            count={page.count}
+            onPrevPage={onPrevPage}
+            onNextPage={onNextPage}
+            onAddPage={onAddPage}
+            compact={false}
+          />
+          {dividerV}
+          <button
+            type="button"
+            onClick={onDeleteSelected}
+            disabled={selectedCount === 0}
+            title="Xoá"
+            style={{ ...btnBaseStyle, padding: "0 5px", color: selectedCount > 0 ? "#dc2626" : "#cbd5e1" }}
+          >
+            <IconTrash size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Hoàn tác"
+            style={{ ...btnBaseStyle, padding: "0 5px", color: canUndo ? "#334155" : "#cbd5e1" }}
+          >
+            <IconUndo size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Làm lại"
+            style={{ ...btnBaseStyle, padding: "0 5px", color: canRedo ? "#334155" : "#cbd5e1" }}
+          >
+            <IconRedo size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            title="Cài đặt"
+            style={{ ...btnBaseStyle, padding: "0 8px", background: "#eff6ff", color: "#1e293b", fontWeight: 600, gap: 4 }}
+          >
+            <IconSettings size={14} color="#2563eb" /> <span>Cài đặt</span>
+          </button>
+        </FloatingDock>
+      )}
     </header>
   );
 };
