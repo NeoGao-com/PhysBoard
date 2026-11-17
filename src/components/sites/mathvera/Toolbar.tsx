@@ -661,12 +661,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   const activeStyle: React.CSSProperties = {
     ...btnBaseStyle,
-    background:
-      "linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(245, 243, 255, 0.98))",
+    background: "#eef2ff",
     color: "#4338ca",
     fontWeight: 700,
-    boxShadow:
-      "0 0 0 1.5px rgba(99, 102, 241, 0.45), 0 0 12px rgba(168, 85, 247, 0.3), 0 2px 5px rgba(99, 102, 241, 0.12)",
+    boxShadow: "0 0 0 1.5px rgba(99, 102, 241, 0.5)",
   };
 
   const caretStyle: React.CSSProperties = {
