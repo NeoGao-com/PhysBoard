@@ -10,6 +10,8 @@
   --font-sans: var(--font-be-vietnam-pro), var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-source-code-pro), ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-heading: var(--font-sans);
+  --font-anime: "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-rounded: "Nunito", "Quicksand", "Comfortaa", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,6 +51,8 @@
 }
 
 :root {
+  --font-anime: "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-rounded: "Nunito", "Quicksand", "Comfortaa", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -238,3 +242,251 @@ math-field {
     flex-wrap: nowrap;
   }
 }
+
+/* ==========================================================================
+   ANIME AESTHETICS & PLAYFUL INTERACTIVE TOOLBAR STYLES
+   - Playful rounded typography ('Comfortaa', 'Nunito', 'Quicksand')
+   - Bouncy hover (cubic-bezier spring physics)
+   - Squishy button click (active:scale(0.92))
+   - Micro-glow & pastel/neon anime accents
+   - Sparkling particle indicators on active tools
+   - Energetic tool selection feedback rings & bouncy pop
+   ========================================================================== */
+
+@keyframes anime-bounce-pop {
+  0% {
+    transform: scale(0.84);
+  }
+  45% {
+    transform: scale(1.14) translateY(-1px);
+  }
+  75% {
+    transform: scale(0.96) translateY(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes anime-icon-pop {
+  0% {
+    transform: scale(0.75) rotate(-8deg);
+  }
+  50% {
+    transform: scale(1.2) rotate(6deg);
+  }
+  75% {
+    transform: scale(0.94) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes anime-active-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7), 0 0 0 0 rgba(236, 72, 153, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25), 0 0 14px 2px rgba(236, 72, 153, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 1.5px rgba(99, 102, 241, 0.45), 0 0 8px 1px rgba(168, 85, 247, 0.25);
+  }
+}
+
+@keyframes anime-sparkle-float {
+  0%, 100% {
+    transform: scale(0.75) rotate(0deg);
+    opacity: 0.7;
+    filter: drop-shadow(0 0 3px rgba(250, 204, 21, 0.7));
+  }
+  50% {
+    transform: scale(1.25) rotate(180deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.9)) drop-shadow(0 0 9px rgba(168, 85, 247, 0.6));
+  }
+}
+
+/* Base font family for anime-styled whiteboard elements & badges */
+.wb-toolbar,
+.wb-toolbar-compact,
+.wb-selection-bar,
+.wb-pagebar,
+[data-wb-toolbar="true"],
+[data-wb-floating-dock],
+[data-wb-page-sidebar],
+.wb-anime-badge,
+[data-wb-solid-badge="true"],
+.wb-page-indicator {
+  font-family: var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif) !important;
+}
+
+/* Toolbar container anime styling */
+.wb-toolbar:not([data-embedded="true"]) {
+  border-radius: 18px !important;
+  border-color: rgba(203, 213, 225, 0.85) !important;
+  box-shadow: 0 10px 32px rgba(99, 102, 241, 0.12),
+              0 3px 12px rgba(15, 23, 42, 0.08) !important;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.wb-toolbar:not([data-embedded="true"]):hover {
+  box-shadow: 0 12px 36px rgba(99, 102, 241, 0.16),
+              0 4px 16px rgba(168, 85, 247, 0.1) !important;
+  border-color: rgba(165, 180, 252, 0.9) !important;
+}
+
+/* Playful Anime Interactive Buttons in Toolbar, Docks, and SelectionBar */
+.wb-toolbar button,
+.wb-toolbar [data-tool],
+.wb-toolbar [data-dropdown],
+.wb-toolbar [data-action],
+.wb-pagebar button,
+.wb-selection-bar button,
+[data-wb-floating-dock] button {
+  font-family: var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, sans-serif) !important;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+              background 0.15s ease,
+              color 0.15s ease,
+              box-shadow 0.18s ease,
+              border-color 0.15s ease !important;
+  will-change: transform;
+}
+
+/* Bouncy hover with spring-like physics and micro-glow */
+.wb-toolbar button:not(:disabled):hover,
+.wb-toolbar [data-tool]:not(:disabled):hover,
+.wb-toolbar [data-dropdown]:not(:disabled):hover,
+.wb-toolbar [data-action]:not(:disabled):hover,
+.wb-pagebar button:not(:disabled):hover,
+.wb-selection-bar button:not(:disabled):hover,
+[data-wb-floating-dock] button:not(:disabled):hover {
+  transform: translateY(-2px) scale(1.05) !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2),
+              0 0 8px rgba(168, 85, 247, 0.18),
+              0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  z-index: 2;
+}
+
+/* SVG icon bouncy response on hover */
+.wb-toolbar button:not(:disabled):hover svg,
+.wb-selection-bar button:not(:disabled):hover svg,
+[data-wb-floating-dock] button:not(:disabled):hover svg {
+  transform: scale(1.12);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 1px 3px rgba(99, 102, 241, 0.25));
+}
+
+/* Squishy button click active:scale(0.92) with snappy spring */
+.wb-toolbar button:not(:disabled):active,
+.wb-toolbar [data-tool]:not(:disabled):active,
+.wb-toolbar [data-dropdown]:not(:disabled):active,
+.wb-toolbar [data-action]:not(:disabled):active,
+.wb-pagebar button:not(:disabled):active,
+.wb-selection-bar button:not(:disabled):active,
+[data-wb-floating-dock] button:not(:disabled):active {
+  transform: translateY(1px) scale(0.92) !important;
+  transition: transform 0.06s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.3) inset !important;
+}
+
+/* Active tool visual feedback: energetic active ring + micro-glow + pastel accent */
+.wb-toolbar button[data-active="true"],
+.wb-toolbar button[aria-pressed="true"]:not([data-dropdown]),
+.wb-toolbar .wb-tool-split[data-active="true"] {
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(245, 243, 255, 0.98)) !important;
+  color: #4338ca !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1.5px rgba(99, 102, 241, 0.5),
+              0 0 12px rgba(168, 85, 247, 0.35),
+              0 2px 6px rgba(99, 102, 241, 0.15) !important;
+  animation: anime-bounce-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+             anime-active-ring 2.4s infinite ease-in-out !important;
+  position: relative;
+}
+
+/* Icon energetic animation inside active button */
+.wb-toolbar button[data-active="true"] svg,
+.wb-toolbar button[aria-pressed="true"]:not([data-dropdown]) svg {
+  animation: anime-icon-pop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 1px 3px rgba(99, 102, 241, 0.35));
+}
+
+/* Sparkling particle on active tool */
+.wb-toolbar button[data-active="true"]::before,
+.wb-toolbar .wb-tool-split[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fde047 30%, #ec4899 80%, transparent 100%);
+  box-shadow: 0 0 6px 1px #f59e0b, 0 0 10px 2px #ec4899;
+  pointer-events: none;
+  animation: anime-sparkle-float 1.8s infinite ease-in-out;
+  z-index: 10;
+}
+
+/* Laser tool special anime energetic glow */
+.wb-toolbar button[data-tool="ink:laser"][data-active="true"],
+.wb-toolbar .wb-tool-split[data-active="true"]:has(button[data-tool="ink:laser"]) {
+  background: linear-gradient(135deg, #fee2e2, #fef2f2) !important;
+  color: #dc2626 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.55),
+              0 0 16px rgba(248, 113, 113, 0.45),
+              0 2px 6px rgba(220, 38, 38, 0.2) !important;
+}
+
+/* Cute rounded badge typography & pill aesthetic */
+[data-wb-toolbar-scale="true"] {
+  border-radius: 10px !important;
+  border-color: #cbd5e1 !important;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06) !important;
+}
+
+[data-wb-toolbar-scale-reset="true"] {
+  font-family: var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, sans-serif) !important;
+  font-weight: 700 !important;
+  color: #3b82f6 !important;
+  letter-spacing: -0.2px;
+}
+
+.wb-page-indicator,
+[data-wb-page-indicator="true"] {
+  font-family: var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, sans-serif) !important;
+  font-weight: 700 !important;
+  font-size: 11.5px !important;
+  background: linear-gradient(135deg, #eff6ff, #f5f3ff) !important;
+  color: #4338ca !important;
+  border-radius: 9999px !important;
+  padding: 2px 8px !important;
+  box-shadow: 0 1px 3px rgba(99, 102, 241, 0.12) inset !important;
+  border: 1px solid rgba(199, 210, 254, 0.8) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* SelectionBar badges with playful rounded aesthetic */
+[data-wb-solid-badge="true"],
+.wb-anime-badge {
+  font-family: var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, sans-serif) !important;
+  border-radius: 12px !important;
+  letter-spacing: -0.2px;
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.18) !important;
+}
+
+/* Dropdown portal menus playful rounded aesthetic */
+[data-wb-portal-menu="true"] {
+  font-family: var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, sans-serif) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 36px rgba(99, 102, 241, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid #e0e7ff !important;
+  animation: anime-bounce-pop 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+

@@ -630,48 +630,59 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     toolCalculator: true,
   };
 
+  const TOOLBAR_FONT =
+    'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif)';
+
   const btnBaseStyle: React.CSSProperties = {
-    height: 25,
-    padding: "0 2.5px",
+    height: 26,
+    padding: "0 3.5px",
     display: "inline-flex",
     alignItems: "center",
-    gap: 1.5,
-    borderRadius: 6,
+    gap: 2,
+    borderRadius: 7,
     border: "none",
     background: "transparent",
     color: "#334155",
-    fontSize: 10.5,
-    fontWeight: 500,
+    fontSize: 11,
+    fontWeight: 600,
     cursor: "pointer",
     userSelect: "none",
     whiteSpace: "nowrap",
     flexShrink: 0,
-    transition: "background-color 0.1s ease",
+    fontFamily: TOOLBAR_FONT,
+    transition:
+      "transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, color 0.15s ease, box-shadow 0.18s ease",
+    willChange: "transform",
   };
 
   const activeStyle: React.CSSProperties = {
     ...btnBaseStyle,
-    background: "#e8f0fe",
-    color: "#1a73e8",
-    fontWeight: 600,
+    background:
+      "linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(245, 243, 255, 0.98))",
+    color: "#4338ca",
+    fontWeight: 700,
+    boxShadow:
+      "0 0 0 1.5px rgba(99, 102, 241, 0.45), 0 0 12px rgba(168, 85, 247, 0.3), 0 2px 5px rgba(99, 102, 241, 0.12)",
   };
 
   const caretStyle: React.CSSProperties = {
-    height: 25,
+    height: 26,
     width: 15,
     padding: "0 2px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 5,
+    borderRadius: 6,
     border: "none",
     background: "transparent",
     color: "#64748b",
-    fontSize: 9.5,
+    fontSize: 10,
     cursor: "pointer",
     userSelect: "none",
     flexShrink: 0,
-    transition: "background-color 0.15s ease",
+    fontFamily: TOOLBAR_FONT,
+    transition:
+      "transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, color 0.15s ease",
   };
 
   const dividerV = (
@@ -691,15 +702,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     top: menuPos?.top ?? 50,
     left: menuPos?.left ?? 12,
     zIndex: 5100,
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 10,
-    boxShadow: "0 10px 28px rgba(15, 23, 42, 0.14)",
+    background: "rgba(255, 255, 255, 0.98)",
+    backdropFilter: "blur(12px)",
+    border: "1px solid #e0e7ff",
+    borderRadius: 14,
+    boxShadow:
+      "0 12px 36px rgba(99, 102, 241, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08)",
     padding: 6,
     display: "flex",
     flexDirection: "column",
     gap: 2,
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+    fontFamily: TOOLBAR_FONT,
   };
 
   const portalItemStyle: React.CSSProperties = {
@@ -709,6 +722,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     padding: "6px 10px",
     height: "auto",
     fontSize: 13,
+    borderRadius: 8,
   };
 
   if (isCollapsed && !embedded) {
@@ -731,10 +745,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           padding: "4px 8px",
           background: "rgba(255, 255, 255, 0.95)",
           backdropFilter: "blur(12px)",
-          border: "1px solid #cbd5e1",
+          border: "1px solid rgba(203, 213, 225, 0.9)",
           borderRadius: 20,
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+          boxShadow:
+            "0 10px 30px rgba(99, 102, 241, 0.16), 0 2px 10px rgba(15, 23, 42, 0.08)",
+          fontFamily: TOOLBAR_FONT,
           userSelect: "none",
         }}
       >
@@ -896,11 +911,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         padding: "4px 8px",
         background: "rgba(255, 255, 255, 0.97)",
         backdropFilter: "blur(10px)",
-        border: "1px solid #cbd5e1",
-        borderRadius: embedded ? 10 : 16,
-        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
-        fontFamily:
-          'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        border: "1px solid rgba(203, 213, 225, 0.85)",
+        borderRadius: embedded ? 12 : 18,
+        boxShadow:
+          "0 10px 32px rgba(99, 102, 241, 0.14), 0 2px 10px rgba(15, 23, 42, 0.08)",
+        fontFamily: TOOLBAR_FONT,
         overflow: "visible",
       }}
     >
@@ -1014,11 +1029,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {vis.groupSelection && vis.toolSelect && (
         <div
           ref={selectBtnRef}
+          className="wb-tool-split"
+          data-active={isSelectActive ? "true" : undefined}
           style={{
             display: "inline-flex",
             alignItems: "center",
-            background: isSelectActive ? "#e8f0fe" : "transparent",
-            borderRadius: 6,
+            background: isSelectActive
+              ? "linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(245, 243, 255, 0.98))"
+              : "transparent",
+            borderRadius: 7,
+            boxShadow: isSelectActive
+              ? "0 0 0 1.5px rgba(99, 102, 241, 0.45), 0 0 12px rgba(168, 85, 247, 0.28)"
+              : undefined,
+            transition: "all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
         >
           <button
@@ -1072,11 +1095,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {vis.groupDrawing && vis.toolPen && (
         <div
           ref={penBtnRef}
+          className="wb-tool-split"
+          data-active={isPenActive ? "true" : undefined}
           style={{
             display: "inline-flex",
             alignItems: "center",
-            background: isPenActive ? "#e8f0fe" : "transparent",
-            borderRadius: 6,
+            background: isPenActive
+              ? "linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(245, 243, 255, 0.98))"
+              : "transparent",
+            borderRadius: 7,
+            boxShadow: isPenActive
+              ? "0 0 0 1.5px rgba(99, 102, 241, 0.45), 0 0 12px rgba(168, 85, 247, 0.28)"
+              : undefined,
+            transition: "all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
         >
           <button
@@ -1120,7 +1151,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* Laser Quick Tool Button with Split Setting Caret */}
-        <div style={{ display: "inline-flex", alignItems: "center" }}>
+        <div
+          className="wb-tool-split"
+          data-active={activeTool === "ink:laser" ? "true" : undefined}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            background:
+              activeTool === "ink:laser"
+                ? "linear-gradient(135deg, #fee2e2, #fef2f2)"
+                : "transparent",
+            borderRadius: 7,
+            boxShadow:
+              activeTool === "ink:laser"
+                ? "0 0 0 1.5px rgba(239, 68, 68, 0.5), 0 0 14px rgba(248, 113, 113, 0.4)"
+                : undefined,
+            transition: "all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          }}
+        >
           <button
             type="button"
             data-tool="ink:laser"
@@ -1316,11 +1364,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {/* Segment Split (CRITICAL DOM ORDER: data-dropdown="segment" FIRST with order:2, data-tool="segment" SECOND with order:1) */}
         <div
           ref={segmentBtnRef}
+          className="wb-tool-split"
+          data-active={isSegmentActive ? "true" : undefined}
           style={{
             display: "inline-flex",
             alignItems: "center",
-            background: isSegmentActive ? "#e8f0fe" : "transparent",
-            borderRadius: 6,
+            background: isSegmentActive
+              ? "linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(245, 243, 255, 0.98))"
+              : "transparent",
+            borderRadius: 7,
+            boxShadow: isSegmentActive
+              ? "0 0 0 1.5px rgba(99, 102, 241, 0.45), 0 0 12px rgba(168, 85, 247, 0.28)"
+              : undefined,
+            transition: "all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
         >
           <button
@@ -1405,11 +1461,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {/* Flood Fill Split (CRITICAL DOM ORDER: data-popover="fill" FIRST with order:2, data-tool="floodFill" SECOND with order:1) */}
         <div
           ref={fillBtnRef}
+          className="wb-tool-split"
+          data-active={isFloodFillActive ? "true" : undefined}
           style={{
             display: "inline-flex",
             alignItems: "center",
-            background: isFloodFillActive ? "#e8f0fe" : "transparent",
-            borderRadius: 6,
+            background: isFloodFillActive
+              ? "linear-gradient(135deg, rgba(238, 242, 255, 0.98), rgba(245, 243, 255, 0.98))"
+              : "transparent",
+            borderRadius: 7,
+            boxShadow: isFloodFillActive
+              ? "0 0 0 1.5px rgba(99, 102, 241, 0.45), 0 0 12px rgba(168, 85, 247, 0.28)"
+              : undefined,
+            transition: "all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
         >
           <button
@@ -1948,6 +2012,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <div
             ref={portalMenuRef}
             role="menu"
+            data-wb-portal-menu="true"
             style={{ ...portalMenuStyle, minWidth: 146 }}
           >
             <button
@@ -2002,6 +2067,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             ref={portalMenuRef}
             role="menu"
             data-wb-pen-menu="true"
+            data-wb-portal-menu="true"
             style={{ ...portalMenuStyle, minWidth: 215, padding: 6 }}
           >
             <div
@@ -2057,6 +2123,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <div
             ref={portalMenuRef}
             role="menu"
+            data-wb-portal-menu="true"
             style={{ ...portalMenuStyle, minWidth: 146 }}
           >
             {SEGMENT_VARIANTS.map((v) => {
@@ -2096,6 +2163,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             role="dialog"
             aria-label="Màu tô"
             data-wb-fill-menu="true"
+            data-wb-portal-menu="true"
             style={{
               ...portalMenuStyle,
               width: 242,

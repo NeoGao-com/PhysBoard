@@ -226,14 +226,18 @@ export const PageBar: React.FC<PageBarProps> = ({
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 6,
+    borderRadius: 7,
     border: "none",
     background: "transparent",
     color: "#334155",
     fontSize: 13,
-    fontWeight: 500,
+    fontWeight: 600,
     cursor: "pointer",
     userSelect: "none",
+    fontFamily:
+      'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, sans-serif)',
+    transition:
+      "transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, color 0.15s ease",
   };
 
   return (

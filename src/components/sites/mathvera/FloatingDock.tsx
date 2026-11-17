@@ -74,10 +74,12 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
         padding: "3px 6px",
         background: "rgba(255, 255, 255, 0.96)",
         backdropFilter: "blur(12px)",
-        border: "1px solid #cbd5e1",
-        borderRadius: 12,
-        boxShadow: "0 10px 28px rgba(15, 23, 42, 0.16)",
-        fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        border: "1px solid rgba(203, 213, 225, 0.9)",
+        borderRadius: 14,
+        boxShadow:
+          "0 12px 32px rgba(99, 102, 241, 0.16), 0 3px 12px rgba(15, 23, 42, 0.08)",
+        fontFamily:
+          'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif)',
         userSelect: "none",
       }}
     >

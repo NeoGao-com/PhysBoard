@@ -75,11 +75,14 @@ const actionBtnStyle: React.CSSProperties = {
   fontWeight: 600,
   cursor: "pointer",
   fontSize: 14,
-  fontFamily: "system-ui, -apple-system, sans-serif",
+  fontFamily:
+    'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, sans-serif)',
   boxShadow: "0 2px 8px rgba(15,23,42,0.12)",
   display: "inline-flex",
   alignItems: "center",
   gap: 5,
+  transition:
+    "transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, box-shadow 0.18s ease",
 };
 
 const menuItemStyle: React.CSSProperties = {
@@ -97,7 +100,9 @@ const menuItemStyle: React.CSSProperties = {
   cursor: "pointer",
   textAlign: "left",
   whiteSpace: "nowrap",
-  fontFamily: "system-ui, -apple-system, sans-serif",
+  fontFamily:
+    'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, sans-serif)',
+  transition: "all 0.15s ease",
 };
 
 const pillGroupStyle: React.CSSProperties = {
@@ -257,7 +262,8 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               color: "#92400e",
               fontWeight: 700,
               fontSize: 14,
-              fontFamily: "system-ui, -apple-system, sans-serif",
+              fontFamily:
+                'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, sans-serif)',
               boxShadow: "0 2px 8px rgba(15,23,42,0.1)",
             }}
           >
