@@ -1106,22 +1106,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </button>
           <button
             type="button"
-            data-tool="ink:fountain"
-            data-active={activeTool === "ink:fountain" ? "true" : undefined}
-            aria-pressed={activeTool === "ink:fountain"}
-            onClick={() => onSelectTool("ink:fountain")}
-            style={
-              activeTool === "ink:fountain"
-                ? { ...activeStyle, padding: "0 4px" }
-                : { ...btnBaseStyle, padding: "0 4px" }
-            }
-            title={withShortcut("Bút máy", "tool:ink:fountain")}
-          >
-            <IconFountain size={14} />
-            <span className="sr-only">Bút máy</span>
-          </button>
-          <button
-            type="button"
             data-dropdown="pen"
             aria-haspopup="menu"
             aria-expanded={openMenu === "pen"}
