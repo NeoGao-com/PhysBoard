@@ -6848,6 +6848,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       modularConfig={modularConfig}
       onChangeModularConfig={handleUpdateModularConfig}
       onOpenSettings={() => setSettingsModalOpen(true)}
+      isSidebarOpen={pageSidebarOpen}
     />
   );
 

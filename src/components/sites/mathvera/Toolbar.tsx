@@ -194,6 +194,7 @@ export interface ToolbarProps {
   modularConfig?: ModularLayoutConfig;
   onChangeModularConfig?: (cfg: ModularLayoutConfig) => void;
   onOpenSettings?: () => void;
+  isSidebarOpen?: boolean;
 }
 
 type OpenDropdown =
@@ -274,6 +275,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   modularConfig = DEFAULT_MODULAR_LAYOUT,
   onChangeModularConfig,
   onOpenSettings,
+  isSidebarOpen = false,
 }) => {
   const withShortcut = (label: string, cmdId: string): string => {
     const combo = shortcutMap?.[cmdId];
@@ -722,6 +724,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     borderRadius: 8,
   };
 
+  const sidebarOffset = !embedded && isSidebarOpen ? 148 : 28;
+  const computedScale = !embedded && isSidebarOpen ? Math.min(toolbarScale, 0.88) : toolbarScale;
+
   if (isCollapsed && !embedded) {
     return (
       <header
@@ -733,7 +738,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         style={{
           position: "fixed",
           top: toolbarPos ? toolbarPos.y : 10,
-          left: toolbarPos ? toolbarPos.x : "50%",
+          left: toolbarPos
+            ? `max(${sidebarOffset}px, ${toolbarPos.x}px)`
+            : isSidebarOpen
+            ? `calc(50% + 64px)`
+            : "50%",
           transform: toolbarPos ? undefined : "translateX(-50%)",
           zIndex: 100,
           display: "flex",
@@ -891,13 +900,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       style={{
         position: embedded ? "relative" : "fixed",
         top: embedded ? undefined : toolbarPos ? toolbarPos.y : 8,
-        left: embedded ? undefined : toolbarPos ? toolbarPos.x : "50%",
+        left: embedded
+          ? undefined
+          : toolbarPos
+          ? `max(${sidebarOffset}px, ${toolbarPos.x}px)`
+          : isSidebarOpen
+          ? `calc(50% + 64px)`
+          : "50%",
         transform: embedded ? undefined : toolbarPos ? undefined : "translateX(-50%)",
         width: "max-content",
         maxWidth: embedded
           ? undefined
-          : `calc((100vw - 16px) / ${toolbarScale || 1})`,
-        zoom: embedded ? undefined : toolbarScale,
+          : `calc((100vw - ${sidebarOffset + 16}px) / ${computedScale || 1})`,
+        zoom: embedded ? undefined : computedScale,
+        transition: "zoom 0.22s ease, left 0.22s ease, max-width 0.22s ease",
         minHeight: 36,
         zIndex: 100,
         display: "flex",
