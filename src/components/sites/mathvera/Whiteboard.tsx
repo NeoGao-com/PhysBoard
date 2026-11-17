@@ -6789,7 +6789,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onPhysicsAction={handlePhysicsAction}
       onOpenPhysicsDrawer={() => setPhysicsDrawerOpen(true)}
       onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
-      onSelectInstrument={handleSelectTeachingInstrument}
       onOpenCalculator={() => setCalculatorOpen((prev) => !prev)}
       isCalculatorOpen={calculatorOpen}
       onGoHome={onGoHome}

@@ -14,7 +14,6 @@ import {
 } from "./FunctionsAndStatsMenus";
 import { PageBar } from "./PageBar";
 import { PhysicsMenu } from "./PhysicsMenu";
-import { TeachingInstrumentsMenu } from "./TeachingInstrumentsMenu";
 import { FILL_PALETTE } from "@/lib/geometry";
 import type { ShortcutMap } from "@/lib/commands";
 import type { ImportedImageResult, ImportedPdfPage } from "@/lib/pdf-import";
@@ -160,7 +159,6 @@ export interface ToolbarProps {
   onPhysicsAction?: (action: string) => void;
   onOpenPhysicsDrawer?: () => void;
   onOpenHtmlSimModal?: () => void;
-  onSelectInstrument?: (kind: "ruler" | "setsquare" | "setsquare-45" | "protractor" | "protractor-360" | "compass") => void;
   onGoHome?: () => void;
   onSaveFile?: () => void;
   onOpenFile?: () => void;
@@ -241,7 +239,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onPhysicsAction,
   onOpenPhysicsDrawer,
   onOpenHtmlSimModal,
-  onSelectInstrument,
   onGoHome,
   onSaveFile,
   onOpenFile,
@@ -514,7 +511,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const statsWrapRef = useRef<HTMLDivElement>(null);
   const realworldWrapRef = useRef<HTMLDivElement>(null);
   const physicsWrapRef = useRef<HTMLDivElement>(null);
-  const instrumentsWrapRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const [pdfImporting, setPdfImporting] = useState(false);
@@ -532,8 +528,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         functionsWrapRef.current?.contains(target) ||
         statsWrapRef.current?.contains(target) ||
         realworldWrapRef.current?.contains(target) ||
-        physicsWrapRef.current?.contains(target) ||
-        instrumentsWrapRef.current?.contains(target)
+        physicsWrapRef.current?.contains(target)
       ) {
         return;
       }
@@ -1716,34 +1711,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             anchorRef={physicsWrapRef}
           />
         </div>
-        )}
-
-        {/* Teaching Instruments Dropdown (Thước, Êke, Đo góc, Compa) */}
-        {onSelectInstrument && (
-          <div ref={instrumentsWrapRef} style={{ display: "inline-flex", position: "relative" }}>
-            <button
-              type="button"
-              data-dropdown="instruments"
-              aria-haspopup="menu"
-              aria-expanded={openMenu === "instruments"}
-              onClick={() =>
-                setOpenMenu((prev) =>
-                  prev === "instruments" ? null : "instruments"
-                )
-              }
-              style={openMenu === "instruments" ? activeStyle : btnBaseStyle}
-              title="Dụng cụ dạy học: Thước thẳng, Êke, Thước đo góc & Compa"
-            >
-              <IconRuler size={14} color="#d97706" />
-              <span>Dụng cụ ▾</span>
-            </button>
-            <TeachingInstrumentsMenu
-              open={openMenu === "instruments"}
-              onClose={() => setOpenMenu(null)}
-              onSelectInstrument={onSelectInstrument}
-              anchorRef={instrumentsWrapRef}
-            />
-          </div>
         )}
 
         {/* Quick Calculator Tool */}
