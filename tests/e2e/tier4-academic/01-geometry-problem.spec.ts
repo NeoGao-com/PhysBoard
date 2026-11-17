@@ -142,7 +142,7 @@ test.describe('Tier 4: Academic Scenarios - High School Plane Geometry (Scenario
 
     // Open More menu "⋯"
     await toolbar.openMoreMenu();
-    const moreMenuPopover = page.locator('[data-wb-more-menu="true"], .wb-more-menu, [role="menu"]').first();
+    const moreMenuPopover = page.locator('[data-wb-more-menu="true"], .wb-more-menu, [role="menu"], [role="dialog"]').first();
     await expect(moreMenuPopover).toBeVisible();
 
     // Check for "Giãn hình" / "Thu hình" scaling controls

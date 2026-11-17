@@ -48,12 +48,10 @@ test.describe('Tier 4: Scientific Calculator Widget & Whiteboard Integration', (
     await expect(panel).not.toBeVisible();
   });
 
-  test('should also open calculator from Insert Menu', async ({ page }) => {
-    // Open insert dropdown
-    await page.locator('[data-dropdown="insert"]').click();
-    const insertCalcBtn = page.locator('[data-wb-insert-calculator="true"]');
-    await expect(insertCalcBtn).toBeVisible();
-    await insertCalcBtn.click();
+  test('should also open calculator from quick action', async ({ page }) => {
+    const calcBtn = page.locator('[data-tool="calculator"], [data-action="open-calculator"]');
+    await expect(calcBtn).toBeVisible();
+    await calcBtn.click();
 
     // Verify Casio fx-580VN X calculator opens
     const panel = page.locator('[data-calc-panel="true"]');

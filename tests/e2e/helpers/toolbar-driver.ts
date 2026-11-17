@@ -73,7 +73,23 @@ export class ToolbarDriver {
    * - floodFill / 'Tô màu'
    */
   async selectTool(toolIdentifier: string) {
-    const btn = this.getToolButton(toolIdentifier);
+    let btn = this.getToolButton(toolIdentifier);
+    const isDirectlyVisible = await btn.isVisible().catch(() => false);
+    if (!isDirectlyVisible) {
+      if (toolIdentifier.startsWith('ink:')) {
+        const penTrigger = this.toolbar.locator('button[data-dropdown="pen"]').first();
+        if (await penTrigger.isVisible()) {
+          await penTrigger.click();
+          btn = this.page.locator(`button[data-tool="${toolIdentifier}"], [data-menu-item="${toolIdentifier}"]`).first();
+        }
+      } else if (toolIdentifier.startsWith('c:')) {
+        const segTrigger = this.toolbar.locator('button[data-dropdown="segment"]').first();
+        if (await segTrigger.isVisible()) {
+          await segTrigger.click();
+          btn = this.page.locator(`button[data-tool="${toolIdentifier}"], [data-menu-item="${toolIdentifier}"]`).first();
+        }
+      }
+    }
     await btn.waitFor({ state: 'visible' });
     await btn.click();
   }
@@ -240,6 +256,8 @@ export class ToolbarDriver {
    */
   async triggerExport(format: 'PNG' | 'PDF' | 'TikZ') {
     await this.openMoreMenu();
+    const exportTab = this.page.locator('button:has-text("Xuất file & Đề thi")');
+    if (await exportTab.isVisible()) await exportTab.click();
     const exportBtn = this.page.locator(
       `button:has-text("${format}"), [data-action="export-${format.toLowerCase()}"]`
     ).first();
@@ -251,7 +269,9 @@ export class ToolbarDriver {
    */
   async openExamMode() {
     await this.openMoreMenu();
-    const examBtn = this.page.locator('button:has-text("Mở đề thi"), button:has-text("Soạn đề")').first();
+    const exportTab = this.page.locator('button:has-text("Xuất file & Đề thi")');
+    if (await exportTab.isVisible()) await exportTab.click();
+    const examBtn = this.page.locator('button[data-action="open-exam"], button:has-text("Mở đề thi"), button:has-text("Soạn đề")').first();
     await examBtn.click();
     await this.page.locator('[data-wb-exam-editor="true"], .wb-exam-editor').waitFor({ state: 'visible' });
   }

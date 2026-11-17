@@ -14,6 +14,7 @@ import {
 } from "./FunctionsAndStatsMenus";
 import { PageBar } from "./PageBar";
 import { PhysicsMenu } from "./PhysicsMenu";
+import { TeachingInstrumentsMenu } from "./TeachingInstrumentsMenu";
 import { FILL_PALETTE } from "@/lib/geometry";
 import type { ShortcutMap } from "@/lib/commands";
 import type { ImportedImageResult, ImportedPdfPage } from "@/lib/pdf-import";
@@ -58,6 +59,7 @@ import {
   IconPolygon,
   IconRealWorld,
   IconRedo,
+  IconRuler,
   IconSave,
   IconSegment,
   IconSetSquare,
@@ -512,6 +514,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const statsWrapRef = useRef<HTMLDivElement>(null);
   const realworldWrapRef = useRef<HTMLDivElement>(null);
   const physicsWrapRef = useRef<HTMLDivElement>(null);
+  const instrumentsWrapRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const [pdfImporting, setPdfImporting] = useState(false);
@@ -529,7 +532,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         functionsWrapRef.current?.contains(target) ||
         statsWrapRef.current?.contains(target) ||
         realworldWrapRef.current?.contains(target) ||
-        physicsWrapRef.current?.contains(target)
+        physicsWrapRef.current?.contains(target) ||
+        instrumentsWrapRef.current?.contains(target)
       ) {
         return;
       }
@@ -738,7 +742,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           top: toolbarPos ? toolbarPos.y : 10,
           left: toolbarPos ? toolbarPos.x : "50%",
           transform: toolbarPos ? undefined : "translateX(-50%)",
-          zIndex: 65,
+          zIndex: 100,
           display: "flex",
           alignItems: "center",
           gap: 4,
@@ -902,7 +906,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           : `calc((100vw - 16px) / ${toolbarScale || 1})`,
         zoom: embedded ? undefined : toolbarScale,
         minHeight: 36,
-        zIndex: 65,
+        zIndex: 100,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -1113,15 +1117,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <button
             type="button"
             data-tool="ink"
-            data-active={
-              isPenActive && activeTool !== "ink:fountain" ? "true" : undefined
-            }
-            aria-pressed={isPenActive && activeTool !== "ink:fountain"}
+            data-active={isPenActive ? "true" : undefined}
+            aria-pressed={isPenActive}
             onClick={() => {
               onSelectTool(lastPenTool);
             }}
             style={
-              isPenActive && activeTool !== "ink:fountain"
+              isPenActive
                 ? { ...activeStyle, background: "transparent" }
                 : btnBaseStyle
             }
@@ -1263,6 +1265,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             gap: 3,
           }}
         />
+
+        {/* Stylus-only vs Hand-drawing quick toggle */}
+        {onTogglePenOnly && (
+          <button
+            type="button"
+            data-action="toggle-pen-only"
+            data-active={penOnlyMode ? "true" : "false"}
+            aria-pressed={penOnlyMode}
+            onClick={() => onTogglePenOnly(!penOnlyMode)}
+            title={
+              penOnlyMode
+                ? "Chế độ chỉ bút: Đang BẬT (chặn tay vẽ dính mực)"
+                : "Chế độ chỉ bút: Đang TẮT (cho phép vẽ cả tay và bút)"
+            }
+            style={
+              penOnlyMode
+                ? {
+                    ...activeStyle,
+                    borderColor: "#3b82f6",
+                    background: "#eff6ff",
+                    color: "#1d4ed8",
+                  }
+                : btnBaseStyle
+            }
+          >
+            {penOnlyMode ? <IconStylusOnly size={14} /> : <IconHandTouch size={14} />}
+          </button>
+        )}
 
         {/* Formula */}
         {vis.groupDrawing && vis.toolFormula && (
@@ -1688,6 +1718,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
         )}
 
+        {/* Teaching Instruments Dropdown (Thước, Êke, Đo góc, Compa) */}
+        {onSelectInstrument && (
+          <div ref={instrumentsWrapRef} style={{ display: "inline-flex", position: "relative" }}>
+            <button
+              type="button"
+              data-dropdown="instruments"
+              aria-haspopup="menu"
+              aria-expanded={openMenu === "instruments"}
+              onClick={() =>
+                setOpenMenu((prev) =>
+                  prev === "instruments" ? null : "instruments"
+                )
+              }
+              style={openMenu === "instruments" ? activeStyle : btnBaseStyle}
+              title="Dụng cụ dạy học: Thước thẳng, Êke, Thước đo góc & Compa"
+            >
+              <IconRuler size={14} color="#d97706" />
+              <span>Dụng cụ ▾</span>
+            </button>
+            <TeachingInstrumentsMenu
+              open={openMenu === "instruments"}
+              onClose={() => setOpenMenu(null)}
+              onSelectInstrument={onSelectInstrument}
+              anchorRef={instrumentsWrapRef}
+            />
+          </div>
+        )}
+
         {/* Quick Calculator Tool */}
         {vis.toolCalculator && onOpenCalculator && (
           <button
@@ -2087,6 +2145,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   key={v.tool}
                   type="button"
                   role="menuitem"
+                  data-tool={v.tool}
                   data-menu-item={v.tool}
                   onClick={() => {
                     if (v.tool !== "ink:fountain") {
@@ -2135,6 +2194,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   key={v.tool}
                   type="button"
                   role="menuitem"
+                  data-tool={v.tool}
                   data-menu-item={v.tool}
                   onClick={() => {
                     setLastSegmentTool(v.tool);

@@ -33,6 +33,8 @@ test.describe("Tier 1: 08 Board Types, Patterns & Dark Contrast", () => {
 
     // Open More menu -> pick Green Chalkboard + Dots + Large spacing
     await page.locator('[data-action="more"]').click();
+    const boardTab = page.locator('button:has-text("Khổ & Nền bảng")');
+    if (await boardTab.isVisible()) await boardTab.click();
     await page.locator('[data-board-surface-option="greenboard"]').click();
     await page.locator('[data-board-pattern-option="dots"]').click();
     await page.locator('[data-board-size-option="lg"]').click();
@@ -56,6 +58,8 @@ test.describe("Tier 1: 08 Board Types, Patterns & Dark Contrast", () => {
 
     // Set page 1 to blackboard + ruled
     await page.locator('[data-action="more"]').click();
+    const boardTab1 = page.locator('button:has-text("Khổ & Nền bảng")');
+    if (await boardTab1.isVisible()) await boardTab1.click();
     await page.locator('[data-board-surface-option="blackboard"]').click();
     await page.locator('[data-board-pattern-option="ruled"]').click();
     await page.keyboard.press("Escape");
@@ -70,6 +74,8 @@ test.describe("Tier 1: 08 Board Types, Patterns & Dark Contrast", () => {
 
     // Switch page 2 to cream + graph and apply to all pages
     await page.locator('[data-action="more"]').click();
+    const boardTab2 = page.locator('button:has-text("Khổ & Nền bảng")');
+    if (await boardTab2.isVisible()) await boardTab2.click();
     await page.locator('[data-board-surface-option="cream"]').click();
     await page.locator('[data-board-pattern-option="graph"]').click();
     await page.locator('[data-action="board-apply-all"]').click();
@@ -84,6 +90,8 @@ test.describe("Tier 1: 08 Board Types, Patterns & Dark Contrast", () => {
   test("TC-08-03: Switch to A4 Portrait/Landscape format renders A4 sheet overlay", async ({ page }) => {
     // Open more menu
     await page.locator('[data-action="more"]').click();
+    const boardTabA = page.locator('button:has-text("Khổ & Nền bảng")');
+    if (await boardTabA.isVisible()) await boardTabA.click();
 
     // Select A4 Portrait format
     const a4PortraitBtn = page.locator('[data-board-format-option="a4_portrait"]');
@@ -97,6 +105,8 @@ test.describe("Tier 1: 08 Board Types, Patterns & Dark Contrast", () => {
 
     // Switch to A4 Landscape
     await page.locator('[data-action="more"]').click();
+    const boardTabB = page.locator('button:has-text("Khổ & Nền bảng")');
+    if (await boardTabB.isVisible()) await boardTabB.click();
     const a4LandscapeBtn = page.locator('[data-board-format-option="a4_landscape"]');
     await expect(a4LandscapeBtn).toBeVisible();
     await a4LandscapeBtn.click();
@@ -107,6 +117,8 @@ test.describe("Tier 1: 08 Board Types, Patterns & Dark Contrast", () => {
 
     // Switch back to Infinite format
     await page.locator('[data-action="more"]').click();
+    const boardTabC = page.locator('button:has-text("Khổ & Nền bảng")');
+    if (await boardTabC.isVisible()) await boardTabC.click();
     await page.locator('[data-board-format-option="infinite"]').click();
     await page.keyboard.press("Escape");
 

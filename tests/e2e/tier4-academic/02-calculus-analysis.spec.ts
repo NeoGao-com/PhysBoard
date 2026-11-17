@@ -76,8 +76,8 @@ test.describe('Tier 4: Academic Scenarios - Calculus & Function Analysis (Scenar
   });
 
   test('should generate calculus variation table (bảng biến thiên) with critical points and arrows', async () => {
-    // Select Functions dropdown -> Variation Table ("Bảng biến thiên")
-    await toolbar.selectDropdownItem('Hàm số', 'Bảng biến thiên');
+    // Select Functions dropdown -> Variation Table ("Bảng biến thiên trống")
+    await toolbar.selectDropdownItem('Hàm số', 'Bảng biến thiên trống');
 
     // Click canvas to place the table
     const center = await canvas.getCanvasCenter();

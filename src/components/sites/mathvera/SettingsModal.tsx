@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as Y from "yjs";
 import {
   ToolbarVisibilityConfig,
@@ -149,6 +149,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     space: false,
     physics: false,
   });
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, onClose]);
 
   if (!open) return null;
 
