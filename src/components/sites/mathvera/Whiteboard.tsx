@@ -6912,6 +6912,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             onOpenPageManager={() => setPageManagerOpen(true)}
             onInsertPdfPages={handleInsertPdfPages}
             onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={undo}
+            onRedo={redo}
+            selectedCount={selectedIds.length}
+            onDeleteSelected={handleDeleteSelected}
+            onOpenSettings={() => setSettingsModalOpen(true)}
             onSelectPage={(p) => {
               setYjsCurrentPage(doc, p);
               if (isA4Format) {

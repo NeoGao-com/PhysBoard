@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { PageBoardConfig, BOARD_SURFACE_PRESETS } from "@/lib/board-themes";
 import { importPdfPages, ImportedPdfPage } from "@/lib/pdf-import";
-import { IconPdf, IconHtmlSim } from "./ToolbarIcons";
+import { IconPdf, IconHtmlSim, IconTrash, IconUndo, IconRedo, IconSettings } from "./ToolbarIcons";
 
 export interface PageSidebarProps {
   currentPage: number;
@@ -14,6 +14,13 @@ export interface PageSidebarProps {
   onOpenPageManager?: () => void;
   onInsertPdfPages?: (pages: ImportedPdfPage[]) => void;
   onOpenHtmlSimModal?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  selectedCount?: number;
+  onDeleteSelected?: () => void;
+  onOpenSettings?: () => void;
   boardConfig?: PageBoardConfig;
   isOpen: boolean;
   onToggleOpen: () => void;
@@ -28,6 +35,13 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onOpenPageManager,
   onInsertPdfPages,
   onOpenHtmlSimModal,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
+  selectedCount = 0,
+  onDeleteSelected,
+  onOpenSettings,
   boardConfig,
   isOpen,
   onToggleOpen,
@@ -357,6 +371,110 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
             }
           }}
         />
+
+        {/* System Tools: Delete, Undo, Redo, Settings */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 4,
+            padding: "4px 0",
+            borderBottom: "1px solid #f1f5f9",
+            marginBottom: 2,
+          }}
+        >
+          {onDeleteSelected && (
+            <button
+              type="button"
+              onClick={onDeleteSelected}
+              disabled={selectedCount === 0}
+              title="Xoá đối tượng chọn (Delete)"
+              style={{
+                flex: 1,
+                height: 28,
+                background: selectedCount > 0 ? "#fef2f2" : "#f8fafc",
+                color: selectedCount > 0 ? "#dc2626" : "#cbd5e1",
+                border: "1px solid #e2e8f0",
+                borderRadius: 6,
+                cursor: selectedCount > 0 ? "pointer" : "default",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <IconTrash size={13} />
+            </button>
+          )}
+
+          {onUndo && (
+            <button
+              type="button"
+              onClick={onUndo}
+              disabled={!canUndo}
+              title="Hoàn tác (Ctrl+Z)"
+              style={{
+                flex: 1,
+                height: 28,
+                background: "#f8fafc",
+                color: canUndo ? "#334155" : "#cbd5e1",
+                border: "1px solid #e2e8f0",
+                borderRadius: 6,
+                cursor: canUndo ? "pointer" : "default",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <IconUndo size={13} />
+            </button>
+          )}
+
+          {onRedo && (
+            <button
+              type="button"
+              onClick={onRedo}
+              disabled={!canRedo}
+              title="Làm lại (Ctrl+Shift+Z)"
+              style={{
+                flex: 1,
+                height: 28,
+                background: "#f8fafc",
+                color: canRedo ? "#334155" : "#cbd5e1",
+                border: "1px solid #e2e8f0",
+                borderRadius: 6,
+                cursor: canRedo ? "pointer" : "default",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <IconRedo size={13} />
+            </button>
+          )}
+
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              title="Cài đặt hệ thống & thanh công cụ"
+              style={{
+                flex: 1,
+                height: 28,
+                background: "#eff6ff",
+                color: "#2563eb",
+                border: "1px solid #bfdbfe",
+                borderRadius: 6,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <IconSettings size={13} />
+            </button>
+          )}
+        </div>
 
         {/* Chèn PDF */}
         <button
