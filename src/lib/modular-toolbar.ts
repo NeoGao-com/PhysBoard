@@ -16,7 +16,7 @@ export const MODULAR_BLOCK_DEFS: Record<ModularBlockId, { id: ModularBlockId; na
   geometry2d: { id: "geometry2d", name: "Hình học phẳng", defaultPos: { x: 160, y: 170 } },
   space3d: { id: "space3d", name: "Không gian & Hàm số", defaultPos: { x: 160, y: 230 } },
   physics: { id: "physics", name: "Vật lý & Dụng cụ", defaultPos: { x: 160, y: 290 } },
-  system: { id: "system", name: "Trang & Hệ thống", defaultPos: { x: 160, y: 350 } },
+  system: { id: "system", name: "Hệ thống", defaultPos: { x: 160, y: 350 } },
 };
 
 export const DEFAULT_MODULAR_LAYOUT: ModularLayoutConfig = {

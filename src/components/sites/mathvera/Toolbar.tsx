@@ -1782,18 +1782,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           flexShrink: 0,
         }}
       >
-        {renderModuleGrip("system", "Trang & Hệ thống")}
-        <PageBar
-          doc={doc}
-          current={page.current}
-          count={page.count}
-          onPrevPage={onPrevPage}
-          onNextPage={onNextPage}
-          onAddPage={onAddPage}
-          compact={embedded}
-        />
-
-        {dividerV}
+        {renderModuleGrip("system", "Hệ thống")}
 
         {/* Delete */}
         {vis.groupSelection && vis.toolTrash && (
@@ -2605,21 +2594,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       {modularConfig.blocks.system.isFloating && (
         <FloatingDock
           id="system"
-          title="Trang & Hệ thống"
+          title="Hệ thống"
           position={modularConfig.blocks.system.position}
           onMove={(pos) => handleMoveFloatingBlock("system", pos)}
           onDock={() => handleDockBlock("system")}
         >
-          <PageBar
-            doc={doc}
-            current={page.current}
-            count={page.count}
-            onPrevPage={onPrevPage}
-            onNextPage={onNextPage}
-            onAddPage={onAddPage}
-            compact={false}
-          />
-          {dividerV}
           <button
             type="button"
             onClick={onDeleteSelected}
