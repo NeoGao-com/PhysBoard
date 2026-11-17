@@ -13,7 +13,6 @@ import {
   M3MenuAction,
 } from "./FunctionsAndStatsMenus";
 import { PageBar } from "./PageBar";
-import { PhysicsMenu } from "./PhysicsMenu";
 import { FILL_PALETTE } from "@/lib/geometry";
 import type { ShortcutMap } from "@/lib/commands";
 import type { ImportedImageResult, ImportedPdfPage } from "@/lib/pdf-import";
@@ -512,7 +511,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const functionsWrapRef = useRef<HTMLDivElement>(null);
   const statsWrapRef = useRef<HTMLDivElement>(null);
   const realworldWrapRef = useRef<HTMLDivElement>(null);
-  const physicsWrapRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const [pdfImporting, setPdfImporting] = useState(false);
@@ -529,8 +527,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         fillBtnRef.current?.contains(target) ||
         functionsWrapRef.current?.contains(target) ||
         statsWrapRef.current?.contains(target) ||
-        realworldWrapRef.current?.contains(target) ||
-        physicsWrapRef.current?.contains(target)
+        realworldWrapRef.current?.contains(target)
       ) {
         return;
       }
@@ -1635,40 +1632,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
         )}
 
-        {/* Physics Menu */}
-        {vis.toolPhysics && (
-        <div
-          ref={physicsWrapRef}
-          style={{ position: "relative", display: "inline-flex" }}
-        >
-          <button
-            type="button"
-            data-dropdown="physics"
-            data-tool="physics"
-            aria-haspopup="menu"
-            aria-expanded={openMenu === "physics"}
-            onClick={() =>
-              setOpenMenu((prev) =>
-                prev === "physics" ? null : "physics"
-              )
-            }
-            style={openMenu === "physics" ? activeStyle : btnBaseStyle}
-            title="Mô phỏng thí nghiệm Vật lý 10–11–12, Mạch điện, Lực, Quang hình, Đo đạc & Công thức"
-          >
-            <IconPhysics size={14} />
-            <span>Vật lý ▾</span>
-          </button>
-          <PhysicsMenu
-            open={openMenu === "physics"}
-            onClose={() => setOpenMenu(null)}
-            onAction={(act) => onPhysicsAction?.(act)}
-            onOpenDrawer={() => onOpenPhysicsDrawer?.()}
-            onOpenHtmlSimModal={() => onOpenHtmlSimModal?.()}
-            anchorRef={physicsWrapRef}
-          />
-        </div>
-        )}
-
         {/* Quick Calculator Tool */}
         {vis.toolCalculator && onOpenCalculator && (
           <button
@@ -2351,25 +2314,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               onOpenDrawer={() => onOpenRealWorldDrawer?.()}
               onOpenDecorHelp={() => onOpenDecorHelp?.()}
               anchorRef={realworldWrapRef}
-            />
-          </div>
-
-          <div ref={physicsWrapRef} style={{ position: "relative", display: "inline-flex" }}>
-            <button
-              type="button"
-              onClick={() => setOpenMenu((p) => (p === "physics" ? null : "physics"))}
-              style={openMenu === "physics" ? activeStyle : btnBaseStyle}
-              title="Vật lý"
-            >
-              <IconPhysics size={14} /> <span>Vật lý ▾</span>
-            </button>
-            <PhysicsMenu
-              open={openMenu === "physics"}
-              onClose={() => setOpenMenu(null)}
-              onAction={(act) => onPhysicsAction?.(act)}
-              onOpenDrawer={() => onOpenPhysicsDrawer?.()}
-              onOpenHtmlSimModal={() => onOpenHtmlSimModal?.()}
-              anchorRef={physicsWrapRef}
             />
           </div>
 
