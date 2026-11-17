@@ -1023,6 +1023,67 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </a>
         )}
 
+        {/* Chèn file PDF trực tiếp */}
+        {vis.groupDrawing && vis.toolInsertPdf && (
+          <>
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept="application/pdf"
+              style={{ display: "none" }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setPdfImporting(true);
+                try {
+                  const result = await importPdfPages(file);
+                  onInsertPdfPages?.(result.pages);
+                } catch (err) {
+                  console.error("Lỗi chèn file PDF:", err);
+                } finally {
+                  setPdfImporting(false);
+                }
+              }}
+            />
+            <button
+              type="button"
+              data-tool="insert-pdf"
+              disabled={pdfImporting}
+              onClick={() => pdfInputRef.current?.click()}
+              style={{
+                ...btnBaseStyle,
+                opacity: pdfImporting ? 0.6 : 1,
+                cursor: pdfImporting ? "wait" : "pointer",
+              }}
+              title="Chèn file PDF vào bảng"
+            >
+              <IconPdf size={14} color="#ef4444" />
+              <span>{pdfImporting ? "Đang nạp..." : "Chèn PDF"}</span>
+            </button>
+          </>
+        )}
+
+        {/* Nút nạp mô phỏng HTML (.html, .htm) trực tiếp */}
+        {onOpenHtmlSimModal && (
+          <button
+            type="button"
+            data-tool="insert-html-sim"
+            onClick={onOpenHtmlSimModal}
+            style={{
+              ...btnBaseStyle,
+              color: "#15803d",
+              fontWeight: 600,
+            }}
+            title="Nạp & nhúng file mô phỏng HTML thí nghiệm trực tiếp vào bảng"
+          >
+            <IconHtmlSim size={14} color="#16a34a" />
+            <span>Nạp HTML</span>
+          </button>
+        )}
+
+        {dividerV}
+
         {/* --- GROUP 1: Chọn, Bút, Tẩy | Màu & Nét | Công thức & Chèn --- */}
         {!modularConfig.blocks.ink.isFloating && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
@@ -1306,65 +1367,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <IconFormula size={14} />
           <span>Công thức</span>
         </button>
-        )}
-
-        {/* Chèn file PDF trực tiếp (thay thế menu chèn cũ) */}
-        {vis.groupDrawing && vis.toolInsertPdf && (
-        <>
-        <input
-          ref={pdfInputRef}
-          type="file"
-          accept="application/pdf"
-          style={{ display: "none" }}
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (!file) return;
-            setPdfImporting(true);
-            try {
-              const result = await importPdfPages(file);
-              onInsertPdfPages?.(result.pages);
-            } catch (err) {
-              console.error("Lỗi chèn file PDF:", err);
-            } finally {
-              setPdfImporting(false);
-            }
-          }}
-        />
-        <button
-          type="button"
-          data-tool="insert-pdf"
-          disabled={pdfImporting}
-          onClick={() => pdfInputRef.current?.click()}
-          style={{
-            ...btnBaseStyle,
-            opacity: pdfImporting ? 0.6 : 1,
-            cursor: pdfImporting ? "wait" : "pointer",
-          }}
-          title="Chèn file PDF vào bảng"
-        >
-          <IconPdf size={14} color="#ef4444" />
-          <span>{pdfImporting ? "Đang nạp..." : "Chèn PDF"}</span>
-        </button>
-        </>
-        )}
-
-        {/* Nút nạp mô phỏng HTML (.html, .htm) trực tiếp */}
-        {onOpenHtmlSimModal && (
-          <button
-            type="button"
-            data-tool="insert-html-sim"
-            onClick={onOpenHtmlSimModal}
-            style={{
-              ...btnBaseStyle,
-              color: "#15803d",
-              fontWeight: 600,
-            }}
-            title="Nạp & nhúng file mô phỏng HTML thí nghiệm trực tiếp vào bảng"
-          >
-            <IconHtmlSim size={14} color="#16a34a" />
-            <span>Nạp HTML</span>
-          </button>
         )}
 
         {dividerV}
