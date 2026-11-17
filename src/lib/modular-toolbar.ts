@@ -12,11 +12,11 @@ export interface ModularLayoutConfig {
 }
 
 export const MODULAR_BLOCK_DEFS: Record<ModularBlockId, { id: ModularBlockId; name: string; defaultPos: { x: number; y: number } }> = {
-  ink: { id: "ink", name: "Thao tác & Viết vẽ", defaultPos: { x: 80, y: 80 } },
-  geometry2d: { id: "geometry2d", name: "Hình học phẳng", defaultPos: { x: 80, y: 160 } },
-  space3d: { id: "space3d", name: "Không gian & Hàm số", defaultPos: { x: 80, y: 240 } },
-  physics: { id: "physics", name: "Vật lý & Dụng cụ", defaultPos: { x: 80, y: 320 } },
-  system: { id: "system", name: "Trang & Hệ thống", defaultPos: { x: 80, y: 400 } },
+  ink: { id: "ink", name: "Thao tác & Viết vẽ", defaultPos: { x: 160, y: 110 } },
+  geometry2d: { id: "geometry2d", name: "Hình học phẳng", defaultPos: { x: 160, y: 170 } },
+  space3d: { id: "space3d", name: "Không gian & Hàm số", defaultPos: { x: 160, y: 230 } },
+  physics: { id: "physics", name: "Vật lý & Dụng cụ", defaultPos: { x: 160, y: 290 } },
+  system: { id: "system", name: "Trang & Hệ thống", defaultPos: { x: 160, y: 350 } },
 };
 
 export const DEFAULT_MODULAR_LAYOUT: ModularLayoutConfig = {

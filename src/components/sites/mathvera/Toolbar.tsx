@@ -738,26 +738,29 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           userSelect: "none",
         }}
       >
-        {/* Drag handle */}
-        <div
-          data-wb-toolbar-drag="true"
-          onPointerDown={handleStartToolbarDrag}
-          onDoubleClick={resetToolbarLayout}
-          title="Kéo di chuyển · Nhấp đúp để đặt lại vị trí giữa"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 14,
-            height: 24,
-            cursor: "grab",
-            borderRadius: 4,
-            color: "#94a3b8",
-            marginRight: 2,
-          }}
-        >
-          <IconGrip size={13} />
-        </div>
+      {/* Drag handle */}
+      <div
+        data-wb-toolbar-drag="true"
+        onPointerDown={handleStartToolbarDrag}
+        onDoubleClick={resetToolbarLayout}
+        title="Kéo di chuyển · Nhấp đúp để đặt lại vị trí giữa"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 18,
+          height: 26,
+          cursor: "grab",
+          borderRadius: 6,
+          background: "#f1f5f9",
+          border: "1px solid #e2e8f0",
+          color: "#64748b",
+          marginRight: 2,
+          flexShrink: 0,
+        }}
+      >
+        <IconGrip size={14} color="#64748b" />
+      </div>
 
         {/* Quick Select */}
         <button
@@ -901,6 +904,33 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         overflow: "visible",
       }}
     >
+      {/* Pinned Toolbar Drag Handle (Always at the very left of the toolbar) */}
+      {!embedded && (
+        <div
+          data-wb-toolbar-drag="true"
+          onPointerDown={handleStartToolbarDrag}
+          onDoubleClick={resetToolbarLayout}
+          title="Kéo để di chuyển thanh công cụ · Nhấp đúp để đặt lại vị trí ban đầu"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 18,
+            height: 26,
+            cursor: "grab",
+            borderRadius: 6,
+            background: "#f1f5f9",
+            color: "#64748b",
+            flexShrink: 0,
+            border: "1px solid #e2e8f0",
+            marginRight: 2,
+            userSelect: "none",
+          }}
+        >
+          <IconGrip size={14} color="#64748b" />
+        </div>
+      )}
+
       {/* Left + Center Tool Groups */}
       <div
         className="wb-scroll"
@@ -915,27 +945,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           scrollbarWidth: "none",
         }}
       >
-        {!embedded && (
-          <div
-            data-wb-toolbar-drag="true"
-            onPointerDown={handleStartToolbarDrag}
-            onDoubleClick={resetToolbarLayout}
-            title="Kéo để di chuyển thanh công cụ · Nhấp đúp để đặt lại vị trí & kích thước"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 14,
-              height: 24,
-              cursor: "grab",
-              borderRadius: 5,
-              flexShrink: 0,
-            }}
-          >
-            <IconGrip size={13} color="#94a3b8" />
-          </div>
-        )}
-
         {/* Brand Home Button / Link */}
         {onGoHome ? (
           <button

@@ -30,38 +30,71 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
 
   if (!isOpen) {
     return (
-      <div
+      <aside
         data-export-skip="true"
+        data-wb-page-sidebar-collapsed="true"
         style={{
           position: "fixed",
-          top: 60,
-          left: 12,
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: 26,
+          background: "#f8fafc",
+          borderRight: "1px solid #cbd5e1",
           zIndex: 80,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          paddingTop: 8,
+          gap: 12,
+          boxShadow: "1px 0 6px rgba(15,23,42,0.06)",
+          userSelect: "none",
         }}
       >
         <button
           type="button"
           onClick={onToggleOpen}
-          title="Mở danh sách trang sổ tay"
+          title="Mở sổ tay trang"
           style={{
             background: "#ffffff",
             border: "1px solid #cbd5e1",
-            borderRadius: 8,
-            boxShadow: "0 4px 12px rgba(15,23,42,0.12)",
-            padding: "8px 12px",
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#334155",
+            borderRadius: 4,
+            width: 20,
+            height: 24,
+            fontSize: 10,
+            color: "#475569",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          ▶
+        </button>
+
+        <div
+          onClick={onToggleOpen}
+          title="Mở sổ tay trang"
+          style={{
+            writingMode: "vertical-rl",
+            textOrientation: "mixed",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            color: "#64748b",
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             gap: 6,
           }}
         >
-          <span>📑</span>
-          <span>Trang ({currentPage}/{totalPages})</span>
-        </button>
-      </div>
+          <span style={{ fontSize: 11 }}>📑</span>
+          <span>SỔ TAY ({currentPage}/{totalPages})</span>
+        </div>
+      </aside>
     );
   }
 
