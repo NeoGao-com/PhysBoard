@@ -25,6 +25,10 @@ function HomeRouter() {
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
   const [localRoom, setLocalRoom] = useState<string | null>(() => readInitialLocalBoard());
 
+  if (!mounted) {
+    return <div className="w-full h-full bg-[#FBFBFD]" />;
+  }
+
   if (hasUrlRoom) {
     const rawRoom = searchParams.get("room");
     const safeRoomId = rawRoom
@@ -50,10 +54,6 @@ function HomeRouter() {
         }}
       />
     );
-  }
-
-  if (!mounted) {
-    return <div className="w-full h-full bg-[#FBFBFD]" />;
   }
 
   if (localRoom) {
