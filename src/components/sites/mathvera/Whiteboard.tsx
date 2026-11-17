@@ -6910,6 +6910,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             isOpen={pageSidebarOpen}
             onToggleOpen={() => setPageSidebarOpen((v) => !v)}
             onOpenPageManager={() => setPageManagerOpen(true)}
+            onInsertPdfPages={handleInsertPdfPages}
+            onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
             onSelectPage={(p) => {
               setYjsCurrentPage(doc, p);
               if (isA4Format) {

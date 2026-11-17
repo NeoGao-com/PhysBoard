@@ -1,7 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useState } from "react";
 import { PageBoardConfig, BOARD_SURFACE_PRESETS } from "@/lib/board-themes";
+import { importPdfPages, ImportedPdfPage } from "@/lib/pdf-import";
+import { IconPdf, IconHtmlSim } from "./ToolbarIcons";
 
 export interface PageSidebarProps {
   currentPage: number;
@@ -10,6 +12,8 @@ export interface PageSidebarProps {
   onAddPage: () => void;
   onDeletePage?: (page: number) => void;
   onOpenPageManager?: () => void;
+  onInsertPdfPages?: (pages: ImportedPdfPage[]) => void;
+  onOpenHtmlSimModal?: () => void;
   boardConfig?: PageBoardConfig;
   isOpen: boolean;
   onToggleOpen: () => void;
@@ -22,11 +26,15 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onAddPage,
   onDeletePage,
   onOpenPageManager,
+  onInsertPdfPages,
+  onOpenHtmlSimModal,
   boardConfig,
   isOpen,
   onToggleOpen,
 }) => {
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const [pdfImporting, setPdfImporting] = useState(false);
 
   if (!isOpen) {
     return (
@@ -320,7 +328,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
       {/* Footer: Add Page & Page Manager Buttons */}
       <div
         style={{
-          padding: 10,
+          padding: 8,
           borderTop: "1px solid #e2e8f0",
           background: "#ffffff",
           display: "flex",
@@ -328,6 +336,82 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           gap: 6,
         }}
       >
+        {/* Hidden PDF Input */}
+        <input
+          ref={pdfInputRef}
+          type="file"
+          accept="application/pdf"
+          style={{ display: "none" }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            setPdfImporting(true);
+            try {
+              const result = await importPdfPages(file);
+              onInsertPdfPages?.(result.pages);
+            } catch (err) {
+              console.error("Lỗi chèn file PDF:", err);
+            } finally {
+              setPdfImporting(false);
+            }
+          }}
+        />
+
+        {/* Chèn PDF */}
+        <button
+          type="button"
+          disabled={pdfImporting}
+          onClick={() => pdfInputRef.current?.click()}
+          title="Chèn file PDF thành các trang sổ tay"
+          style={{
+            width: "100%",
+            background: "#fff1f2",
+            color: "#e11d48",
+            border: "1px solid #fecdd3",
+            borderRadius: 6,
+            padding: "6px 0",
+            fontSize: 11.5,
+            fontWeight: 600,
+            cursor: pdfImporting ? "wait" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 4,
+            opacity: pdfImporting ? 0.6 : 1,
+          }}
+        >
+          <IconPdf size={13} color="#e11d48" />
+          <span>{pdfImporting ? "Đang nạp..." : "Chèn PDF"}</span>
+        </button>
+
+        {/* Nạp HTML Sim */}
+        {onOpenHtmlSimModal && (
+          <button
+            type="button"
+            onClick={onOpenHtmlSimModal}
+            title="Nạp & nhúng file mô phỏng HTML thí nghiệm trực tiếp vào bảng"
+            style={{
+              width: "100%",
+              background: "#f0fdf4",
+              color: "#16a34a",
+              border: "1px solid #bbf7d0",
+              borderRadius: 6,
+              padding: "6px 0",
+              fontSize: 11.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+            }}
+          >
+            <IconHtmlSim size={13} color="#16a34a" />
+            <span>Nạp HTML</span>
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onAddPage}
@@ -338,7 +422,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
             color: "#ffffff",
             border: "none",
             borderRadius: 6,
-            padding: "8px 0",
+            padding: "7px 0",
             fontSize: 12,
             fontWeight: 700,
             cursor: "pointer",
@@ -346,7 +430,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
             alignItems: "center",
             justifyContent: "center",
             gap: 4,
-            boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+            boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
           }}
         >
           <span>+</span>
