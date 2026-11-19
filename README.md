@@ -6,6 +6,10 @@
     <a href="https://github.com/NeoGao-com/PhysBoard/releases/latest">
       <img src="https://img.shields.io/badge/Download-PhysBoard%20Windows%20(.exe)-2563eb?style=for-the-badge&logo=windows" alt="Download Windows EXE" />
     </a>
+    &nbsp;
+    <a href="https://github.com/NeoGao-com/PhysBoard/releases/latest">
+      <img src="https://img.shields.io/badge/Download-PhysBoard%20Android%20(.apk)-16a34a?style=for-the-badge&logo=android" alt="Download Android APK" />
+    </a>
   </p>
   <p>
     <em>Next.js 16 (Static Export) · React 19 · Tailwind CSS v4 · Electron · Capacitor Android</em>
