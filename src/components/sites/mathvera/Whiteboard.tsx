@@ -2362,8 +2362,23 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
       const startSnap = startSnapId ? null : snapPointAtCursor(p1, 20);
       const endSnap = endSnapId ? null : snapPointAtCursor(p2, 20);
-      const resolvedP1 = startSnap && startSnap.constraint.kind !== "free" ? startSnap.point : p1;
-      const resolvedP2 = endSnap && endSnap.constraint.kind !== "free" ? endSnap.point : p2;
+      const rawResolvedP1 = startSnap && startSnap.constraint.kind !== "free" ? startSnap.point : p1;
+      const rawResolvedP2 = endSnap && endSnap.constraint.kind !== "free" ? endSnap.point : p2;
+
+      const a4Opt = isA4Format
+        ? BOARD_FORMAT_OPTIONS.find((f) => f.id === currentBoardConfig?.format)
+        : null;
+      const clampA4 = (pt: Point2D): Point2D => {
+        if (!a4Opt) return pt;
+        const hw = a4Opt.widthWorld / 2;
+        const hh = a4Opt.heightWorld / 2;
+        return {
+          x: Math.max(-hw, Math.min(hw, pt.x)),
+          y: Math.max(-hh, Math.min(hh, pt.y)),
+        };
+      };
+      const resolvedP1 = clampA4(rawResolvedP1);
+      const resolvedP2 = clampA4(rawResolvedP2);
 
       const createSnappedEndpoints = (needStart: boolean, needEnd: boolean) => {
         let sId = startSnapId;
@@ -2505,7 +2520,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }
       });
     },
-    [dispatcher, currentStyle, viewport.scale, snapPointAtCursor, pageElements]
+    [
+      dispatcher,
+      currentStyle,
+      viewport.scale,
+      snapPointAtCursor,
+      pageElements,
+      isA4Format,
+      currentBoardConfig,
+    ]
   );
 
   // --- Insert / M3 / Exam / RealWorld Handlers ---
@@ -4478,6 +4501,26 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return;
       }
 
+      // In A4 mode: strictly only allow writing / drawing inside the paper sheet!
+      if (isA4Format) {
+        const a4Opt = BOARD_FORMAT_OPTIONS.find(
+          (f) => f.id === currentBoardConfig?.format
+        );
+        if (a4Opt) {
+          const hw = a4Opt.widthWorld / 2;
+          const hh = a4Opt.heightWorld / 2;
+          const isInsideA4 =
+            worldPos.x >= -hw &&
+            worldPos.x <= hw &&
+            worldPos.y >= -hh &&
+            worldPos.y <= hh;
+          if (!isInsideA4) {
+            // Cannot start writing, drawing, or placing objects outside the A4 paper sheet
+            return;
+          }
+        }
+      }
+
       // Contact Eraser
       if (activeTool === "erase") {
         eraserDidEraseRef.current = true;
@@ -5152,6 +5195,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       handleSelectTool,
       handleConstructionClick,
       penOnlyMode,
+      isA4Format,
+      currentBoardConfig,
+      spenConfig,
     ]
   );
 
@@ -5878,6 +5924,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         rect
       );
 
+      if (isA4Format) {
+        const a4Opt = BOARD_FORMAT_OPTIONS.find(
+          (f) => f.id === currentBoardConfig?.format
+        );
+        if (a4Opt) {
+          const hw = a4Opt.widthWorld / 2;
+          const hh = a4Opt.heightWorld / 2;
+          pt.x = Math.max(-hw, Math.min(hw, pt.x));
+          pt.y = Math.max(-hh, Math.min(hh, pt.y));
+        }
+      }
+
       if (isHtml) {
         try {
           const text = await file.text();
@@ -5921,7 +5979,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }
       }
     },
-    [containerRef, viewport, dispatcher]
+    [containerRef, viewport, dispatcher, isA4Format, currentBoardConfig]
   );
 
   // --- Shared Renderers (used in both Fullscreen Whiteboard & 50/50 Split Exam Mode) ---

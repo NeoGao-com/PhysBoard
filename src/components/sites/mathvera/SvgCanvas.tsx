@@ -213,7 +213,19 @@ export function SvgCanvas({
             )}
           </pattern>
 
-          {/* Dedicated crisp vector pattern for A4 paper sheet */}
+          {/* Clip path to strictly constrain board content within the A4 paper sheet */}
+          {isA4 && a4FormatOption && (
+            <clipPath id="wb-a4-clip">
+              <rect
+                x={-a4FormatOption.widthWorld / 2}
+                y={-a4FormatOption.heightWorld / 2}
+                width={a4FormatOption.widthWorld}
+                height={a4FormatOption.heightWorld}
+                rx={0.06}
+                ry={0.06}
+              />
+            </clipPath>
+          )}
           {isA4 && a4FormatOption && showPattern && (
             <pattern
               id="wb-a4-grid"
@@ -357,7 +369,13 @@ export function SvgCanvas({
             </g>
           )}
 
-          {children}
+          {isA4 && a4FormatOption ? (
+            <g data-wb-a4-clipped="true" clipPath="url(#wb-a4-clip)">
+              {children}
+            </g>
+          ) : (
+            children
+          )}
         </g>
 
         {/* SVG Selection & Marquee Overlay Container */}
