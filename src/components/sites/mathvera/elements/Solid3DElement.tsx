@@ -25,12 +25,14 @@ import {
   buildOxyzAxes,
   computeCircumsphereWireframe,
   computeOrthoViews,
+  computePolyhedronSection,
   computeRevolutionGeometry,
   computeRoundCrossSection,
   computeSolidWireframe,
   computeSpaceFigureGeometry,
   dist3,
   getRoundRims,
+  isEdgeHidden,
   isRoundPointOccluded,
   liftRoundSolidTo3D,
   liftSolidTo3D,
@@ -529,51 +531,84 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
     );
   }
 
-  // --- 3. RoundSection ---
-  if (element.type === "RoundSection") {
+  // --- 3. RoundSection / SolidSection (cross-section of any 3D solid) ---
+  if (element.type === "RoundSection" || (element.type as string) === "SolidSection") {
     const props = element.props as Partial<RoundSectionProps>;
     const solidEl = props.solid ? byId.get(props.solid) : undefined;
     const secPts = Array.isArray(props.points) ? props.points : [];
-    if (!solidEl || solidEl.type !== "Solid3D" || secPts.length < 3 || !points3D) return null;
+    if (!solidEl || solidEl.type !== "Solid3D" || secPts.length < 3) return null;
 
     const kind = solidEl.props.kind as Solid3DKind;
+    const isRound = kind === "cone" || kind === "cylinder" || kind === "sphere";
     const r = typeof solidEl.props.r === "number" ? solidEl.props.r : 1.3;
     const solidPts2 = (solidEl.props.points as string[])
       .map((id) => points.get(id))
       .filter((p): p is Point2D => p !== undefined);
-    const lift = lifts?.get(solidEl.id) ?? liftRoundSolidTo3D(kind, solidPts2, r);
-    const p3A = points3D.get(secPts[0]);
-    const p3B = points3D.get(secPts[1]);
-    const p3C = points3D.get(secPts[2]);
-    if (!lift || !p3A || !p3B || !p3C) return null;
+    const lift =
+      lifts?.get(solidEl.id) ??
+      (isRound
+        ? liftRoundSolidTo3D(kind, solidPts2, r)
+        : liftSolidTo3D(kind, solidPts2));
+    if (!lift) return null;
 
-    const boundary3 = computeRoundCrossSection(kind, lift, r, p3A, p3B, p3C);
-    if (!boundary3) return null;
+    const resolveP3 = (ptIdOrIdx: string): Point3D | undefined => {
+      if (points3D?.has(ptIdOrIdx)) return points3D.get(ptIdOrIdx);
+      if (solidEl.props.points && Array.isArray(solidEl.props.points)) {
+        const vIdx = (solidEl.props.points as string[]).indexOf(ptIdOrIdx);
+        if (vIdx >= 0 && lift.p3[vIdx]) return lift.p3[vIdx];
+      }
+      const num = Number(ptIdOrIdx);
+      if (Number.isInteger(num) && num >= 0 && num < lift.p3.length) {
+        return lift.p3[num];
+      }
+      return undefined;
+    };
+
+    const p3A = resolveP3(secPts[0]);
+    const p3B = resolveP3(secPts[1]);
+    const p3C = resolveP3(secPts[2]);
+    if (!p3A || !p3B || !p3C) return null;
+
+    const boundary3 = isRound
+      ? computeRoundCrossSection(kind, lift, r, p3A, p3B, p3C)
+      : computePolyhedronSection(lift, [p3A, p3B, p3C]);
+    if (!boundary3 || boundary3.length < 3) return null;
 
     const fillPts2 = boundary3.map((p) => project3DTo2D(lift, p));
     const solidRuns: Point2D[][] = [];
     const dashedRuns: Point2D[][] = [];
-    let curRun: Point2D[] = [fillPts2[0]];
-    let curHidden = isRoundPointOccluded(kind, lift, r, lift.view, boundary3[0]);
 
-    for (let i = 1; i <= boundary3.length; i++) {
-      const idx = i % boundary3.length;
-      const mid3 = {
-        x: (boundary3[i - 1].x + boundary3[idx].x) / 2,
-        y: (boundary3[i - 1].y + boundary3[idx].y) / 2,
-        z: (boundary3[i - 1].z + boundary3[idx].z) / 2,
-      };
-      const hid = isRoundPointOccluded(kind, lift, r, lift.view, mid3);
-      if (hid === curHidden) {
-        curRun.push(fillPts2[idx]);
-      } else {
-        (curHidden ? dashedRuns : solidRuns).push(curRun);
-        curHidden = hid;
-        curRun = [fillPts2[(i - 1) % boundary3.length], fillPts2[idx]];
+    if (isRound) {
+      let curRun: Point2D[] = [fillPts2[0]];
+      let curHidden = isRoundPointOccluded(kind, lift, r, lift.view, boundary3[0]);
+
+      for (let i = 1; i <= boundary3.length; i++) {
+        const idx = i % boundary3.length;
+        const mid3 = {
+          x: (boundary3[i - 1].x + boundary3[idx].x) / 2,
+          y: (boundary3[i - 1].y + boundary3[idx].y) / 2,
+          z: (boundary3[i - 1].z + boundary3[idx].z) / 2,
+        };
+        const hid = isRoundPointOccluded(kind, lift, r, lift.view, mid3);
+        if (hid === curHidden) {
+          curRun.push(fillPts2[idx]);
+        } else {
+          (curHidden ? dashedRuns : solidRuns).push(curRun);
+          curHidden = hid;
+          curRun = [fillPts2[(i - 1) % boundary3.length], fillPts2[idx]];
+        }
+      }
+      (curHidden ? dashedRuns : solidRuns).push(curRun);
+    } else {
+      for (let i = 0; i < boundary3.length; i++) {
+        const nextIdx = (i + 1) % boundary3.length;
+        const seg = [fillPts2[i], fillPts2[nextIdx]];
+        const hidden = isEdgeHidden(lift, boundary3[i], boundary3[nextIdx]);
+        if (hidden) dashedRuns.push(seg);
+        else solidRuns.push(seg);
       }
     }
-    (curHidden ? dashedRuns : solidRuns).push(curRun);
-    const color = activeColor ?? style.stroke ?? "#334155";
+    const color = activeColor ?? style.stroke ?? "#e8590c";
 
     return (
       <g
@@ -587,7 +622,7 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
       >
         <polygon
           points={toPolygonPoints(fillPts2)}
-          fill={style.fill ?? "#f08c0066"}
+          fill={style.fill ?? "rgba(240, 140, 0, 0.35)"}
           stroke="none"
           style={{ pointerEvents: "none" }}
         />
