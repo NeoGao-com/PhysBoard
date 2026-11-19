@@ -343,6 +343,7 @@ export function getElementBoundingBox(
 
   if (
     el.type === "RoundSection" ||
+    el.type === "SolidSection" ||
     el.type === "OrthoViews" ||
     el.type === "Revolution" ||
     el.type === "SpaceFigure"

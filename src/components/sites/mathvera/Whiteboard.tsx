@@ -58,6 +58,7 @@ import {
   resolveCircleRadius,
   resolveLineEndpoints,
   resolveLineGeometry,
+  rotatePointAround,
   snapPointToObject,
   tangentPointToCircle,
   bisectorFoot2D,
@@ -74,7 +75,6 @@ import {
   buildSpatialConstructionElements,
   cameraToAzimuthElevation,
   computeFlattenedFace,
-  computePolyhedronSection,
   computeUnfoldedPolyhedronNet,
   createOxyzElement,
   projectOxyzPoint,
@@ -84,7 +84,6 @@ import {
   extractPolyhedronEdges,
   liftSolidTo3D,
   orbitCamera,
-  project3DTo2D,
   resolveSolidSubSelectionAtPoint,
   skewLineClosest,
   solveGeometry3D,
@@ -720,6 +719,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   } = useCanvasNavigation({
     currentTool: activeTool,
     isA4: isA4Format,
+    penOnlyMode,
     onCursorMove: updateLocalCursor,
   });
 
@@ -1274,6 +1274,31 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           return true;
         }
         return false;
+      }
+
+      // 6. 3D Cross-Section from 3 selected points
+      if (tool === "c:section") {
+        const ptIds = selGeom.points.map((p) => p.elementId).filter(Boolean);
+        if (ptIds.length === 3) {
+          const ownerId = ptIds
+            .map((id) => solved3D.owner.get(id))
+            .find((id): id is string => Boolean(id));
+          const solidEl = ownerId ? byId.get(ownerId) : undefined;
+          if (solidEl && solidEl.type === "Solid3D") {
+            const secId = newElId("sec");
+            const res = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: secId,
+                type: "RoundSection",
+                style: { stroke: "#e8590c", fill: "rgba(240,140,0,0.35)", width: 2 },
+                props: { solid: solidEl.id, points: ptIds },
+              },
+            });
+            if (res.created?.[0]) setSelectedIds([res.created[0]]);
+            return true;
+          }
+        }
       }
 
       return false;
@@ -1955,6 +1980,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
       if (isModifier && lower === "a") {
         e.preventDefault();
+        setSolidSubSel(null);
         setSelectedIds(
           pageElements.filter((el) => !el.style?.hidden).map((el) => el.id)
         );
@@ -3770,7 +3796,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               const ptIds = Array.isArray(el.props.points) ? (el.props.points as string[]) : [];
               const kind = (el.props.kind ?? "pyramid") as Solid3DKind;
               const pts2d = ptIds.map((id) => hydratedPts.get(id)).filter((p): p is Point2D => Boolean(p));
-              const lift = pts2d.length === ptIds.length ? liftSolidTo3D(kind, pts2d) : null;
+              const lift = solved3D.lifts.get(el.id) ?? (pts2d.length === ptIds.length ? liftSolidTo3D(kind, pts2d) : null);
               if (lift) {
                 const hitFace = lift.faces.find((face) => {
                   const poly = face.map((idx) => pts2d[idx]).filter(Boolean);
@@ -3996,7 +4022,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
         if (tool === "c:section") {
           const ownerId = nextIds
-            .map((id) => solved3D.owner.get(id))
+            .map((id) => {
+              if (solved3D.owner.get(id)) return solved3D.owner.get(id);
+              for (const el of pageElements) {
+                if (el.type === "Solid3D" && Array.isArray(el.props.points) && (el.props.points as string[]).includes(id)) {
+                  return el.id;
+                }
+              }
+              return undefined;
+            })
             .find((id): id is string => Boolean(id));
           const solidEl = ownerId ? byId.get(ownerId) : undefined;
           if (!solidEl || solidEl.type !== "Solid3D") {
@@ -4004,52 +4038,16 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               "Vui lòng chọn 3 điểm thuộc hoặc nằm trên các cạnh/mặt của một khối 3D."
             );
           } else {
-            const kind = solidEl.props.kind as Solid3DKind;
-            if (kind === "cone" || kind === "cylinder" || kind === "sphere") {
-              dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  id: newElId("rsec"),
-                  type: "RoundSection",
-                  style: { stroke: "#e8590c", fill: "rgba(240,140,0,0.35)", width: 2 },
-                  props: { solid: solidEl.id, points: [nextIds[0], nextIds[1], nextIds[2]] },
-                },
-              });
-              setStatusHint(null);
-            } else {
-              const lift = solved3D.lifts.get(solidEl.id);
-              const p3A = solved3D.p3.get(nextIds[0]);
-              const p3B = solved3D.p3.get(nextIds[1]);
-              const p3C = solved3D.p3.get(nextIds[2]);
-              const poly3 =
-                lift && p3A && p3B && p3C
-                  ? computePolyhedronSection(lift, [p3A, p3B, p3C])
-                  : null;
-              if (poly3 && lift) {
-                const secId = newElId("sec");
-                const embedded: EmbeddedVertex[] = poly3.map((p3, i) => {
-                  const pt2 = project3DTo2D(lift, p3);
-                  return {
-                    id: `${secId}_v${i}`,
-                    name: "",
-                    x: pt2.x,
-                    y: pt2.y,
-                  };
-                });
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: secId,
-                    type: "GeomPolygon",
-                    style: { stroke: "#e8590c", fill: "rgba(240,140,0,0.35)", width: 2 },
-                    props: { vertices: embedded.map((v) => v.id), points: embedded },
-                  },
-                });
-                setStatusHint(null);
-              } else {
-                setStatusHint("3 điểm thẳng hàng hoặc mặt phẳng không cắt khối.");
-              }
-            }
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: newElId("sec"),
+                type: "RoundSection",
+                style: { stroke: "#e8590c", fill: "rgba(240,140,0,0.35)", width: 2 },
+                props: { solid: solidEl.id, points: [nextIds[0], nextIds[1], nextIds[2]] },
+              },
+            });
+            setStatusHint(null);
           }
         } else {
           const built = buildSpatialConstructionElements(
@@ -4102,7 +4100,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   // --- Transform Handles & Element Pointer Handlers ---
   const handleHandlePointerDown = useCallback(
     (e: React.PointerEvent, handle: TransformHandle) => {
+      // Allow 1-finger touch or stylus to drag the resize squares (TransformHandles)
       e.stopPropagation();
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore capture errors
+      }
       resizeStartRef.current = {
         handle,
         initHandlePos: { x: handle.x, y: handle.y },
@@ -4115,6 +4119,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
   const handleBoxPointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (penOnlyMode && e.pointerType === "touch") {
+        navPointerDown(e as unknown as React.PointerEvent<SVGSVGElement>);
+        return;
+      }
       e.stopPropagation();
       const rect = containerRef.current?.getBoundingClientRect();
       const worldPos = screenToWorld(
@@ -4181,11 +4189,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       };
       dispatcher.gesture(true);
     },
-    [dispatcher, containerRef, viewport, selectedElements, byId, pageElements]
+    [dispatcher, containerRef, viewport, selectedElements, byId, pageElements, penOnlyMode, navPointerDown]
   );
 
   const handleElementPointerDown = useCallback(
     (e: React.PointerEvent, elementId: string) => {
+      if (penOnlyMode && e.pointerType === "touch") {
+        navPointerDown(e as unknown as React.PointerEvent<SVGSVGElement>);
+        return;
+      }
       if (activeTool === "erase") return;
       if (
         activeTool === null ||
@@ -4267,6 +4279,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       pageElements,
       hydratedPts,
       solved3D,
+      penOnlyMode,
+      navPointerDown,
     ]
   );
 
@@ -5792,6 +5806,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             isSelected={isSel}
             onPointerDown={(e, id) => handleElementPointerDown(e, id)}
             onLabelPointerDown={(e, id) => {
+              if (penOnlyMode && e.pointerType === "touch") {
+                navPointerDown(e as unknown as React.PointerEvent<SVGSVGElement>);
+                return;
+              }
               e.stopPropagation();
               setSelectedIds([id]);
               const rect = containerRef.current?.getBoundingClientRect();
@@ -5921,6 +5939,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       case "Solid3D":
       case "Axes3D":
       case "RoundSection":
+      case "SolidSection":
       case "SpaceFigure":
       case "OrthoViews":
       case "Revolution":
@@ -5937,8 +5956,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             dotScale={dotScale}
             orbitCam={
               orbitCamById[el.id] ??
-              (el.type === "SpaceFigure" && (el.props as any)?.axes
-                ? orbitCamById[(el.props as any).axes]
+              ((el.type === "RoundSection" || (el.type as string) === "SolidSection") && (el.props as Record<string, unknown>)?.solid
+                ? orbitCamById[String((el.props as Record<string, unknown>).solid)]
+                : undefined) ??
+              (el.type === "SpaceFigure" && (el.props as Record<string, unknown>)?.axes
+                ? orbitCamById[String((el.props as Record<string, unknown>).axes)]
                 : undefined)
             }
             isSelected={isSel}
@@ -5994,7 +6016,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             isSelected={isSel}
             onPointerDown={(e) => handleElementPointerDown(e, el.id)}
             onResizeHandlePointerDown={(e, side) => {
-              void e;
+              e.stopPropagation();
               axesResizeRef.current = { id: el.id, side, element: el };
               dispatcher.gesture(true);
             }}
@@ -6908,6 +6930,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       {/* Floating Selection Bar */}
       {!examOpen && (
         <SelectionBar
+          sidebarOpen={pageSidebarOpen}
           selectedCount={selectedIds.length}
           hiddenCount={hiddenCount}
           selectedAxes2D={selectedAxes2D}
@@ -7321,6 +7344,161 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           onAxesOpenInequality={() => setCurve2dDialogMode("inequality")}
           onAxesOpenParametric={() => setCurve2dDialogMode("parametric")}
           onAxesOpenSequence={() => setCurve2dDialogMode("sequence")}
+          onRotateSelection={(deltaDeg) => {
+            if (selectedElements.length === 0) return;
+            const bbox = getCompositeBoundingBox(selectedElements, pageElements, viewport.scale);
+            const center: Point2D = bbox
+              ? { x: bbox.centerX, y: bbox.centerY }
+              : {
+                  x:
+                    selectedElements.reduce((sum, e) => sum + e.transform.x, 0) /
+                    selectedElements.length,
+                  y:
+                    selectedElements.reduce((sum, e) => sum + e.transform.y, 0) /
+                    selectedElements.length,
+                };
+
+            const rotatedPointIds = new Set<string>();
+            const rotateFreePointById = (ptId: unknown) => {
+              if (typeof ptId !== "string" || rotatedPointIds.has(ptId)) return;
+              const ptEl = byId.get(ptId);
+              if (!ptEl || (ptEl.type !== "GeomPoint" && ptEl.type !== "Point")) return;
+              const kind = (ptEl.props?.constraint as { kind?: string } | undefined)?.kind ?? "free";
+              if (kind !== "free") return;
+              rotatedPointIds.add(ptId);
+              const p = rotatePointAround(
+                { x: ptEl.transform.x, y: ptEl.transform.y },
+                center,
+                deltaDeg
+              );
+              dispatcher.dispatch({
+                type: "object.update",
+                params: {
+                  id: ptEl.id,
+                  transform: { x: p.x, y: p.y },
+                },
+              });
+            };
+
+            dispatcher.batch(() => {
+              for (const el of selectedElements) {
+                if (el.type === "Solid3D" || el.type === "Axes3D") {
+                  const sProps = el.props as Partial<Solid3DProps>;
+                  const curAz = typeof sProps.azimuth === "number" ? sProps.azimuth : 26;
+                  const curEl = typeof sProps.elevation === "number" ? sProps.elevation : 17;
+                  let nextAz = Math.round(curAz + deltaDeg);
+                  while (nextAz > 180) nextAz -= 360;
+                  while (nextAz < -180) nextAz += 360;
+                  const nextCam = azimuthElevationToCamera(nextAz, curEl);
+                  setOrbitCamById((prev) => ({ ...prev, [el.id]: nextCam }));
+                  dispatcher.dispatch({
+                    type: "object.update",
+                    params: {
+                      id: el.id,
+                      props: { ...el.props, azimuth: nextAz, elevation: curEl },
+                    },
+                  });
+                } else if (el.type === "GeomPoint" || el.type === "Point") {
+                  rotateFreePointById(el.id);
+                } else if (el.type === "GeomPolygon") {
+                  if (Array.isArray(el.props.points)) {
+                    const rotatedPts = (el.props.points as EmbeddedVertex[]).map((v) => {
+                      const wx = v.x + el.transform.x;
+                      const wy = v.y + el.transform.y;
+                      const r = rotatePointAround({ x: wx, y: wy }, center, deltaDeg);
+                      return {
+                        ...v,
+                        x: r.x - el.transform.x,
+                        y: r.y - el.transform.y,
+                      };
+                    });
+                    dispatcher.dispatch({
+                      type: "object.update",
+                      params: {
+                        id: el.id,
+                        props: { ...el.props, points: rotatedPts },
+                      },
+                    });
+                  } else if (Array.isArray(el.props.vertices)) {
+                    for (const vid of el.props.vertices) {
+                      rotateFreePointById(vid);
+                    }
+                  }
+                } else if (el.type === "GeomCircle") {
+                  rotateFreePointById(el.props.center);
+                  const rad = el.props.radius as Record<string, unknown> | undefined;
+                  if (rad?.kind === "through") {
+                    rotateFreePointById(rad.point);
+                  }
+                  if (el.props.centerPt && typeof el.props.centerPt === "object") {
+                    const nextCenter = rotatePointAround(el.props.centerPt as Point2D, center, deltaDeg);
+                    dispatcher.dispatch({
+                      type: "object.update",
+                      params: {
+                        id: el.id,
+                        props: { ...el.props, centerPt: nextCenter },
+                      },
+                    });
+                  }
+                } else if (
+                  el.type === "GeomSegment" ||
+                  el.type === "GeomVector" ||
+                  el.type === "GeomRay" ||
+                  (el.type === "GeomLine" && el.props.def === "through")
+                ) {
+                  rotateFreePointById(el.props.from);
+                  rotateFreePointById(el.props.to);
+                  const nextProps: Record<string, unknown> = { ...el.props };
+                  let changed = false;
+                  if (el.props.fromPt && typeof el.props.fromPt === "object") {
+                    nextProps.fromPt = rotatePointAround(el.props.fromPt as Point2D, center, deltaDeg);
+                    changed = true;
+                  }
+                  if (el.props.toPt && typeof el.props.toPt === "object") {
+                    nextProps.toPt = rotatePointAround(el.props.toPt as Point2D, center, deltaDeg);
+                    changed = true;
+                  }
+                  if (changed) {
+                    dispatcher.dispatch({
+                      type: "object.update",
+                      params: { id: el.id, props: nextProps },
+                    });
+                  }
+                } else if (el.type === "Ink") {
+                  const pts = (el.props.points as number[]) || [];
+                  const rotatedPoints: number[] = [];
+                  for (let i = 0; i + 1 < pts.length; i += 2) {
+                    const wx = el.transform.x + pts[i] * el.transform.scale;
+                    const wy = el.transform.y + pts[i + 1] * el.transform.scale;
+                    const r = rotatePointAround({ x: wx, y: wy }, center, deltaDeg);
+                    rotatedPoints.push(r.x, r.y);
+                  }
+                  dispatcher.dispatch({
+                    type: "object.update",
+                    params: {
+                      id: el.id,
+                      transform: { x: 0, y: 0, scale: 1 },
+                      props: { ...el.props, points: rotatedPoints },
+                    },
+                  });
+                } else {
+                  const r = rotatePointAround({ x: el.transform.x, y: el.transform.y }, center, deltaDeg);
+                  dispatcher.dispatch({
+                    type: "object.update",
+                    params: {
+                      id: el.id,
+                      transform: {
+                        ...el.transform,
+                        x: r.x,
+                        y: r.y,
+                        rotation: Math.round(((el.transform.rotation || 0) + deltaDeg) % 360),
+                      },
+                    },
+                  });
+                }
+              }
+            });
+          }}
           onPhysicsRotateInstrument={(deltaDeg) => {
             if (selectedPhysicsEl?.type !== "PhysicsInstrument") return;
             dispatcher.dispatch({

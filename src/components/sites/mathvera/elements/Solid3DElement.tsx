@@ -162,6 +162,8 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
     }
 
     const strokeColor = activeColor ?? style.stroke ?? "#0f766e";
+    const hiddenStrokeColor = style.stroke ? strokeColor : "#64748b";
+    const solidStrokeColor = style.stroke ? strokeColor : "#0f766e";
     const xs = vertexPositions.map((p) => p.x);
     const ys = vertexPositions.map((p) => p.y);
     const rxPad = kind === "cone" || kind === "cylinder" || kind === "sphere" ? r : 0.2;
@@ -279,12 +281,12 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
               y1={-poly[0].y}
               x2={poly[1].x}
               y2={-poly[1].y}
-              stroke={strokeColor}
-              strokeWidth={strokeWidth}
-              strokeDasharray="5 4"
+              stroke={hiddenStrokeColor}
+              strokeWidth={Math.max(1.2, strokeWidth * 0.85)}
+              strokeDasharray="4 3"
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
-              opacity={0.85}
+              opacity={0.65}
             />
           ) : (
             <path
@@ -293,12 +295,12 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
               className="wb-hidden-edge"
               d={toSvgPath(poly)}
               fill="none"
-              stroke={strokeColor}
-              strokeWidth={strokeWidth}
-              strokeDasharray="5 4"
+              stroke={hiddenStrokeColor}
+              strokeWidth={Math.max(1.2, strokeWidth * 0.85)}
+              strokeDasharray="4 3"
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
-              opacity={0.85}
+              opacity={0.65}
             />
           )
         )}
@@ -313,7 +315,7 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
               y1={-poly[0].y}
               x2={poly[1].x}
               y2={-poly[1].y}
-              stroke={strokeColor}
+              stroke={solidStrokeColor}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
@@ -325,7 +327,7 @@ export const Solid3DElement: React.FC<Solid3DElementProps> = ({
               data-wb-edge="solid"
               d={toSvgPath(poly)}
               fill="none"
-              stroke={strokeColor}
+              stroke={solidStrokeColor}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"

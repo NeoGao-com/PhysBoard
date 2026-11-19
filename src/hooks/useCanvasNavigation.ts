@@ -22,6 +22,7 @@ export interface UseCanvasNavigationOptions {
   maxScale?: number;
   currentTool?: string | null;
   isA4?: boolean;
+  penOnlyMode?: boolean;
   onViewportChange?: (viewport: ViewportTransform) => void;
   onCursorMove?: (worldPos: Point) => void;
 }
@@ -56,6 +57,7 @@ export function useCanvasNavigation(
     maxScale = MAX_SCALE,
     currentTool = null,
     isA4 = false,
+    penOnlyMode = false,
     onViewportChange,
     onCursorMove,
   } = options;
@@ -189,11 +191,12 @@ export function useCanvasNavigation(
 
       // Check whether pan should initiate
       const isMiddleClick = e.button === 1;
+      const isTouchPan = penOnlyMode && e.pointerType === "touch";
       const isPanTool = currentTool === null || currentTool === "pan";
       const isShiftSelect =
         currentTool === "select" && (e.shiftKey || isMiddleClick);
       const shouldPan =
-        isPanTool || isMiddleClick || isSpacePressed || isShiftSelect;
+        isTouchPan || isPanTool || isMiddleClick || isSpacePressed || isShiftSelect;
 
       if (shouldPan) {
         try {
@@ -210,7 +213,7 @@ export function useCanvasNavigation(
         setIsPanning(true);
       }
     },
-    [currentTool, isSpacePressed, viewport]
+    [currentTool, isSpacePressed, penOnlyMode, viewport]
   );
 
   // Pointer Move
@@ -248,13 +251,14 @@ export function useCanvasNavigation(
       }
 
       // Single pointer pan dragging
-      if (panStartRef.current) {
-        const dx = e.clientX - panStartRef.current.sx;
-        const dy = e.clientY - panStartRef.current.sy;
+      const panStart = panStartRef.current;
+      if (panStart) {
+        const dx = e.clientX - panStart.sx;
+        const dy = e.clientY - panStart.sy;
         setViewport((prev) => ({
           ...prev,
-          tx: panStartRef.current!.tx + dx,
-          ty: panStartRef.current!.ty + dy,
+          tx: panStart.tx + dx,
+          ty: panStart.ty + dy,
         }));
       }
 

@@ -17,14 +17,16 @@ export interface OrbitBarProps {
 }
 
 const PILL_BTN_STYLE: React.CSSProperties = {
-  padding: "5px 10px",
-  borderRadius: 8,
+  padding: "7px 12px",
+  borderRadius: 12,
   border: "none",
   color: "#ffffff",
-  fontSize: 13,
-  fontWeight: 500,
+  fontSize: 12.5,
+  fontWeight: 600,
   cursor: "pointer",
   whiteSpace: "nowrap",
+  fontFamily: 'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, sans-serif)',
+  transition: "transform 0.16s ease, background 0.15s ease, box-shadow 0.16s ease",
 };
 
 export const OrbitBar: React.FC<OrbitBarProps> = ({
@@ -102,34 +104,35 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           flexDirection: "column",
           alignItems: "stretch",
           gap: 10,
-          width: 140,
-          padding: "12px 10px",
-          borderRadius: 14,
-          background: "rgba(15, 23, 42, 0.95)",
-          backdropFilter: "blur(8px)",
-          border: "1px solid rgba(255, 255, 255, 0.12)",
+          width: 154,
+          padding: "14px 12px",
+          borderRadius: 18,
+          background: "rgba(15, 23, 42, 0.90)",
+          backdropFilter: "blur(12px)",
+          border: "1.5px solid rgba(255, 255, 255, 0.16)",
           color: "#ffffff",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          fontFamily: 'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, sans-serif)',
           fontSize: 12,
-          boxShadow: "0 10px 25px rgba(15, 23, 42, 0.4)",
+          boxShadow: "0 14px 35px rgba(15, 23, 42, 0.45), 0 0 0 1px rgba(99, 102, 241, 0.2)",
           userSelect: "none",
         }}
       >
         <div
           style={{
             textAlign: "center",
-            fontWeight: 600,
-            fontSize: 12,
-            color: "#94a3b8",
-            paddingBottom: 4,
-            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+            fontWeight: 700,
+            fontSize: 13,
+            color: "#e2e8f0",
+            paddingBottom: 6,
+            borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: 4,
+            gap: 5,
+            letterSpacing: "-0.2px",
           }}
         >
-          <span>⟳ Xoay hình</span>
+          <span>✨ ⟳ Xoay hình 3D</span>
         </div>
 
         {/* Interactive orbital drag handle */}
@@ -162,17 +165,22 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           style={{
             ...PILL_BTN_STYLE,
             width: "100%",
-            padding: "8px 6px",
-            background: draggingHandle ? "#2563eb" : "#1e293b",
-            border: "1px solid #3b82f6",
+            padding: "9px 8px",
+            background: draggingHandle
+              ? "linear-gradient(135deg, #3b82f6, #6366f1)"
+              : "linear-gradient(135deg, #1e293b, #334155)",
+            border: draggingHandle ? "1.5px solid #93c5fd" : "1.5px solid #475569",
             cursor: draggingHandle ? "grabbing" : "grab",
             touchAction: "none",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 6,
-            fontWeight: 600,
-            boxShadow: draggingHandle ? "0 0 10px rgba(59, 130, 246, 0.5)" : "none",
+            fontWeight: 700,
+            borderRadius: 14,
+            boxShadow: draggingHandle
+              ? "0 4px 14px rgba(59, 130, 246, 0.55)"
+              : "0 2px 6px rgba(0, 0, 0, 0.2)",
           }}
         >
           <span>⟲</span>
@@ -240,11 +248,11 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             ...PILL_BTN_STYLE,
             width: "100%",
             background: "#334155",
-            fontSize: 11.5,
-            padding: "5px 6px",
+            fontSize: 12,
+            padding: "6px 8px",
           }}
         >
-          Góc ban đầu
+          ↺ Góc ban đầu
         </button>
 
         {onToggleSpin && (
@@ -256,12 +264,15 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             style={{
               ...PILL_BTN_STYLE,
               width: "100%",
-              background: isAutoSpin ? "#b45309" : "#334155",
-              fontSize: 11.5,
-              padding: "5px 6px",
+              background: isAutoSpin
+                ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                : "#334155",
+              fontSize: 12,
+              padding: "6px 8px",
+              boxShadow: isAutoSpin ? "0 3px 10px rgba(245, 158, 11, 0.4)" : "none",
             }}
           >
-            {isAutoSpin ? "⏸ Dừng quay" : "▶ Tự xoay"}
+            {isAutoSpin ? "⏸ Dừng quay" : "▶ Tự xoay 3D"}
           </button>
         )}
 
@@ -272,13 +283,14 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             style={{
               ...PILL_BTN_STYLE,
               width: "100%",
-              background: "#2563eb",
-              fontSize: 12,
-              fontWeight: 600,
-              padding: "6px 6px",
+              background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+              fontSize: 13,
+              fontWeight: 700,
+              padding: "8px 8px",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.4)",
             }}
           >
-            ✓ Xong
+            ✓ Hoàn tất
           </button>
         )}
       </div>

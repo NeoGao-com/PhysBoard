@@ -93,6 +93,7 @@ export type WhiteboardElementType =
   | "TrigCircle"
   | "Solid3D"
   | "RoundSection"
+  | "SolidSection"
   | "SpaceFigure"
   | "OrthoViews"
   | "Revolution"

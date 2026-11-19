@@ -109,6 +109,9 @@ export interface SolidLift {
   p3: Point3D[];
   faces: number[][];
   view: Point3D;
+  isOrbited?: boolean;
+  center?: Point3D;
+  baseCenter2D?: Point2D;
 }
 
 export interface Solved3DScene {
@@ -238,6 +241,12 @@ export function cameraToAzimuthElevation(cam: CameraMatrix3): { azimuth: number;
 }
 
 export function project3DTo2D(lift: SolidLift, p3: Point3D): Point2D {
+  if (lift.isOrbited && lift.center && lift.baseCenter2D) {
+    return {
+      x: lift.baseCenter2D.x + (p3.x - lift.center.x),
+      y: lift.baseCenter2D.y + (p3.y - lift.center.y),
+    };
+  }
   return {
     x: p3.x + lift.view.x * p3.z,
     y: p3.y + lift.view.y * p3.z,
@@ -249,7 +258,13 @@ export function applyOrbitToPoints(
   cam: CameraMatrix3,
   blend = 1,
   baseLift?: SolidLift
-): { pts2d: Point2D[]; rotatedP3: Point3D[]; view: Point3D } {
+): {
+  pts2d: Point2D[];
+  rotatedP3: Point3D[];
+  view: Point3D;
+  center: Point3D;
+  baseCenter2D: Point2D;
+} {
   const n = p3List.length || 1;
   const weights = p3List.map(() => 1 / n);
   const center = linComb3(p3List, weights);
@@ -258,11 +273,6 @@ export function applyOrbitToPoints(
     y: cam[3] * v.x + cam[4] * v.y + cam[5] * v.z,
     z: cam[6] * v.x + cam[7] * v.y + cam[8] * v.z,
   });
-  const inverseView: Point3D = {
-    x: -cam[6],
-    y: -cam[7],
-    z: -cam[8],
-  };
 
   const baseCenter2D = baseLift ? project3DTo2D(baseLift, center) : { x: center.x, y: center.y };
   const rotatedP3: Point3D[] = [];
@@ -287,10 +297,9 @@ export function applyOrbitToPoints(
     }
   }
 
-  const view: Point3D =
-    baseLift && blend < 0.5 ? baseLift.view : inverseView;
+  const view: Point3D = { x: 0, y: 0, z: -1 };
 
-  return { pts2d, rotatedP3, view };
+  return { pts2d, rotatedP3, view, center, baseCenter2D };
 }
 
 export function applyOrbitToSolid(
@@ -434,7 +443,7 @@ export function isEdgeHidden(lift: SolidLift, pA: Point3D, pB: Point3D): boolean
     const nLen = len3(normal);
     const origin = lift.p3[face[0]];
     const distToPlane = (pt: Point3D) => Math.abs(dot3(sub3(pt, origin), normal)) / nLen;
-    if (distToPlane(pA) <= 1e-6 * scaleRef && distToPlane(pB) <= 1e-6 * scaleRef) {
+    if (distToPlane(pA) <= 1e-3 * scaleRef && distToPlane(pB) <= 1e-3 * scaleRef) {
       if (dot3(normal, lift.view) > 0) {
         return false;
       }
@@ -659,9 +668,12 @@ export function computeSolidWireframe(
       const orbited = applyOrbitToPoints(lift.p3, orbitCam, 1, lift);
       effectivePts2D = orbited.pts2d;
       effectiveLift = {
-        p3: lift.p3,
+        p3: orbited.rotatedP3,
         faces: lift.faces,
         view: orbited.view,
+        isOrbited: true,
+        center: orbited.center,
+        baseCenter2D: orbited.baseCenter2D,
       };
     }
 
@@ -1309,7 +1321,14 @@ export function solveGeometry3D(
           typeof solid.props.elevation === "number" ? solid.props.elevation : 17
         );
       const orb = applyOrbitToPoints(baseLift.p3, cam, 1, baseLift);
-      finalLift = { p3: orb.rotatedP3, faces: baseLift.faces, view: orb.view };
+      finalLift = {
+        p3: orb.rotatedP3,
+        faces: baseLift.faces,
+        view: orb.view,
+        isOrbited: true,
+        center: orb.center,
+        baseCenter2D: orb.baseCenter2D,
+      };
       displayPts2 = orb.pts2d;
     }
 
@@ -1459,6 +1478,24 @@ export function solveGeometry3D(
         break;
       case "onLine":
         handledIn3D = applyBarycentric3D(el.id, [c.a, c.b], () => [1 - Number(c.t), Number(c.t)]);
+        break;
+      case "on":
+      case "onObject": {
+        const ends = getEnds(c.target);
+        if (ends) {
+          const t = typeof c.t === "number" ? c.t : 0.5;
+          handledIn3D = applyBarycentric3D(el.id, ends, () => [1 - t, t]);
+        }
+        break;
+      }
+      case "reflectPoint":
+        handledIn3D = applyBarycentric3D(el.id, [c.center, c.p], () => [2, -1]);
+        break;
+      case "homothety":
+        handledIn3D = applyBarycentric3D(el.id, [c.center, c.p], () => [1 - c.k, c.k]);
+        break;
+      case "translate":
+        handledIn3D = applyBarycentric3D(el.id, [c.p, c.to, c.from], () => [1, 1, -1]);
         break;
       case "linePlane":
         handledIn3D = applyBarycentric3D(
@@ -2389,7 +2426,12 @@ export function computePlaneIntersectionLine(
   plane1Ids: [string, string, string],
   plane2Ids: [string, string, string],
   scene: Solved3DScene
-): { p1: Point3D; p2: Point3D; existingIds: [string | null, string | null] } | null {
+): {
+  p1: Point3D;
+  p2: Point3D;
+  existingIds: [string | null, string | null];
+  constraints: [PointConstraint | null, PointConstraint | null];
+} | null {
   const n1 = plane1Ids.map((id) => scene.p3.get(id));
   const n2 = plane2Ids.map((id) => scene.p3.get(id));
   if (n1.some((p) => !p) || n2.some((p) => !p)) return null;
@@ -2406,8 +2448,8 @@ export function computePlaneIntersectionLine(
   const onPlane1 = (pt: Point3D) => Math.abs(dot3(norm1, sub3(pt, a1))) / len3(norm1) <= 1e-6 * scaleRef;
   const onPlane2 = (pt: Point3D) => Math.abs(dot3(norm2, sub3(pt, a2))) / len3(norm2) <= 1e-6 * scaleRef;
 
-  const candidates: Array<{ id: string | null; pos: Point3D }> = [];
-  const pushUnique = (cand: { id: string | null; pos: Point3D }) => {
+  const candidates: Array<{ id: string | null; pos: Point3D; constraint?: PointConstraint }> = [];
+  const pushUnique = (cand: { id: string | null; pos: Point3D; constraint?: PointConstraint }) => {
     if (!candidates.some((c) => dist3(c.pos, cand.pos) <= 1e-6 * scaleRef)) {
       candidates.push(cand);
     }
@@ -2420,7 +2462,11 @@ export function computePlaneIntersectionLine(
     }
   }
 
-  const intersectTriEdges = (tri: [string, string, string], other: [Point3D, Point3D, Point3D]) => {
+  const intersectTriEdges = (
+    tri: [string, string, string],
+    other: [Point3D, Point3D, Point3D],
+    otherIds: [string, string, string]
+  ) => {
     const pairs: Array<[string, string]> = [
       [tri[0], tri[1]],
       [tri[1], tri[2]],
@@ -2432,13 +2478,24 @@ export function computePlaneIntersectionLine(
       if (!u || !v) continue;
       const w = Ops3D.linePlane(u, v, other[0], other[1], other[2]);
       if (w) {
-        pushUnique({ id: null, pos: linComb3([u, v], w) });
+        pushUnique({
+          id: null,
+          pos: linComb3([u, v], w),
+          constraint: {
+            kind: "linePlane",
+            a: uId,
+            b: vId,
+            p: otherIds[0],
+            q: otherIds[1],
+            r: otherIds[2],
+          },
+        });
       }
     }
   };
 
-  if (candidates.length < 2) intersectTriEdges(plane1Ids, [a2, b2, c2]);
-  if (candidates.length < 2) intersectTriEdges(plane2Ids, [a1, b1, c1]);
+  if (candidates.length < 2) intersectTriEdges(plane1Ids, [a2, b2, c2], plane2Ids);
+  if (candidates.length < 2) intersectTriEdges(plane2Ids, [a1, b1, c1], plane1Ids);
   if (candidates.length < 2) return null;
 
   let best: [number, number] = [0, 1];
@@ -2457,6 +2514,7 @@ export function computePlaneIntersectionLine(
     p1: candidates[best[0]].pos,
     p2: candidates[best[1]].pos,
     existingIds: [candidates[best[0]].id, candidates[best[1]].id],
+    constraints: [candidates[best[0]].constraint ?? null, candidates[best[1]].constraint ?? null],
   };
 }
 
@@ -2751,13 +2809,17 @@ export function buildSpatialConstructionElements(
       if (!res) return { elements: [], error: "Hai mặt phẳng song song hoặc trùng nhau." };
       const created: CanvasElement[] = [];
       const names = getNextPointNames(2, elements, ["I", "K", "J", "E", "F"]);
+      const ownerId = scene.owner.get(pickedIds[0]) ?? scene.owner.get(pickedIds[3]);
+      const lift = ownerId ? scene.lifts.get(ownerId) : undefined;
+      const p1_2d = lift ? project3DTo2D(lift, res.p1) : { x: res.p1.x, y: res.p1.y };
+      const p2_2d = lift ? project3DTo2D(lift, res.p2) : { x: res.p2.x, y: res.p2.y };
       const p1Id = res.existingIds[0] ?? (() => {
-        const pt = makePoint(names[0], { kind: "free" }, { x: res.p1.x, y: res.p1.y });
+        const pt = makePoint(names[0], res.constraints[0] ?? { kind: "free" }, p1_2d);
         created.push(pt);
         return pt.id;
       })();
       const p2Id = res.existingIds[1] ?? (() => {
-        const pt = makePoint(names[1], { kind: "free" }, { x: res.p2.x, y: res.p2.y });
+        const pt = makePoint(names[1], res.constraints[1] ?? { kind: "free" }, p2_2d);
         created.push(pt);
         return pt.id;
       })();
@@ -2886,7 +2948,11 @@ export function buildSpatialConstructionElements(
         }
       }
       if (!destId) {
-        const cPt = makePoint(getNextPointName(elements, ["C'", "E", "F", "K"]), { kind: "free" }, target2);
+        const cPt = makePoint(
+          getNextPointName(elements, ["C'", "E", "F", "K"]),
+          { kind: "combo", refs: [idB, idD, idAp, idA], w: [1, 1, 1, -2] },
+          target2
+        );
         created.push(cPt);
         destId = cPt.id;
       }
@@ -2956,13 +3022,17 @@ export function buildSpatialConstructionElements(
       );
       if (inter) {
         const names = getNextPointNames(2, elements, ["I", "K", "M", "N"]);
+        const ownerId = scene.owner.get(pickedIds[0]) ?? scene.owner.get(pickedIds[3]);
+        const lift = ownerId ? scene.lifts.get(ownerId) : undefined;
+        const p1_2d = lift ? project3DTo2D(lift, inter.p1) : { x: inter.p1.x, y: inter.p1.y };
+        const p2_2d = lift ? project3DTo2D(lift, inter.p2) : { x: inter.p2.x, y: inter.p2.y };
         const p1Id = inter.existingIds[0] ?? (() => {
-          const pt = makePoint(names[0], { kind: "free" }, inter.p1);
+          const pt = makePoint(names[0], inter.constraints[0] ?? { kind: "free" }, p1_2d);
           created.push(pt);
           return pt.id;
         })();
         const p2Id = inter.existingIds[1] ?? (() => {
-          const pt = makePoint(names[1], { kind: "free" }, inter.p2);
+          const pt = makePoint(names[1], inter.constraints[1] ?? { kind: "free" }, p2_2d);
           created.push(pt);
           return pt.id;
         })();

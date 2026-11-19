@@ -60,6 +60,8 @@ export interface SelectionBarProps {
   onSolidEdgePoint?: () => void;
   onSolidEdgePerpBisector?: () => void;
   onSolidSelectWhole?: () => void;
+  onRotateSelection?: (deltaDeg: number) => void;
+  sidebarOpen?: boolean;
 }
 
 const actionBtnStyle: React.CSSProperties = {
@@ -184,9 +186,12 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onSolidEdgePoint,
   onSolidEdgePerpBisector,
   onSolidSelectWhole,
+  onRotateSelection,
+  sidebarOpen = false,
 }) => {
   const [moreAxesOpen, setMoreAxesOpen] = useState(false);
   const moreWrapRef = useRef<HTMLDivElement>(null);
+  const barLeft = sidebarOpen ? 152 : 38;
 
   useEffect(() => {
     if (!moreAxesOpen) return;
@@ -234,14 +239,15 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
           data-wb-selection-bar="true"
           style={{
             position: "fixed",
-            left: 12,
+            left: barLeft,
             bottom: 12,
             zIndex: 10000,
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
             gap: 8,
-            maxWidth: "calc(100vw - 24px)",
+            maxWidth: `calc(100vw - ${barLeft + 12}px)`,
+            transition: "left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
         >
           <span
@@ -443,14 +449,15 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
         data-wb-selection-bar="true"
         style={{
           position: "fixed",
-          left: 12,
+          left: barLeft,
           bottom: 12,
           zIndex: 10000,
           display: "flex",
           flexWrap: "wrap",
           alignItems: "center",
           gap: 8,
-          maxWidth: "calc(100vw - 24px)",
+          maxWidth: `calc(100vw - ${barLeft + 12}px)`,
+          transition: "left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
         }}
       >
         {/* Delete button (Red) */}
@@ -895,6 +902,39 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
           </button>
         )}
 
+        {/* Rotate buttons for 2D/Image elements */}
+        {onRotateSelection && !isPointsContext && (
+          <>
+            <button
+              type="button"
+              data-action="rotate-ccw"
+              onClick={() => onRotateSelection(-15)}
+              title="Xoay ngược chiều kim đồng hồ 15°"
+              style={actionBtnStyle}
+            >
+              ↺ Xoay -15°
+            </button>
+            <button
+              type="button"
+              data-action="rotate-cw"
+              onClick={() => onRotateSelection(15)}
+              title="Xoay theo chiều kim đồng hồ 15°"
+              style={actionBtnStyle}
+            >
+              ↻ Xoay +15°
+            </button>
+            <button
+              type="button"
+              data-action="rotate-90"
+              onClick={() => onRotateSelection(90)}
+              title="Xoay góc vuông 90°"
+              style={actionBtnStyle}
+            >
+              ⟳ 90°
+            </button>
+          </>
+        )}
+
         {/* Duplicate */}
         <button
           type="button"
@@ -1274,7 +1314,13 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
     return (
       <div
         data-export-skip="true"
-        style={{ position: "fixed", left: 12, bottom: 12, zIndex: 55 }}
+        style={{
+          position: "fixed",
+          left: barLeft,
+          bottom: 12,
+          zIndex: 55,
+          transition: "left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
       >
         <button
           type="button"
