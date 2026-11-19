@@ -4117,6 +4117,121 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [dispatcher, selectedElements]
   );
 
+  // Build drag map for selected elements including geometric & Cartesian/function dependencies
+  const buildDragTransformMap = useCallback(
+    (elementsToDrag: CanvasElement[]) => {
+      const map = new Map<string, { x: number; y: number }>();
+      const addEl = (el: CanvasElement) => {
+        if (!map.has(el.id)) {
+          map.set(el.id, { x: el.transform.x, y: el.transform.y });
+        }
+      };
+
+      for (const el of elementsToDrag) {
+        addEl(el);
+
+        // 1. Also move referenced free points when dragging a segment/circle/polygon
+        const refIds: string[] = [];
+        if (typeof el.props?.from === "string") refIds.push(el.props.from);
+        if (typeof el.props?.to === "string") refIds.push(el.props.to);
+        if (typeof el.props?.center === "string") refIds.push(el.props.center);
+        if (Array.isArray(el.props?.vertices)) {
+          for (const vid of el.props.vertices) {
+            if (typeof vid === "string") refIds.push(vid);
+          }
+        }
+        for (const rid of refIds) {
+          const refEl = byId.get(rid);
+          if (refEl) addEl(refEl);
+        }
+
+        // 2. LineDecor dependencies
+        for (const other of pageElements) {
+          if (other.type === "LineDecor" && other.props?.target === el.id) {
+            addEl(other);
+          }
+        }
+        if (el.type === "LineDecor" && typeof el.props?.target === "string") {
+          const targetSeg = byId.get(el.props.target);
+          if (targetSeg) {
+            addEl(targetSeg);
+            if (typeof targetSeg.props?.from === "string") {
+              const pA = byId.get(targetSeg.props.from);
+              if (pA) addEl(pA);
+            }
+            if (typeof targetSeg.props?.to === "string") {
+              const pB = byId.get(targetSeg.props.to);
+              if (pB) addEl(pB);
+            }
+          }
+        }
+
+        // 3. Cartesian Axes2D & Function/Graph dependencies
+        // If dragging a function curve/plot/conic/tangent/area/slider linked to Axes2D, move the axes (and sibling plots/sliders) too!
+        if (
+          el.type === "Plot" ||
+          el.type === "Conic" ||
+          el.type === "Curve2D" ||
+          el.type === "GraphTangent" ||
+          el.type === "GraphArea" ||
+          el.type === "Slider"
+        ) {
+          const linkedAxesId =
+            typeof el.props?.axes === "string"
+              ? el.props.axes
+              : pageElements.find((cand) => cand.type === "Axes2D")?.id;
+          if (linkedAxesId) {
+            const axesEl = byId.get(linkedAxesId);
+            if (axesEl) {
+              addEl(axesEl);
+              // Also add all items attached to this axes
+              for (const other of pageElements) {
+                if (
+                  other.props?.axes === linkedAxesId ||
+                  (other.props?.constraint as { kind?: string; axes?: string } | undefined)?.axes === linkedAxesId
+                ) {
+                  addEl(other);
+                }
+              }
+            }
+          }
+        }
+
+        // If dragging Axes2D or Axes3D, move all attached plots, curves, conics, tangents, areas, sliders, oxy-points
+        if (el.type === "Axes2D" || el.type === "Axes3D") {
+          for (const other of pageElements) {
+            if (
+              other.props?.axes === el.id ||
+              (other.props?.constraint as { kind?: string; axes?: string } | undefined)?.axes === el.id
+            ) {
+              addEl(other);
+            }
+          }
+        }
+
+        // If point has constraint to axes (e.g. oxy or oxyz)
+        const constraintAxes = (el.props?.constraint as { kind?: string; axes?: string } | undefined)?.axes;
+        if (constraintAxes) {
+          const axesEl = byId.get(constraintAxes);
+          if (axesEl) {
+            addEl(axesEl);
+            for (const other of pageElements) {
+              if (
+                other.props?.axes === constraintAxes ||
+                (other.props?.constraint as { kind?: string; axes?: string } | undefined)?.axes === constraintAxes
+              ) {
+                addEl(other);
+              }
+            }
+          }
+        }
+      }
+
+      return map;
+    },
+    [byId, pageElements]
+  );
+
   const handleBoxPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (penOnlyMode && e.pointerType === "touch") {
@@ -4133,55 +4248,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         viewport.scale,
         rect
       );
-      const map = new Map<string, { x: number; y: number }>();
-      for (const el of selectedElements) {
-        map.set(el.id, { x: el.transform.x, y: el.transform.y });
-        // Also move referenced free points when dragging a segment/circle/polygon
-        const refIds: string[] = [];
-        if (typeof el.props.from === "string") refIds.push(el.props.from);
-        if (typeof el.props.to === "string") refIds.push(el.props.to);
-        if (typeof el.props.center === "string") refIds.push(el.props.center);
-        if (Array.isArray(el.props.vertices)) {
-          for (const vid of el.props.vertices) {
-            if (typeof vid === "string") refIds.push(vid);
-          }
-        }
-        for (const rid of refIds) {
-          const refEl = byId.get(rid);
-          if (refEl && !map.has(rid)) {
-            map.set(rid, { x: refEl.transform.x, y: refEl.transform.y });
-          }
-        }
-        // If el is a segment or line, also move any attached LineDecor
-        for (const other of pageElements) {
-          if (other.type === "LineDecor" && other.props?.target === el.id) {
-            if (!map.has(other.id)) {
-              map.set(other.id, { x: other.transform.x, y: other.transform.y });
-            }
-          }
-        }
-        // If el is a LineDecor, also move its target segment and endpoints
-        if (el.type === "LineDecor" && typeof el.props?.target === "string") {
-          const targetSeg = byId.get(el.props.target);
-          if (targetSeg) {
-            if (!map.has(targetSeg.id)) {
-              map.set(targetSeg.id, { x: targetSeg.transform.x, y: targetSeg.transform.y });
-            }
-            if (typeof targetSeg.props?.from === "string") {
-              const pA = byId.get(targetSeg.props.from);
-              if (pA && !map.has(pA.id)) {
-                map.set(pA.id, { x: pA.transform.x, y: pA.transform.y });
-              }
-            }
-            if (typeof targetSeg.props?.to === "string") {
-              const pB = byId.get(targetSeg.props.to);
-              if (pB && !map.has(pB.id)) {
-                map.set(pB.id, { x: pB.transform.x, y: pB.transform.y });
-              }
-            }
-          }
-        }
-      }
+      const map = buildDragTransformMap(selectedElements);
       dragBoxStartRef.current = {
         startX: worldPos.x,
         startY: worldPos.y,
@@ -4189,7 +4256,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       };
       dispatcher.gesture(true);
     },
-    [dispatcher, containerRef, viewport, selectedElements, byId, pageElements, penOnlyMode, navPointerDown]
+    [dispatcher, containerRef, viewport, selectedElements, penOnlyMode, navPointerDown, buildDragTransformMap]
   );
 
   const handleElementPointerDown = useCallback(
@@ -4207,16 +4274,17 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         e.stopPropagation();
         let resolvedId = elementId;
         let nextSubSel: SolidSubSelection | null = null;
+        const rect = containerRef.current?.getBoundingClientRect();
+        const worldPos = screenToWorld(
+          e.clientX,
+          e.clientY,
+          viewport.tx,
+          viewport.ty,
+          viewport.scale,
+          rect
+        );
+
         if (!e.shiftKey) {
-          const rect = containerRef.current?.getBoundingClientRect();
-          const worldPos = screenToWorld(
-            e.clientX,
-            e.clientY,
-            viewport.tx,
-            viewport.ty,
-            viewport.scale,
-            rect
-          );
           const threshold = 14 / (viewport.scale || 45);
           let bestDist = Infinity;
           for (const el of pageElements) {
@@ -4244,19 +4312,22 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             );
           }
         }
+
+        let nextSelectedIds = selectedIds;
         if (e.shiftKey) {
           setSolidSubSel(null);
-          setSelectedIds((prev) =>
-            prev.includes(resolvedId)
-              ? prev.filter((id) => id !== resolvedId)
-              : [...prev, resolvedId]
-          );
+          nextSelectedIds = selectedIds.includes(resolvedId)
+            ? selectedIds.filter((id) => id !== resolvedId)
+            : [...selectedIds, resolvedId];
+          setSelectedIds(nextSelectedIds);
         } else {
           setSolidSubSel(nextSubSel);
           if (selectedIds.length !== 1 || selectedIds[0] !== resolvedId) {
-            setSelectedIds([resolvedId]);
+            nextSelectedIds = [resolvedId];
+            setSelectedIds(nextSelectedIds);
           }
         }
+
         const clickedEl = byId.get(resolvedId);
         if (
           clickedEl &&
@@ -4265,6 +4336,22 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           setOrbitActiveId(clickedEl.id);
         } else {
           setOrbitActiveId(null);
+        }
+
+        // Initialize drag immediately on element pointerdown so dragging starts smoothly
+        const dragTargets: CanvasElement[] = [];
+        for (const id of nextSelectedIds) {
+          const target = byId.get(id);
+          if (target) dragTargets.push(target);
+        }
+        if (dragTargets.length > 0) {
+          const map = buildDragTransformMap(dragTargets);
+          dragBoxStartRef.current = {
+            startX: worldPos.x,
+            startY: worldPos.y,
+            initialTransforms: map,
+          };
+          dispatcher.gesture(true);
         }
       }
     },
@@ -4281,6 +4368,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       solved3D,
       penOnlyMode,
       navPointerDown,
+      buildDragTransformMap,
+      dispatcher,
     ]
   );
 

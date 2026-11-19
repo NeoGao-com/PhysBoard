@@ -104,6 +104,12 @@ export function SvgCanvas({
   const a4FormatOption = BOARD_FORMAT_OPTIONS.find((f) => f.id === boardFormat);
   const isA4 = boardFormat === "a4_portrait" || boardFormat === "a4_landscape";
 
+  const a4Spacing = theme.spacingPx / 45;
+  const a4GraphMajor = a4Spacing * 5;
+  const a4StrokeW = 1 / (viewport.scale || 45);
+  const a4SubStrokeW = 0.85 / (viewport.scale || 45);
+  const a4DotR = 1.35 / (viewport.scale || 45);
+
   return (
     <div
       onDragOver={onDragOver}
@@ -206,6 +212,72 @@ export function SvgCanvas({
               />
             )}
           </pattern>
+
+          {/* Dedicated crisp vector patterns for A4 paper sheets */}
+          {isA4 &&
+            a4FormatOption &&
+            showPattern &&
+            Array.from({ length: Math.max(1, totalPages) }, (_, idx) => {
+              const p = idx + 1;
+              const pageGap = 1.0;
+              const pageStep = a4FormatOption.heightWorld + pageGap;
+              const pageTop = (p - 1) * pageStep - a4FormatOption.heightWorld / 2;
+              return (
+                <pattern
+                  key={`wb-a4-grid-${p}`}
+                  id={`wb-a4-grid-${p}`}
+                  data-wb-grid="true"
+                  x={-a4FormatOption.widthWorld / 2}
+                  y={pageTop}
+                  width={boardConfig.pattern === "graph" ? a4GraphMajor : a4Spacing}
+                  height={boardConfig.pattern === "graph" ? a4GraphMajor : a4Spacing}
+                  patternUnits="userSpaceOnUse"
+                >
+                  {boardConfig.pattern === "dots" ? (
+                    <circle
+                      cx={a4Spacing / 2}
+                      cy={a4Spacing / 2}
+                      r={a4DotR}
+                      fill={theme.dotFill}
+                    />
+                  ) : boardConfig.pattern === "ruled" ? (
+                    <line
+                      x1={0}
+                      y1={a4Spacing}
+                      x2={a4Spacing}
+                      y2={a4Spacing}
+                      stroke={theme.ruledStroke}
+                      strokeWidth={a4StrokeW}
+                    />
+                  ) : boardConfig.pattern === "graph" ? (
+                    <>
+                      <path
+                        d={Array.from({ length: 4 }, (_, i) => {
+                          const offset = (i + 1) * a4Spacing;
+                          return `M ${offset} 0 V ${a4GraphMajor} M 0 ${offset} H ${a4GraphMajor}`;
+                        }).join(" ")}
+                        fill="none"
+                        stroke={theme.subGridStroke}
+                        strokeWidth={a4SubStrokeW}
+                      />
+                      <path
+                        d={`M ${a4GraphMajor} 0 H 0 V ${a4GraphMajor}`}
+                        fill="none"
+                        stroke={theme.gridStroke}
+                        strokeWidth={a4StrokeW}
+                      />
+                    </>
+                  ) : (
+                    <path
+                      d={`M ${a4Spacing} 0 H 0 V ${a4Spacing}`}
+                      fill="none"
+                      stroke={theme.gridStroke}
+                      strokeWidth={a4StrokeW}
+                    />
+                  )}
+                </pattern>
+              );
+            })}
         </defs>
 
         {/* Board Surface Fill */}
@@ -277,7 +349,7 @@ export function SvgCanvas({
                         height={a4FormatOption.heightWorld}
                         rx={0.06}
                         ry={0.06}
-                        fill="url(#wb-dot-grid)"
+                        fill={`url(#wb-a4-grid-${p})`}
                         style={{ pointerEvents: "none" }}
                       />
                     )}
