@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import * as Y from "yjs";
 import { deleteYjsPages, addYjsPage, setYjsCurrentPage } from "./PageBar";
+import { readPageBoardConfig, writePageBoardConfig } from "@/lib/board-themes";
 
 export interface PageManagerModalProps {
   open: boolean;
@@ -64,6 +65,8 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
       for (const p of selectedPages) {
         const added = addYjsPage(doc);
         const newPageNum = added.count;
+        const cfg = readPageBoardConfig(doc, p);
+        writePageBoardConfig(doc, newPageNum, cfg);
         // Clone elements
         for (let i = 0; i < arr.length; i++) {
           const elMap = arr.get(i);

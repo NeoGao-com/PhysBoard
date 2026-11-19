@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import * as Y from "yjs";
+import { readPageBoardConfig, writePageBoardConfig } from "@/lib/board-themes";
 
 export interface PageState {
   current: number;
@@ -44,8 +45,10 @@ export function setYjsCurrentPage(doc: Y.Doc, nextPage: number): void {
  */
 export function addYjsPage(doc: Y.Doc): PageState {
   const pagesMap = doc.getMap<number>("pages");
-  const { count } = getYjsPageState(doc);
+  const { count, current } = getYjsPageState(doc);
   const nextCount = count + 1;
+  const currentConfig = readPageBoardConfig(doc, current);
+  writePageBoardConfig(doc, nextCount, currentConfig);
   doc.transact(() => {
     pagesMap.set("count", nextCount);
     pagesMap.set("cur", nextCount);

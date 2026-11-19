@@ -16,6 +16,8 @@ import {
   InkProps,
   TransformHandle,
   BoundingBox,
+  SPenConfig,
+  DEFAULT_SPEN_CONFIG,
 } from "@/types/whiteboard";
 import { screenToWorld } from "@/lib/coordinates";
 import { OneEuroFilter } from "@/lib/ink";
@@ -335,6 +337,7 @@ function resolvePenNib(tool: WhiteboardTool): InkProps["nib"] | null {
 
 const PEN_ONLY_MODE_STORAGE_KEY = "physboard_pen_only_mode";
 const INK_TO_SHAPE_STORAGE_KEY = "physboard_ink_to_shape";
+const SPEN_CONFIG_STORAGE_KEY = "physboard_spen_config";
 
 function isPenTool(tool: WhiteboardTool): boolean {
   return resolvePenNib(tool) !== null;
@@ -439,6 +442,22 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [gridEnabled, setGridEnabled] = useState<boolean>(true);
   const [penOnlyMode, setPenOnlyMode] = useState<boolean>(false);
   const [inkToShape, setInkToShape] = useState<boolean>(true);
+  const [spenConfig, setSpenConfig] = useState<SPenConfig>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(SPEN_CONFIG_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return { ...DEFAULT_SPEN_CONFIG, ...parsed };
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return DEFAULT_SPEN_CONFIG;
+  });
+  const spenPreviousToolRef = useRef<WhiteboardTool | null>(null);
+  const spenActiveOverrideRef = useRef<boolean>(false);
   const [autoSwitchTarget, setAutoSwitchTarget] = useState<"select" | "ink" | "off">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("physboard_auto_switch_target");
@@ -541,6 +560,17 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     if (typeof window !== "undefined") {
       try {
         window.localStorage.setItem(PEN_ONLY_MODE_STORAGE_KEY, enabled ? "true" : "false");
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const handleUpdateSPenConfig = useCallback((cfg: SPenConfig) => {
+    setSpenConfig(cfg);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(SPEN_CONFIG_STORAGE_KEY, JSON.stringify(cfg));
       } catch {
         // ignore
       }
@@ -715,7 +745,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     zoomIn,
     zoomOut,
     resetView,
-    scrollToPage,
   } = useCanvasNavigation({
     currentTool: activeTool,
     isA4: isA4Format,
@@ -4382,6 +4411,37 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return;
       }
 
+      // Check S Pen / Stylus side button (button === 2 or 5, or buttons & 2, or buttons & 32)
+      let currentActiveTool = activeTool;
+      if (
+        e.pointerType === "pen" &&
+        spenConfig.action !== "none" &&
+        (e.button === 2 || e.button === 5 || (e.buttons & 2) !== 0 || (e.buttons & 32) !== 0)
+      ) {
+        if (spenConfig.behavior === "hold") {
+          if (!spenActiveOverrideRef.current) {
+            spenPreviousToolRef.current = activeTool;
+            spenActiveOverrideRef.current = true;
+          }
+          currentActiveTool = spenConfig.action as WhiteboardTool;
+          setActiveTool(currentActiveTool);
+        } else if (spenConfig.behavior === "toggle") {
+          if (activeTool !== spenConfig.action) {
+            spenPreviousToolRef.current = activeTool;
+            currentActiveTool = spenConfig.action as WhiteboardTool;
+            setActiveTool(currentActiveTool);
+            if (spenConfig.returnAfterAction) {
+              spenActiveOverrideRef.current = true;
+            }
+          } else if (spenPreviousToolRef.current) {
+            currentActiveTool = spenPreviousToolRef.current;
+            setActiveTool(currentActiveTool);
+            spenPreviousToolRef.current = null;
+            spenActiveOverrideRef.current = false;
+          }
+        }
+      }
+
       const rect = containerRef.current?.getBoundingClientRect();
       const worldPos = screenToWorld(
         e.clientX,
@@ -4393,7 +4453,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       );
 
       const isMiddleClick = e.button === 1;
-      const isPan = isSpacePressed || isMiddleClick || activeTool === "pan";
+      const isPan = isSpacePressed || isMiddleClick || currentActiveTool === "pan";
       if (isPan) {
         navPointerDown(e);
         return;
@@ -4401,9 +4461,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
       // Select / Marquee
       if (
-        activeTool === null ||
-        activeTool === "select" ||
-        activeTool === "select:marquee"
+        currentActiveTool === null ||
+        currentActiveTool === "select" ||
+        currentActiveTool === "select:marquee"
       ) {
         setSelectedIds([]);
         setOrbitActiveId(null);
@@ -5731,6 +5791,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           resetToolAfterEraser();
         }
       }
+
+      // Check S Pen auto-return: if stylus button was held or configured to return after action
+      if (spenActiveOverrideRef.current && spenPreviousToolRef.current) {
+        if (spenConfig.behavior === "hold" || spenConfig.returnAfterAction) {
+          setActiveTool(spenPreviousToolRef.current);
+          spenPreviousToolRef.current = null;
+          spenActiveOverrideRef.current = false;
+        }
+      }
     },
     [
       navPointerUp,
@@ -5744,6 +5813,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       inkToShape,
       activeTool,
       resetToolAfterEraser,
+      spenConfig,
     ]
   );
 
@@ -5776,8 +5846,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         liveStrokePressuresRef.current = [];
         setLiveStroke(null);
       }
+      if (spenActiveOverrideRef.current && spenPreviousToolRef.current) {
+        if (spenConfig.behavior === "hold" || spenConfig.returnAfterAction) {
+          setActiveTool(spenPreviousToolRef.current);
+          spenPreviousToolRef.current = null;
+          spenActiveOverrideRef.current = false;
+        }
+      }
     },
-    [navPointerCancel, dispatcher, liveStroke]
+    [navPointerCancel, dispatcher, liveStroke, spenConfig]
   );
 
   // Drag-and-drop image or HTML simulation file onto canvas
@@ -6508,77 +6585,28 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         </>
       }
     >
-      {isA4Format ? (
-        Array.from({ length: Math.max(1, pageCount) }, (_, idx) => {
-          const p = idx + 1;
-          const a4Opt = BOARD_FORMAT_OPTIONS.find(
-            (f) => f.id === currentBoardConfig?.format
-          );
-          const pageStep = (a4Opt?.heightWorld ?? 24.04) + 1.0;
-          const pageEls = elements.filter(
-            (el) =>
-              (el.meta.page ?? 1) === p &&
-              el.type !== "ExamPaper" &&
-              el.type !== "ExamItem"
-          );
-          return (
-            <g
-              key={`page-content-${p}`}
-              data-page-content={p}
-              transform={`translate(0, ${(p - 1) * pageStep})`}
-            >
-              {[...pageEls]
-                .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
-                .map(renderBoardElement)}
+      {[...pageElements]
+        .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
+        .map(renderBoardElement)}
 
-              {liveStroke && currentPage === p && (
-                <InkElement
-                  id="live-in-progress-stroke"
-                  transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
-                  style={{
-                    ...liveStroke.style,
-                    stroke: adaptStrokeForBoard(
-                      liveStroke.style?.stroke,
-                      currentBoardTheme.isDark
-                    ),
-                  }}
-                  props={{
-                    points: liveStroke.points,
-                    pressures: liveStroke.pressures,
-                    nib: liveStroke.nib,
-                  }}
-                  scale={viewport.scale}
-                />
-              )}
-            </g>
-          );
-        })
-      ) : (
-        <>
-          {[...pageElements]
-            .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
-            .map(renderBoardElement)}
-
-          {liveStroke && (
-            <InkElement
-              id="live-in-progress-stroke"
-              transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
-              style={{
-                ...liveStroke.style,
-                stroke: adaptStrokeForBoard(
-                  liveStroke.style?.stroke,
-                  currentBoardTheme.isDark
-                ),
-              }}
-              props={{
-                points: liveStroke.points,
-                pressures: liveStroke.pressures,
-                nib: liveStroke.nib,
-              }}
-              scale={viewport.scale}
-            />
-          )}
-        </>
+      {liveStroke && (
+        <InkElement
+          id="live-in-progress-stroke"
+          transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
+          style={{
+            ...liveStroke.style,
+            stroke: adaptStrokeForBoard(
+              liveStroke.style?.stroke,
+              currentBoardTheme.isDark
+            ),
+          }}
+          props={{
+            points: liveStroke.points,
+            pressures: liveStroke.pressures,
+            nib: liveStroke.nib,
+          }}
+          scale={viewport.scale}
+        />
       )}
     </SvgCanvas>
   );
@@ -6772,23 +6800,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             onOpenCommandPalette={() => setCommandPaletteOpen(true)}
             onSelectPage={(p) => {
               setYjsCurrentPage(doc, p);
-              if (isA4Format) {
-                const a4Opt = BOARD_FORMAT_OPTIONS.find(
-                  (f) => f.id === currentBoardConfig?.format
-                );
-                scrollToPage(p, a4Opt?.heightWorld ?? 24.04, 1.0);
-              }
             }}
             onAddPage={() => {
               addYjsPage(doc);
-              if (isA4Format) {
-                const a4Opt = BOARD_FORMAT_OPTIONS.find(
-                  (f) => f.id === currentBoardConfig?.format
-                );
-                setTimeout(() => {
-                  scrollToPage(pageCount + 1, a4Opt?.heightWorld ?? 24.04, 1.0);
-                }, 40);
-              }
             }}
             onDeletePage={(p) => {
               if (doc && pageCount > 1) {
@@ -8553,6 +8567,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onChangeInkToShape={(val) => setInkToShape(val)}
         penOnlyMode={penOnlyMode}
         onChangePenOnlyMode={(val) => setPenOnlyMode(val)}
+        spenConfig={spenConfig}
+        onChangeSPenConfig={handleUpdateSPenConfig}
         laserConfig={laserConfig}
         onChangeLaserConfig={handleUpdateLaserConfig}
         gridEnabled={gridEnabled}

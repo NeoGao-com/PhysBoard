@@ -347,6 +347,22 @@ export type WhiteboardTool =
   | string
   | null;
 
+// --- SPen / Stylus Button Configuration ---
+export type SPenButtonAction = "erase" | "select" | "ink:laser" | "pan" | "ink:highlighter" | "none";
+export type SPenButtonBehavior = "hold" | "toggle"; // "hold": giữ nút để tạm dùng / nhả nút quay về công cụ cũ; "toggle": bấm nút chuyển công cụ và ở lại hoặc quay về sau khi vẽ xong
+
+export interface SPenConfig {
+  action: SPenButtonAction;
+  behavior: SPenButtonBehavior;
+  returnAfterAction: boolean; // Dành cho toggle: sau khi vẽ/tác vụ xong thì tự động quay về công cụ trước đó
+}
+
+export const DEFAULT_SPEN_CONFIG: SPenConfig = {
+  action: "erase",
+  behavior: "hold",
+  returnAfterAction: true,
+};
+
 // --- Selection & Bounding Box ---
 export interface BoundingBox {
   minX: number;

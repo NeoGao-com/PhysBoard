@@ -22,6 +22,7 @@ import {
   type PageBoardConfig,
 } from "@/lib/board-themes";
 import { exportPNG, downloadBlob } from "@/lib/export";
+import { SPenConfig, DEFAULT_SPEN_CONFIG, SPenButtonAction, SPenButtonBehavior } from "@/types/whiteboard";
 
 export interface SettingsModalProps {
   open: boolean;
@@ -40,6 +41,9 @@ export interface SettingsModalProps {
   onChangeInkToShape: (val: boolean) => void;
   penOnlyMode: boolean;
   onChangePenOnlyMode: (val: boolean) => void;
+  // SPen / Stylus Button Config
+  spenConfig?: SPenConfig;
+  onChangeSPenConfig?: (cfg: SPenConfig) => void;
   // Laser Config
   laserConfig: LaserConfig;
   onChangeLaserConfig: (cfg: LaserConfig) => void;
@@ -114,6 +118,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeInkToShape,
   penOnlyMode,
   onChangePenOnlyMode,
+  spenConfig = DEFAULT_SPEN_CONFIG,
+  onChangeSPenConfig,
   laserConfig,
   onChangeLaserConfig,
   gridEnabled,
@@ -401,6 +407,126 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                   </div>
                 </label>
+              </div>
+
+              {/* Cài đặt nút bấm S Pen / Stylus */}
+              <div style={SECTION_BOX_STYLE}>
+                <div style={SECTION_TITLE_STYLE}>
+                  <span>🖊️</span>
+                  <span>Nút bấm trên bút S Pen / Stylus (Samsung Tab & Wacom)</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: "#475569" }}>
+                    Tùy chỉnh hành vi khi ấn nút bên hông thân bút S Pen trên màn hình:
+                  </div>
+
+                  {/* 1. Chọn chức năng */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                      Chức năng gán cho nút bút:
+                    </label>
+                    <select
+                      value={spenConfig.action}
+                      onChange={(e) =>
+                        onChangeSPenConfig?.({
+                          ...spenConfig,
+                          action: e.target.value as SPenButtonAction,
+                        })
+                      }
+                      style={{
+                        padding: "7px 10px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        fontSize: 13,
+                        background: "#fff",
+                        color: "#0f172a",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <option value="erase">Tẩy xoá (Gôm nhanh)</option>
+                      <option value="select">Công cụ Chọn / Di chuyển (Select)</option>
+                      <option value="ink:laser">Bút Laze chỉ điểm (Laser Pointer)</option>
+                      <option value="ink:highlighter">Bút Dạ quang (Highlighter)</option>
+                      <option value="pan">Kéo trượt bảng (Pan Canvas)</option>
+                      <option value="none">Không làm gì (Tắt phím bút)</option>
+                    </select>
+                  </div>
+
+                  {/* 2. Cách thức hoạt động */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                      Cơ chế kích hoạt nút bấm:
+                    </label>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, cursor: "pointer" }}>
+                        <input
+                          type="radio"
+                          name="spenBehavior"
+                          value="hold"
+                          checked={spenConfig.behavior === "hold"}
+                          onChange={() =>
+                            onChangeSPenConfig?.({
+                              ...spenConfig,
+                              behavior: "hold",
+                            })
+                          }
+                          style={{ accentColor: "#2563eb" }}
+                        />
+                        <div>
+                          <span style={{ fontWeight: 500 }}>Giữ nút để dùng, nhả nút tự quay về</span>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>
+                            Vừa giữ nút bấm vừa chấm bút để tẩy/chọn, nhả nút ra sẽ lập tức trở lại cây bút bạn đang vẽ.
+                          </div>
+                        </div>
+                      </label>
+
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, cursor: "pointer" }}>
+                        <input
+                          type="radio"
+                          name="spenBehavior"
+                          value="toggle"
+                          checked={spenConfig.behavior === "toggle"}
+                          onChange={() =>
+                            onChangeSPenConfig?.({
+                              ...spenConfig,
+                              behavior: "toggle",
+                            })
+                          }
+                          style={{ accentColor: "#2563eb" }}
+                        />
+                        <div>
+                          <span style={{ fontWeight: 500 }}>Bấm 1 lần để chuyển công cụ</span>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>
+                            Bấm nút 1 lần là đổi sang công cụ được gán mà không cần phải giữ tay liên tục.
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* 3. Tùy chọn quay lại sau khi thực hiện xong (đặc biệt hữu ích khi dùng chế độ toggle hoặc tẩy) */}
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", marginTop: 2 }}>
+                    <input
+                      type="checkbox"
+                      checked={spenConfig.returnAfterAction}
+                      onChange={(e) =>
+                        onChangeSPenConfig?.({
+                          ...spenConfig,
+                          returnAfterAction: e.target.checked,
+                        })
+                      }
+                      style={{ accentColor: "#2563eb", marginTop: 2 }}
+                    />
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>
+                        Tự động quay lại công cụ vẽ cũ sau khi thao tác xong
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>
+                        Sau khi nhấc bút tẩy xong hoặc vẽ xong 1 nét laze/dạ quang, ứng dụng tự động trả về loại bút trước đó.
+                      </div>
+                    </div>
+                  </label>
+                </div>
               </div>
 
               {/* Nhận diện hình học tay */}
