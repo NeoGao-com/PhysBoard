@@ -13,7 +13,6 @@ import {
   evalMathExpr,
   compileMathExpr,
   findRoots,
-  simplifyFraction,
   formatCleanNumber,
 } from "./math-eval";
 

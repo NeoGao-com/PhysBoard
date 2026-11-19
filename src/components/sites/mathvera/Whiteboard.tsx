@@ -1638,49 +1638,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [getViewCenter, dispatcher, handleSelectTool]
   );
 
-  const handleSelectTeachingInstrument = useCallback(
-    (kind: "ruler" | "setsquare" | "setsquare-45" | "protractor" | "protractor-360" | "compass") => {
-      const center = getViewCenter();
-      let instrumentKind: PhysicsInstrumentKind = "ruler";
-      let extraProps: Record<string, unknown> = {};
-
-      if (kind === "ruler") {
-        instrumentKind = "ruler";
-        extraProps = { lengthCm: 20 };
-      } else if (kind === "setsquare") {
-        instrumentKind = "setsquare";
-        extraProps = { setSquareKind: "30-60-90", width: 7.2, height: 4.5 };
-      } else if (kind === "setsquare-45") {
-        instrumentKind = "setsquare";
-        extraProps = { setSquareKind: "45-45-90", width: 6.0, height: 6.0 };
-      } else if (kind === "protractor") {
-        instrumentKind = "protractor";
-        extraProps = { protractorType: "180", protractorAngle: 45, width: 6.4, height: 3.6 };
-      } else if (kind === "protractor-360") {
-        instrumentKind = "protractor";
-        extraProps = { protractorType: "360", protractorAngle: 45, width: 6.4, height: 6.4 };
-      } else if (kind === "compass") {
-        instrumentKind = "compass";
-        extraProps = { compassRadius: 3.0, compassAngle: 0, width: 5.2, height: 5.2 };
-      }
-
-      const res = dispatcher.dispatch({
-        type: "object.create",
-        params: {
-          type: "PhysicsInstrument",
-          transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-          props: {
-            instrumentKind,
-            ...extraProps,
-          },
-        },
-      });
-      if (res.created?.[0]) setSelectedIds([res.created[0]]);
-      handleSelectTool("select");
-    },
-    [getViewCenter, dispatcher, handleSelectTool]
-  );
-
   const handleCompassDrawArc = useCallback(
     (cx: number, cy: number, r: number, startDeg = 0, endDeg = 360) => {
       const pts: number[] = [];
@@ -6034,7 +5991,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           <AxesElement
             key={el.id}
             element={el}
-            allElements={pageElements}
             isSelected={isSel}
             onPointerDown={(e) => handleElementPointerDown(e, el.id)}
             onResizeHandlePointerDown={(e, side) => {
@@ -6559,7 +6515,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setStatusHint(`Bấm lên bảng để đặt ${item.name}`);
       }}
       onOpenRealWorldDrawer={() => setRealWorldDrawerOpen(true)}
-      onPhysicsAction={handlePhysicsAction}
       onOpenPhysicsDrawer={() => setPhysicsDrawerOpen(true)}
       onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
       onOpenCalculator={() => setCalculatorOpen((prev) => !prev)}

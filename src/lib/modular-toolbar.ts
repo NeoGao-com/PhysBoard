@@ -1,4 +1,4 @@
-export type ModularBlockId = "ink" | "geometry2d" | "space3d" | "physics" | "system";
+export type ModularBlockId = "ink" | "geometry2d" | "space3d" | "physics";
 
 export interface ModularBlockState {
   id: ModularBlockId;
@@ -16,7 +16,6 @@ export const MODULAR_BLOCK_DEFS: Record<ModularBlockId, { id: ModularBlockId; na
   geometry2d: { id: "geometry2d", name: "Hình học phẳng", defaultPos: { x: 160, y: 170 } },
   space3d: { id: "space3d", name: "Không gian & Hàm số", defaultPos: { x: 160, y: 230 } },
   physics: { id: "physics", name: "Vật lý & Dụng cụ", defaultPos: { x: 160, y: 290 } },
-  system: { id: "system", name: "Hệ thống", defaultPos: { x: 160, y: 350 } },
 };
 
 export const DEFAULT_MODULAR_LAYOUT: ModularLayoutConfig = {
@@ -25,7 +24,6 @@ export const DEFAULT_MODULAR_LAYOUT: ModularLayoutConfig = {
     geometry2d: { id: "geometry2d", name: MODULAR_BLOCK_DEFS.geometry2d.name, isFloating: false, position: MODULAR_BLOCK_DEFS.geometry2d.defaultPos },
     space3d: { id: "space3d", name: MODULAR_BLOCK_DEFS.space3d.name, isFloating: false, position: MODULAR_BLOCK_DEFS.space3d.defaultPos },
     physics: { id: "physics", name: MODULAR_BLOCK_DEFS.physics.name, isFloating: false, position: MODULAR_BLOCK_DEFS.physics.defaultPos },
-    system: { id: "system", name: MODULAR_BLOCK_DEFS.system.name, isFloating: false, position: MODULAR_BLOCK_DEFS.system.defaultPos },
   },
 };
 
@@ -44,7 +42,6 @@ export function loadModularLayoutConfig(): ModularLayoutConfig {
         geometry2d: { ...DEFAULT_MODULAR_LAYOUT.blocks.geometry2d, ...parsed.blocks.geometry2d },
         space3d: { ...DEFAULT_MODULAR_LAYOUT.blocks.space3d, ...parsed.blocks.space3d },
         physics: { ...DEFAULT_MODULAR_LAYOUT.blocks.physics, ...parsed.blocks.physics },
-        system: { ...DEFAULT_MODULAR_LAYOUT.blocks.system, ...parsed.blocks.system },
       },
     };
   } catch {

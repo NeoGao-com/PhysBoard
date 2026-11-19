@@ -41,7 +41,6 @@ export type AxesResizeSide = "xNeg" | "xPos" | "yPos" | "yNeg";
 
 export interface AxesElementProps {
   element: CanvasElement;
-  allElements?: CanvasElement[];
   isSelected?: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
   onResizeHandlePointerDown?: (
@@ -56,7 +55,6 @@ export interface AxesElementProps {
  */
 export const AxesElement: React.FC<AxesElementProps> = ({
   element,
-  allElements = [],
   isSelected = false,
   onPointerDown,
   onResizeHandlePointerDown,

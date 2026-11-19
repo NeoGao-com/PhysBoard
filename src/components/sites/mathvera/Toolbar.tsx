@@ -27,14 +27,12 @@ import {
   type ModularBlockId,
 } from "@/lib/modular-toolbar";
 import { FloatingDock } from "./FloatingDock";
-import { importPdfPages } from "@/lib/pdf-import";
 import {
   IconBrush,
   IconBucket,
   IconCalculator,
   IconChart,
   IconCircle,
-  IconCommand,
   IconCursor,
   IconDashedPen,
   IconEraser,
@@ -47,26 +45,16 @@ import {
   IconHighlighter,
   IconLaser,
   IconMarquee,
-  IconOpenFile,
   IconPen,
   IconPencil,
   IconPhysics,
-  IconPdf,
-  IconHtmlSim,
   IconPoint,
   IconPolygon,
   IconRealWorld,
   IconRedo,
-  IconRuler,
-  IconSave,
   IconSegment,
-  IconSetSquare,
-  IconSettings,
-  IconProtractor,
-  IconCompassTool,
   IconShapeSnap,
   IconStylusOnly,
-  IconTrash,
   IconUndo,
 } from "./ToolbarIcons";
 
@@ -155,7 +143,6 @@ export interface ToolbarProps {
   onSelectQuickRealWorld?: (item: RealWorldArtItem) => void;
   onOpenRealWorldDrawer?: () => void;
   onOpenDecorHelp?: () => void;
-  onPhysicsAction?: (action: string) => void;
   onOpenPhysicsDrawer?: () => void;
   onOpenHtmlSimModal?: () => void;
   onGoHome?: () => void;
@@ -204,8 +191,6 @@ type OpenDropdown =
   | "functions"
   | "statistics"
   | "realworld"
-  | "physics"
-  | "instruments"
   | null;
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -236,7 +221,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onSelectQuickRealWorld,
   onOpenRealWorldDrawer,
   onOpenDecorHelp,
-  onPhysicsAction,
   onOpenPhysicsDrawer,
   onOpenHtmlSimModal,
   onGoHome,
@@ -512,8 +496,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const statsWrapRef = useRef<HTMLDivElement>(null);
   const realworldWrapRef = useRef<HTMLDivElement>(null);
   const portalMenuRef = useRef<HTMLDivElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
-  const [pdfImporting, setPdfImporting] = useState(false);
 
   useEffect(() => {
     if (!openMenu) return;
