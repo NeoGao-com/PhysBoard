@@ -22,9 +22,14 @@ export interface UseCanvasNavigationOptions {
   maxScale?: number;
   currentTool?: string | null;
   isA4?: boolean;
+  totalPages?: number;
+  pageWidthWorld?: number;
+  pageHeightWorld?: number;
+  pageGapWorld?: number;
   penOnlyMode?: boolean;
   onViewportChange?: (viewport: ViewportTransform) => void;
   onCursorMove?: (worldPos: Point) => void;
+  onPageChange?: (page: number) => void;
 }
 
 export interface UseCanvasNavigationReturn {
@@ -34,6 +39,10 @@ export interface UseCanvasNavigationReturn {
   isPanning: boolean;
   isSpacePressed: boolean;
   cursorWorld: Point | null;
+  isFitLocked: boolean;
+  toggleFitLock: () => void;
+  setFitLocked: (locked: boolean) => void;
+  fitToScreen: () => void;
   handlePointerDown: (e: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerMove: (e: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerUp: (e: React.PointerEvent<SVGSVGElement>) => void;
@@ -57,9 +66,14 @@ export function useCanvasNavigation(
     maxScale = MAX_SCALE,
     currentTool = null,
     isA4 = false,
+    totalPages = 1,
+    pageWidthWorld = 17,
+    pageHeightWorld = 24.04,
+    pageGapWorld = 0.8,
     penOnlyMode = false,
     onViewportChange,
     onCursorMove,
+    onPageChange,
   } = options;
 
   const [viewport, setViewport] = useState<ViewportTransform>({
@@ -68,6 +82,7 @@ export function useCanvasNavigation(
     scale: initialScale,
   });
 
+  const [isFitLocked, setIsFitLocked] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [cursorWorld, setCursorWorld] = useState<Point | null>(null);
@@ -90,10 +105,91 @@ export function useCanvasNavigation(
   } | null>(null);
   const lastCursorSentRef = useRef<number>(0);
 
+  const pW = pageWidthWorld ?? 17;
+  const pH = pageHeightWorld ?? 24.04;
+  const pGap = pageGapWorld ?? 0.8;
+  const pStep = pH + pGap;
+  const count = Math.max(1, totalPages ?? 1);
+  const totalH = (count - 1) * pStep + pH;
+
+  // Clamps viewport for continuous A4 mode:
+  // - Top of Page 1 cannot go below top of screen (ty <= 0)
+  // - Bottom of Page N cannot go above bottom of screen (ty >= viewH - totalH * scale)
+  // - If isFitLocked is active, scale is locked to fit width, and tx is locked centered
+  const clampA4Viewport = useCallback(
+    (
+      vp: ViewportTransform,
+      fitLocked = isFitLocked,
+      rect = containerRef.current?.getBoundingClientRect()
+    ): ViewportTransform => {
+      if (!isA4) return vp;
+
+      const viewW = rect?.width ?? 1200;
+      const viewH = rect?.height ?? 800;
+
+      let targetScale = vp.scale;
+      let targetTx = vp.tx;
+
+      if (fitLocked) {
+        targetScale = viewW / pW;
+        targetTx = viewW / 2;
+      }
+
+      const totalHPx = totalH * targetScale;
+      const maxTy = 0; // Mép trên trang đầu tiên sát mép màn hình trên (không cho lướt lên nữa)
+      const minTy = Math.min(0, viewH - totalHPx); // Mép dưới trang cuối cùng sát mép dưới màn hình
+
+      const clampedTy = Math.max(minTy, Math.min(maxTy, vp.ty));
+
+      return {
+        scale: targetScale,
+        tx: fitLocked ? targetTx : vp.tx,
+        ty: clampedTy,
+      };
+    },
+    [isA4, isFitLocked, pW, totalH]
+  );
+
+  const fitToScreen = useCallback(() => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const viewW = rect?.width ?? 1200;
+    const viewH = rect?.height ?? 800;
+    const fitScale = viewW / pW;
+    const totalHPx = totalH * fitScale;
+    const minTy = Math.min(0, viewH - totalHPx);
+
+    setViewport((prev) => ({
+      scale: fitScale,
+      tx: viewW / 2,
+      ty: Math.max(minTy, Math.min(0, prev.ty)),
+    }));
+  }, [pW, totalH]);
+
+  const toggleFitLock = useCallback(() => {
+    setIsFitLocked((prev) => {
+      const next = !prev;
+      if (next) {
+        fitToScreen();
+      }
+      return next;
+    });
+  }, [fitToScreen]);
+
   // Sync state changes with callback
   useEffect(() => {
     onViewportChange?.(viewport);
   }, [viewport, onViewportChange]);
+
+  // Page detection during scroll in continuous A4 mode
+  useEffect(() => {
+    if (!isA4 || !onPageChange) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    const viewH = rect?.height ?? 800;
+    const ySvgCenter = (viewH / 2 - viewport.ty) / (viewport.scale || 45);
+    const p = Math.floor(ySvgCenter / pStep) + 1;
+    const clampedP = Math.max(1, Math.min(count, p));
+    onPageChange(clampedP);
+  }, [isA4, viewport.ty, viewport.scale, pStep, count, onPageChange]);
 
   // Spacebar tracking
   useEffect(() => {
@@ -132,15 +228,55 @@ export function useCanvasNavigation(
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = svgEl.getBoundingClientRect();
+      const viewW = rect.width;
+      const viewH = rect.height;
 
-      // In A4 document mode, wheel without Ctrl/Meta smoothly scrolls vertically!
-      // Ctrl+Wheel or Meta+Wheel zooms in/out.
-      if (isA4 && !e.ctrlKey && !e.metaKey) {
-        setViewport((prev) => ({
-          ...prev,
-          ty: prev.ty - e.deltaY,
-          tx: e.shiftKey ? prev.tx - e.deltaY : prev.tx - (e.deltaX || 0),
-        }));
+      // In continuous A4 mode:
+      if (isA4) {
+        // If locked: zooming is completely disabled; wheel scrolls vertically
+        // If unlocked: Ctrl/Meta+wheel zooms, normal wheel scrolls vertically
+        const allowZoom = !isFitLocked && (e.ctrlKey || e.metaKey);
+        if (allowZoom) {
+          setViewport((prev) => {
+            const nextVp = calculateZoomAtPoint(
+              e.clientX,
+              e.clientY,
+              e.deltaY,
+              prev.tx,
+              prev.ty,
+              prev.scale,
+              rect,
+              0.0015,
+              minScale,
+              maxScale
+            );
+            const totalHPx = totalH * nextVp.scale;
+            const minTy = Math.min(0, viewH - totalHPx);
+            return {
+              ...nextVp,
+              ty: Math.max(minTy, Math.min(0, nextVp.ty)),
+            };
+          });
+        } else {
+          // Continuous vertical scrolling
+          setViewport((prev) => {
+            const scale = isFitLocked ? viewW / pW : prev.scale;
+            const totalHPx = totalH * scale;
+            const minTy = Math.min(0, viewH - totalHPx);
+            const nextTy = prev.ty - e.deltaY;
+            const clampedTy = Math.max(minTy, Math.min(0, nextTy));
+            const nextTx = isFitLocked
+              ? viewW / 2
+              : e.shiftKey
+              ? prev.tx - e.deltaY
+              : prev.tx - (e.deltaX || 0);
+            return {
+              scale,
+              tx: nextTx,
+              ty: clampedTy,
+            };
+          });
+        }
       } else {
         setViewport((prev) =>
           calculateZoomAtPoint(
@@ -163,7 +299,7 @@ export function useCanvasNavigation(
     return () => {
       svgEl.removeEventListener("wheel", onWheel);
     };
-  }, [minScale, maxScale, isA4]);
+  }, [minScale, maxScale, isA4, isFitLocked, pW, totalH]);
 
   // Pointer Down
   const handlePointerDown = useCallback(
@@ -230,6 +366,10 @@ export function useCanvasNavigation(
 
       // Multi-touch pinch handling
       if (pinchStateRef.current && activePointersRef.current.size >= 2) {
+        if (isA4 && isFitLocked) {
+          // In locked mode, pinch cannot zoom!
+          return;
+        }
         const pts = [...activePointersRef.current.values()];
         const p1 = pts[0];
         const p2 = pts[1];
@@ -245,7 +385,7 @@ export function useCanvasNavigation(
             minScale,
             maxScale
           );
-          setViewport(next);
+          setViewport(isA4 ? clampA4Viewport(next, false, rect) : next);
           return;
         }
       }
@@ -253,13 +393,14 @@ export function useCanvasNavigation(
       // Single pointer pan dragging
       const panStart = panStartRef.current;
       if (panStart) {
-        const dx = e.clientX - panStart.sx;
+        const dx = isA4 && isFitLocked ? 0 : e.clientX - panStart.sx;
         const dy = e.clientY - panStart.sy;
-        setViewport((prev) => ({
-          ...prev,
+        const nextVp = {
+          ...viewport,
           tx: panStart.tx + dx,
           ty: panStart.ty + dy,
-        }));
+        };
+        setViewport(isA4 ? clampA4Viewport(nextVp, isFitLocked, rect) : nextVp);
       }
 
       // Cursor world tracking (throttled to 50ms for external callbacks)
@@ -279,7 +420,7 @@ export function useCanvasNavigation(
         onCursorMove?.(worldPos);
       }
     },
-    [minScale, maxScale, viewport, onCursorMove]
+    [minScale, maxScale, viewport, onCursorMove, isA4, isFitLocked, clampA4Viewport]
   );
 
   // Pointer Up / Cancel
@@ -305,19 +446,34 @@ export function useCanvasNavigation(
     const rect = containerRef.current?.getBoundingClientRect();
     const width = rect?.width ?? 1000;
     const height = rect?.height ?? 640;
-    setViewport({
-      tx: width / 2,
-      ty: height / 2,
-      scale: DEFAULT_SCALE,
-    });
-  }, []);
+    if (isA4) {
+      if (isFitLocked) {
+        fitToScreen();
+      } else {
+        const totalHPx = totalH * DEFAULT_SCALE;
+        const minTy = Math.min(0, height - totalHPx);
+        setViewport({
+          scale: DEFAULT_SCALE,
+          tx: width / 2,
+          ty: Math.max(minTy, 0),
+        });
+      }
+    } else {
+      setViewport({
+        tx: width / 2,
+        ty: height / 2,
+        scale: DEFAULT_SCALE,
+      });
+    }
+  }, [isA4, isFitLocked, fitToScreen, totalH]);
 
   const zoomIn = useCallback(() => {
+    if (isA4 && isFitLocked) return;
     const rect = containerRef.current?.getBoundingClientRect();
     const cx = (rect?.left ?? 0) + (rect?.width ?? 1000) / 2;
     const cy = (rect?.top ?? 0) + (rect?.height ?? 640) / 2;
-    setViewport((prev) =>
-      calculateZoomAtPoint(
+    setViewport((prev) => {
+      const next = calculateZoomAtPoint(
         cx,
         cy,
         -100,
@@ -328,16 +484,18 @@ export function useCanvasNavigation(
         0.0015,
         minScale,
         maxScale
-      )
-    );
-  }, [minScale, maxScale]);
+      );
+      return isA4 ? clampA4Viewport(next, false, rect) : next;
+    });
+  }, [minScale, maxScale, isA4, isFitLocked, clampA4Viewport]);
 
   const zoomOut = useCallback(() => {
+    if (isA4 && isFitLocked) return;
     const rect = containerRef.current?.getBoundingClientRect();
     const cx = (rect?.left ?? 0) + (rect?.width ?? 1000) / 2;
     const cy = (rect?.top ?? 0) + (rect?.height ?? 640) / 2;
-    setViewport((prev) =>
-      calculateZoomAtPoint(
+    setViewport((prev) => {
+      const next = calculateZoomAtPoint(
         cx,
         cy,
         100,
@@ -348,32 +506,44 @@ export function useCanvasNavigation(
         0.0015,
         minScale,
         maxScale
-      )
-    );
-  }, [minScale, maxScale]);
+      );
+      return isA4 ? clampA4Viewport(next, false, rect) : next;
+    });
+  }, [minScale, maxScale, isA4, isFitLocked, clampA4Viewport]);
 
-  const panBy = useCallback((dx: number, dy: number) => {
-    setViewport((prev) => ({
-      ...prev,
-      tx: prev.tx + dx,
-      ty: prev.ty + dy,
-    }));
-  }, []);
+  const panBy = useCallback(
+    (dx: number, dy: number) => {
+      setViewport((prev) => {
+        const next = {
+          ...prev,
+          tx: isA4 && isFitLocked ? prev.tx : prev.tx + dx,
+          ty: prev.ty + dy,
+        };
+        return isA4 ? clampA4Viewport(next, isFitLocked) : next;
+      });
+    },
+    [isA4, isFitLocked, clampA4Viewport]
+  );
 
   const scrollToPage = useCallback(
-    (p: number, pageHeightWorld = 24.04, pageGapWorld = 1.0) => {
-      const svgEl = containerRef.current;
-      const rect = svgEl?.getBoundingClientRect();
-      const viewH = rect?.height ?? 800;
+    (p: number) => {
+      const rect = containerRef.current?.getBoundingClientRect();
       const viewW = rect?.width ?? 1200;
-      const step = pageHeightWorld + pageGapWorld;
-      setViewport((prev) => ({
-        ...prev,
-        tx: viewW / 2,
-        ty: viewH / 2 - (p - 1) * step * prev.scale,
-      }));
+      const viewH = rect?.height ?? 800;
+      setViewport((prev) => {
+        const scale = isFitLocked ? viewW / pW : prev.scale;
+        const totalHPx = totalH * scale;
+        const minTy = Math.min(0, viewH - totalHPx);
+        const targetTy = -(p - 1) * pStep * scale;
+        const clampedTy = Math.max(minTy, Math.min(0, targetTy));
+        return {
+          scale,
+          tx: isFitLocked ? viewW / 2 : prev.tx,
+          ty: clampedTy,
+        };
+      });
     },
-    []
+    [isFitLocked, pW, pStep, totalH]
   );
 
   return {
@@ -383,6 +553,10 @@ export function useCanvasNavigation(
     isPanning,
     isSpacePressed,
     cursorWorld,
+    isFitLocked,
+    toggleFitLock,
+    setFitLocked: setIsFitLocked,
+    fitToScreen,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,

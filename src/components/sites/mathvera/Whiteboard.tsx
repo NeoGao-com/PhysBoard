@@ -343,6 +343,28 @@ function isPenTool(tool: WhiteboardTool): boolean {
   return resolvePenNib(tool) !== null;
 }
 
+function getA4PageAtPoint(
+  worldPos: Point2D,
+  totalPages: number,
+  pageW: number,
+  pageH: number,
+  pageGap = 0.8
+): number | null {
+  const hw = pageW / 2;
+  if (worldPos.x < -hw || worldPos.x > hw) return null;
+  const ySvg = -worldPos.y;
+  if (ySvg < 0) return null;
+  const pageStep = pageH + pageGap;
+  const p = Math.floor(ySvg / pageStep) + 1;
+  if (p < 1 || p > totalPages) return null;
+  const pageTop = (p - 1) * pageStep;
+  const pageBottom = pageTop + pageH;
+  if (ySvg >= pageTop && ySvg <= pageBottom) {
+    return p;
+  }
+  return null;
+}
+
 function isEditableTarget(el: Element | null): boolean {
   if (!el) return false;
   const tag = el.tagName?.toLowerCase();
@@ -730,6 +752,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const isA4Format =
     currentBoardConfig?.format === "a4_portrait" ||
     currentBoardConfig?.format === "a4_landscape";
+  const a4Opt = isA4Format
+    ? BOARD_FORMAT_OPTIONS.find((f) => f.id === currentBoardConfig?.format)
+    : null;
 
   const {
     viewport,
@@ -737,6 +762,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     isPanning,
     isSpacePressed,
     cursorWorld,
+    isFitLocked,
+    toggleFitLock,
     handlePointerDown: navPointerDown,
     handlePointerMove: navPointerMove,
     handlePointerUp: navPointerUp,
@@ -745,26 +772,39 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     zoomIn,
     zoomOut,
     resetView,
+    scrollToPage,
   } = useCanvasNavigation({
     currentTool: activeTool,
     isA4: isA4Format,
+    totalPages: pageCount,
+    pageWidthWorld: a4Opt?.widthWorld,
+    pageHeightWorld: a4Opt?.heightWorld,
+    pageGapWorld: 0.8,
     penOnlyMode,
     onCursorMove: updateLocalCursor,
+    onPageChange: (p) => {
+      if (p !== currentPage) {
+        setYjsCurrentPage(doc, p);
+      }
+    },
   });
+
+  // Track which A4 page is being drawn on
+  const activeDrawPageRef = useRef<number>(1);
 
   // Undo / Redo Hook
   const { canUndo, canRedo, undo, redo } = useHistory(dispatcher);
 
-  // Page-filtered elements
+  // Page-filtered elements: in continuous A4 mode, all pages are visible together
   const pageElements = useMemo(
     () =>
       elements.filter(
         (el) =>
-          (el.meta.page ?? 1) === currentPage &&
+          (isA4Format || (el.meta.page ?? 1) === currentPage) &&
           el.type !== "ExamPaper" &&
           el.type !== "ExamItem"
       ),
-    [elements, currentPage]
+    [elements, currentPage, isA4Format]
   );
 
   const hasPaper = useMemo(
@@ -1587,24 +1627,35 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const handlePrevPage = useCallback(() => {
     if (currentPage > 1) {
       setYjsCurrentPage(doc, currentPage - 1);
+      if (isA4Format) {
+        scrollToPage(currentPage - 1);
+      }
       setSelectedIds([]);
       setOrbitActiveId(null);
     }
-  }, [doc, currentPage]);
+  }, [doc, currentPage, isA4Format, scrollToPage]);
 
   const handleNextPage = useCallback(() => {
     if (currentPage < pageCount) {
       setYjsCurrentPage(doc, currentPage + 1);
+      if (isA4Format) {
+        scrollToPage(currentPage + 1);
+      }
       setSelectedIds([]);
       setOrbitActiveId(null);
     }
-  }, [doc, currentPage, pageCount]);
+  }, [doc, currentPage, pageCount, isA4Format, scrollToPage]);
 
   const handleAddPage = useCallback(() => {
-    addYjsPage(doc);
+    const added = addYjsPage(doc);
+    if (isA4Format) {
+      setTimeout(() => {
+        scrollToPage(added.count);
+      }, 40);
+    }
     setSelectedIds([]);
     setOrbitActiveId(null);
-  }, [doc]);
+  }, [doc, isA4Format, scrollToPage]);
 
   // --- Physics Teaching Suite Handlers ---
   const handlePhysicsAction = useCallback(
@@ -4501,24 +4552,24 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return;
       }
 
-      // In A4 mode: strictly only allow writing / drawing inside the paper sheet!
+      // In continuous A4 mode: strictly only allow writing / drawing inside one of the paper sheets!
       if (isA4Format) {
-        const a4Opt = BOARD_FORMAT_OPTIONS.find(
-          (f) => f.id === currentBoardConfig?.format
-        );
         if (a4Opt) {
-          const hw = a4Opt.widthWorld / 2;
-          const hh = a4Opt.heightWorld / 2;
-          const isInsideA4 =
-            worldPos.x >= -hw &&
-            worldPos.x <= hw &&
-            worldPos.y >= -hh &&
-            worldPos.y <= hh;
-          if (!isInsideA4) {
-            // Cannot start writing, drawing, or placing objects outside the A4 paper sheet
+          const targetPage = getA4PageAtPoint(
+            worldPos,
+            pageCount,
+            a4Opt.widthWorld,
+            a4Opt.heightWorld,
+            0.8
+          );
+          if (!targetPage) {
+            // Cannot start writing, drawing, or placing objects outside the A4 paper sheets
             return;
           }
+          activeDrawPageRef.current = targetPage;
         }
+      } else {
+        activeDrawPageRef.current = currentPage;
       }
 
       // Contact Eraser
@@ -5810,6 +5861,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   pressures,
                   nib: liveStroke.nib,
                   style: liveStroke.style,
+                  page: isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage,
                 },
               });
             }
@@ -5821,6 +5873,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 pressures,
                 nib: liveStroke.nib,
                 style: liveStroke.style,
+                page: isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage,
               },
             });
           }
@@ -6698,6 +6751,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onDeleteSelected={handleDeleteSelected}
       isFullscreen={isFullscreen}
       onToggleFullscreen={handleToggleFullscreen}
+      isA4Format={isA4Format}
+      isFitLocked={isFitLocked}
+      onToggleFitLock={toggleFitLock}
       page={{ current: currentPage, count: pageCount }}
       onPrevPage={handlePrevPage}
       onNextPage={handleNextPage}
@@ -6858,9 +6914,17 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             onOpenCommandPalette={() => setCommandPaletteOpen(true)}
             onSelectPage={(p) => {
               setYjsCurrentPage(doc, p);
+              if (isA4Format) {
+                scrollToPage(p);
+              }
             }}
             onAddPage={() => {
-              addYjsPage(doc);
+              const added = addYjsPage(doc);
+              if (isA4Format) {
+                setTimeout(() => {
+                  scrollToPage(added.count);
+                }, 40);
+              }
             }}
             onDeletePage={(p) => {
               if (doc && pageCount > 1) {
@@ -8772,24 +8836,113 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             position: "fixed",
             bottom: 12,
             right: 12,
-            background: "rgba(255, 255, 255, 0.88)",
-            backdropFilter: "blur(4px)",
-            border: "1px solid #e2e8f0",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "rgba(255, 255, 255, 0.92)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid #cbd5e1",
             borderRadius: 8,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
             padding: "4px 8px",
             fontSize: 11,
-            fontFamily: "monospace",
+            fontFamily: "sans-serif",
             color: "#64748b",
-            pointerEvents: "none",
+            pointerEvents: "auto",
             zIndex: 40,
+            userSelect: "none",
           }}
         >
           {cursorWorld ? (
-            <>
-              X: {cursorWorld.x.toFixed(2)} | Y: {cursorWorld.y.toFixed(2)} |{" "}
-            </>
+            <span style={{ fontFamily: "monospace", color: "#94a3b8", fontSize: 10 }}>
+              X: {cursorWorld.x.toFixed(1)} | Y: {cursorWorld.y.toFixed(1)} |{" "}
+            </span>
           ) : null}
-          Zoom: {Math.round(viewport.scale)}
+
+          {isA4Format && (
+            <button
+              type="button"
+              onClick={toggleFitLock}
+              style={{
+                background: isFitLocked ? "#dbeafe" : "#f1f5f9",
+                color: isFitLocked ? "#1d4ed8" : "#475569",
+                border: `1px solid ${isFitLocked ? "#93c5fd" : "#cbd5e1"}`,
+                borderRadius: 5,
+                padding: "2px 6px",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+              }}
+              title={
+                isFitLocked
+                  ? "Đang khóa vừa màn hình (Bấm để mở khóa thu phóng)"
+                  : "Tự động vừa màn hình & Khóa thu phóng"
+              }
+            >
+              <span>{isFitLocked ? "🔒 Đã khóa vừa" : "🔓 Vừa màn hình"}</span>
+            </button>
+          )}
+
+          {!isFitLocked && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+              <button
+                type="button"
+                onClick={zoomOut}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#475569",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  padding: "0 3px",
+                }}
+                title="Thu nhỏ"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                onClick={resetView}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#334155",
+                  fontWeight: 600,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+                title="Đặt lại mức thu phóng"
+              >
+                {Math.round(viewport.scale)}
+              </button>
+              <button
+                type="button"
+                onClick={zoomIn}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#475569",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  padding: "0 3px",
+                }}
+                title="Phóng to"
+              >
+                +
+              </button>
+            </div>
+          )}
+          {isFitLocked && (
+            <span style={{ fontVariantNumeric: "tabular-nums", color: "#64748b", fontSize: 11 }}>
+              Zoom: {Math.round(viewport.scale)}
+            </span>
+          )}
         </div>
       )}
     </div>

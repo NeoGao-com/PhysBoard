@@ -163,6 +163,9 @@ export interface ToolbarProps {
   onOpenCalculator?: () => void;
   isCalculatorOpen?: boolean;
   onOpenCommandPalette?: () => void;
+  isA4Format?: boolean;
+  isFitLocked?: boolean;
+  onToggleFitLock?: () => void;
   onExportPdf?: () => void;
   onExportTikz?: () => void;
   onOpenJsonModal?: () => void;
@@ -241,6 +244,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenCalculator,
   isCalculatorOpen,
   onOpenCommandPalette,
+  isA4Format = false,
+  isFitLocked = false,
+  onToggleFitLock,
   onExportPdf,
   onExportTikz,
   onOpenJsonModal,
@@ -1677,6 +1683,36 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           >
             <span aria-hidden="true">🔗</span>
             <span className="sr-only">Chia sẻ</span>
+          </button>
+        )}
+
+        {/* A4 Fit Screen & Lock Zoom Toggle */}
+        {isA4Format && onToggleFitLock && (
+          <button
+            type="button"
+            data-tool="a4-fit-lock"
+            onClick={onToggleFitLock}
+            title={
+              isFitLocked
+                ? "Đang khóa vừa màn hình (Bấm để mở khóa thu phóng)"
+                : "Tự động phóng to vừa màn hình & Khóa thu phóng"
+            }
+            aria-pressed={isFitLocked}
+            style={{
+              ...btnBaseStyle,
+              padding: "0 7px",
+              background: isFitLocked ? "#dbeafe" : "#f1f5f9",
+              color: isFitLocked ? "#1d4ed8" : "#475569",
+              border: `1px solid ${isFitLocked ? "#93c5fd" : "#cbd5e1"}`,
+              fontWeight: 600,
+              fontSize: 11,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+            }}
+          >
+            <span aria-hidden="true">{isFitLocked ? "🔒" : "🔓"}</span>
+            <span>{isFitLocked ? "Đã khóa vừa" : "Vừa màn hình"}</span>
           </button>
         )}
 

@@ -104,6 +104,11 @@ export function SvgCanvas({
   const a4FormatOption = BOARD_FORMAT_OPTIONS.find((f) => f.id === boardFormat);
   const isA4 = boardFormat === "a4_portrait" || boardFormat === "a4_landscape";
 
+  const pageW = a4FormatOption?.widthWorld ?? 17;
+  const pageH = a4FormatOption?.heightWorld ?? 24.04;
+  const pageGap = 0.8;
+  const pageStep = pageH + pageGap;
+
   const a4Spacing = theme.spacingPx / 45;
   const a4GraphMajor = a4Spacing * 5;
   const a4StrokeW = 1 / (viewport.scale || 45);
@@ -213,73 +218,88 @@ export function SvgCanvas({
             )}
           </pattern>
 
-          {/* Clip path to strictly constrain board content within the A4 paper sheet */}
+          {/* Continuous A4 clipPath across all pages */}
           {isA4 && a4FormatOption && (
             <clipPath id="wb-a4-clip">
-              <rect
-                x={-a4FormatOption.widthWorld / 2}
-                y={-a4FormatOption.heightWorld / 2}
-                width={a4FormatOption.widthWorld}
-                height={a4FormatOption.heightWorld}
-                rx={0.06}
-                ry={0.06}
-              />
+              {Array.from({ length: Math.max(1, totalPages) }, (_, idx) => {
+                const p = idx + 1;
+                const pageTop = (p - 1) * pageStep;
+                return (
+                  <rect
+                    key={`clip-page-${p}`}
+                    x={-pageW / 2}
+                    y={pageTop}
+                    width={pageW}
+                    height={pageH}
+                    rx={0.06}
+                    ry={0.06}
+                  />
+                );
+              })}
             </clipPath>
           )}
-          {isA4 && a4FormatOption && showPattern && (
-            <pattern
-              id="wb-a4-grid"
-              data-wb-grid="true"
-              x={-a4FormatOption.widthWorld / 2}
-              y={-a4FormatOption.heightWorld / 2}
-              width={boardConfig.pattern === "graph" ? a4GraphMajor : a4Spacing}
-              height={boardConfig.pattern === "graph" ? a4GraphMajor : a4Spacing}
-              patternUnits="userSpaceOnUse"
-            >
-              {boardConfig.pattern === "dots" ? (
-                <circle
-                  cx={a4Spacing / 2}
-                  cy={a4Spacing / 2}
-                  r={a4DotR}
-                  fill={theme.dotFill}
-                />
-              ) : boardConfig.pattern === "ruled" ? (
-                <line
-                  x1={0}
-                  y1={a4Spacing}
-                  x2={a4Spacing}
-                  y2={a4Spacing}
-                  stroke={theme.ruledStroke}
-                  strokeWidth={a4StrokeW}
-                />
-              ) : boardConfig.pattern === "graph" ? (
-                <>
-                  <path
-                    d={Array.from({ length: 4 }, (_, i) => {
-                      const offset = (i + 1) * a4Spacing;
-                      return `M ${offset} 0 V ${a4GraphMajor} M 0 ${offset} H ${a4GraphMajor}`;
-                    }).join(" ")}
-                    fill="none"
-                    stroke={theme.subGridStroke}
-                    strokeWidth={a4SubStrokeW}
-                  />
-                  <path
-                    d={`M ${a4GraphMajor} 0 H 0 V ${a4GraphMajor}`}
-                    fill="none"
-                    stroke={theme.gridStroke}
-                    strokeWidth={a4StrokeW}
-                  />
-                </>
-              ) : (
-                <path
-                  d={`M ${a4Spacing} 0 H 0 V ${a4Spacing}`}
-                  fill="none"
-                  stroke={theme.gridStroke}
-                  strokeWidth={a4StrokeW}
-                />
-              )}
-            </pattern>
-          )}
+          {isA4 &&
+            a4FormatOption &&
+            showPattern &&
+            Array.from({ length: Math.max(1, totalPages) }, (_, idx) => {
+              const p = idx + 1;
+              const pageTop = (p - 1) * pageStep;
+              return (
+                <pattern
+                  key={`wb-a4-grid-${p}`}
+                  id={`wb-a4-grid-${p}`}
+                  data-wb-grid="true"
+                  x={-pageW / 2}
+                  y={pageTop}
+                  width={boardConfig.pattern === "graph" ? a4GraphMajor : a4Spacing}
+                  height={boardConfig.pattern === "graph" ? a4GraphMajor : a4Spacing}
+                  patternUnits="userSpaceOnUse"
+                >
+                  {boardConfig.pattern === "dots" ? (
+                    <circle
+                      cx={a4Spacing / 2}
+                      cy={a4Spacing / 2}
+                      r={a4DotR}
+                      fill={theme.dotFill}
+                    />
+                  ) : boardConfig.pattern === "ruled" ? (
+                    <line
+                      x1={0}
+                      y1={a4Spacing}
+                      x2={a4Spacing}
+                      y2={a4Spacing}
+                      stroke={theme.ruledStroke}
+                      strokeWidth={a4StrokeW}
+                    />
+                  ) : boardConfig.pattern === "graph" ? (
+                    <>
+                      <path
+                        d={Array.from({ length: 4 }, (_, i) => {
+                          const offset = (i + 1) * a4Spacing;
+                          return `M ${offset} 0 V ${a4GraphMajor} M 0 ${offset} H ${a4GraphMajor}`;
+                        }).join(" ")}
+                        fill="none"
+                        stroke={theme.subGridStroke}
+                        strokeWidth={a4SubStrokeW}
+                      />
+                      <path
+                        d={`M ${a4GraphMajor} 0 H 0 V ${a4GraphMajor}`}
+                        fill="none"
+                        stroke={theme.gridStroke}
+                        strokeWidth={a4StrokeW}
+                      />
+                    </>
+                  ) : (
+                    <path
+                      d={`M ${a4Spacing} 0 H 0 V ${a4Spacing}`}
+                      fill="none"
+                      stroke={theme.gridStroke}
+                      strokeWidth={a4StrokeW}
+                    />
+                  )}
+                </pattern>
+              );
+            })}
         </defs>
 
         {/* Board Surface Fill */}
@@ -310,7 +330,7 @@ export function SvgCanvas({
           className="wb-board-content"
           transform={`translate(${viewport.tx} ${viewport.ty}) scale(${viewport.scale})`}
         >
-          {/* A4 Paper Sheet (Clean paper, centered sheet for currentPage) */}
+          {/* Continuous A4 Multi-page Paper Sheets */}
           {isA4 && a4FormatOption && (
             <g data-wb-a4-sheet="true" data-export-skip="false">
               {/* Invisible accessibility/metadata node for automated testing while keeping canvas 100% clean */}
@@ -322,50 +342,56 @@ export function SvgCanvas({
               >
                 {boardFormat === "a4_portrait" ? "Khổ A4 Dọc (210 × 297mm)" : "Khổ A4 Ngang (297 × 210mm)"}
               </text>
-              <g data-page-sheet={currentPage}>
-                {/* Clean Paper Sheet Background */}
-                <rect
-                  data-page-rect={currentPage}
-                  x={-a4FormatOption.widthWorld / 2}
-                  y={-a4FormatOption.heightWorld / 2}
-                  width={a4FormatOption.widthWorld}
-                  height={a4FormatOption.heightWorld}
-                  rx={0.06}
-                  ry={0.06}
-                  fill={theme.bg}
-                  stroke={theme.isDark ? "rgba(255,255,255,0.18)" : "#cbd5e1"}
-                  strokeWidth={1 / (viewport.scale || 45)}
-                />
-                {/* Pattern inside A4 Sheet */}
-                {showPattern && (
-                  <rect
-                    x={-a4FormatOption.widthWorld / 2}
-                    y={-a4FormatOption.heightWorld / 2}
-                    width={a4FormatOption.widthWorld}
-                    height={a4FormatOption.heightWorld}
-                    rx={0.06}
-                    ry={0.06}
-                    fill="url(#wb-a4-grid)"
-                    style={{ pointerEvents: "none" }}
-                  />
-                )}
-                {/* Clean discrete page indicator outside paper in margin */}
-                <text
-                  x={-a4FormatOption.widthWorld / 2 - 0.3}
-                  y={-a4FormatOption.heightWorld / 2 + 0.55}
-                  textAnchor="end"
-                  fontSize={0.34}
-                  fill={theme.isDark ? "#64748b" : "#94a3b8"}
-                  style={{
-                    userSelect: "none",
-                    pointerEvents: "none",
-                    fontFamily: "sans-serif",
-                    fontWeight: 600,
-                  }}
-                >
-                  Trang {currentPage} / {Math.max(1, totalPages)}
-                </text>
-              </g>
+              {Array.from({ length: Math.max(1, totalPages) }, (_, idx) => {
+                const p = idx + 1;
+                const pageTop = (p - 1) * pageStep;
+                return (
+                  <g key={`a4-page-sheet-${p}`} data-page-sheet={p}>
+                    {/* Clean Paper Sheet Background */}
+                    <rect
+                      data-page-rect={p}
+                      x={-pageW / 2}
+                      y={pageTop}
+                      width={pageW}
+                      height={pageH}
+                      rx={0.06}
+                      ry={0.06}
+                      fill={theme.bg}
+                      stroke={theme.isDark ? "rgba(255,255,255,0.18)" : "#cbd5e1"}
+                      strokeWidth={1 / (viewport.scale || 45)}
+                    />
+                    {/* Pattern inside A4 Sheet */}
+                    {showPattern && (
+                      <rect
+                        x={-pageW / 2}
+                        y={pageTop}
+                        width={pageW}
+                        height={pageH}
+                        rx={0.06}
+                        ry={0.06}
+                        fill={`url(#wb-a4-grid-${p})`}
+                        style={{ pointerEvents: "none" }}
+                      />
+                    )}
+                    {/* Clean discrete page indicator outside paper in margin */}
+                    <text
+                      x={-pageW / 2 - 0.3}
+                      y={pageTop + 0.55}
+                      textAnchor="end"
+                      fontSize={0.34}
+                      fill={theme.isDark ? "#64748b" : "#94a3b8"}
+                      style={{
+                        userSelect: "none",
+                        pointerEvents: "none",
+                        fontFamily: "sans-serif",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Trang {p} / {Math.max(1, totalPages)}
+                    </text>
+                  </g>
+                );
+              })}
             </g>
           )}
 
