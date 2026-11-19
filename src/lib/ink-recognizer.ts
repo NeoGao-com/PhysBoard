@@ -78,6 +78,87 @@ function resamplePoints(pts: Point2D[], n = 64): Point2D[] {
 }
 
 /**
+ * Fit circle using Kåsa algebraic method (fast, stable, handles noisy/overlapping hand strokes).
+ */
+function fitCircleKasa(pts: Point2D[]): { cx: number; cy: number; r: number } | null {
+  const n = pts.length;
+  if (n < 4) return null;
+  let sumX = 0;
+  let sumY = 0;
+  let sumX2 = 0;
+  let sumY2 = 0;
+  let sumXY = 0;
+  let sumZ = 0;
+  let sumXZ = 0;
+  let sumYZ = 0;
+
+  for (let i = 0; i < n; i++) {
+    const x = pts[i].x;
+    const y = pts[i].y;
+    const z = x * x + y * y;
+    sumX += x;
+    sumY += y;
+    sumX2 += x * x;
+    sumY2 += y * y;
+    sumXY += x * y;
+    sumZ += z;
+    sumXZ += x * z;
+    sumYZ += y * z;
+  }
+
+  const M = [
+    [sumX2, sumXY, sumX, sumXZ],
+    [sumXY, sumY2, sumY, sumYZ],
+    [sumX, sumY, n, sumZ],
+  ];
+
+  for (let i = 0; i < 3; i++) {
+    let maxRow = i;
+    for (let k = i + 1; k < 3; k++) {
+      if (Math.abs(M[k][i]) > Math.abs(M[maxRow][i])) maxRow = k;
+    }
+    const tmp = M[i];
+    M[i] = M[maxRow];
+    M[maxRow] = tmp;
+    if (Math.abs(M[i][i]) < 1e-9) return null;
+    for (let k = i + 1; k < 3; k++) {
+      const c = M[k][i] / M[i][i];
+      for (let j = i; j <= 3; j++) M[k][j] -= c * M[i][j];
+    }
+  }
+
+  const sol = [0, 0, 0];
+  for (let i = 2; i >= 0; i--) {
+    let s = M[i][3];
+    for (let j = i + 1; j < 3; j++) s -= M[i][j] * sol[j];
+    sol[i] = s / M[i][i];
+  }
+
+  const cx = sol[0] / 2;
+  const cy = sol[1] / 2;
+  const r2 = sol[2] + cx * cx + cy * cy;
+  if (r2 <= 0) return null;
+  return { cx, cy, r: Math.sqrt(r2) };
+}
+
+/**
+ * Measure cumulative rotational angle around center (in radians).
+ * A full loop circle traces approximately 2*PI (~6.28 rad) or more if overlapping.
+ */
+function cumulativeAngleSpan(pts: Point2D[], cx: number, cy: number): number {
+  let totalDelta = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a1 = Math.atan2(pts[i - 1].y - cy, pts[i - 1].x - cx);
+    const a2 = Math.atan2(pts[i].y - cy, pts[i].x - cx);
+    let diff = a2 - a1;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    totalDelta += diff;
+  }
+  return Math.abs(totalDelta);
+}
+
+/**
  * Ramer-Douglas-Peucker polyline simplification
  */
 export function simplifyRDP(points: Point2D[], epsilon: number): Point2D[] {
@@ -133,104 +214,73 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
   const pStart = pts[0];
   const pEnd = pts[pts.length - 1];
   const endToStartDist = dist2D(pStart, pEnd);
-  const isClosedRoughly = endToStartDist < Math.max(0.4, arcLen * 0.28);
+
+  // Bounding box
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const bboxW = Math.max(1e-4, maxX - minX);
+  const bboxH = Math.max(1e-4, maxY - minY);
+  const diag = Math.hypot(bboxW, bboxH);
+  const bboxAspect = Math.max(bboxW, bboxH) / Math.min(bboxW, bboxH);
+
+  // A closed shape either brings endpoints near each other, OR completes at least ~300° around the center
+  const isClosedRoughly = endToStartDist < Math.max(0.6, arcLen * 0.35);
 
   const resampled = resamplePoints(pts, 64);
 
-  // Compute closed shape area and perimeter for isoperimetric circularity quotient
-  let closedArea = 0;
-  for (let i = 0; i < pts.length; i++) {
-    const j = (i + 1) % pts.length;
-    closedArea += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
-  }
-  closedArea = Math.abs(closedArea) / 2;
-  const peri = arcLen + (isClosedRoughly ? endToStartDist : 0);
-  const circularity = peri > 1e-4 ? (4 * Math.PI * closedArea) / (peri * peri) : 0;
+  // =========================================================================
+  // 1. Check Circle FIRST (robust to overlap loops, gaps, and slight wobbles)
+  // =========================================================================
+  if (pts.length >= 8 && diag > 0.25) {
+    const fit = fitCircleKasa(resampled);
+    if (fit && fit.r > 0.12) {
+      const center: Point2D = { x: fit.cx, y: fit.cy };
+      const angleSpan = cumulativeAngleSpan(resampled, fit.cx, fit.cy);
 
-  // 1. Check Circle FIRST if it is round
-  // A hand-drawn circle typically has circularity in [0.80, 1.05], low radius stdDev (< 0.22), and maxR/minR < 1.52.
-  // Note: A square has theoretical circularity = pi/4 ≈ 0.785 and maxR/minR = sqrt(2) ≈ 1.414.
-  // A rectangle (e.g. 2x1) has circularity ≈ 0.698 and maxR/minR > 2.0.
-  // An equilateral triangle has circularity ≈ 0.604.
-  if (isClosedRoughly && pts.length >= 10 && circularity >= 0.80) {
-    let cx = 0;
-    let cy = 0;
-    for (const p of resampled) {
-      cx += p.x;
-      cy += p.y;
-    }
-    cx /= resampled.length;
-    cy /= resampled.length;
-    const center: Point2D = { x: cx, y: cy };
+      // Must complete at least ~280° (4.9 rad) around the fitted center
+      // or endpoints close and angleSpan >= 250°
+      const isAngleLoop = angleSpan >= 4.9 || (isClosedRoughly && angleSpan >= 4.3);
 
-    const radii = resampled.map((p) => dist2D(p, center));
-    const meanR = radii.reduce((s, r) => s + r, 0) / radii.length;
-    if (meanR > 0.15) {
-      const variance = radii.reduce((s, r) => s + Math.pow(r - meanR, 2), 0) / radii.length;
-      const stdDev = Math.sqrt(variance);
-      const minR = Math.min(...radii);
-      const maxR = Math.max(...radii);
+      if (isAngleLoop) {
+        const radii = resampled.map((p) => dist2D(p, center));
+        const meanR = fit.r;
+        const variance =
+          radii.reduce((s, r) => s + Math.pow(r - meanR, 2), 0) / radii.length;
+        const stdDev = Math.sqrt(variance);
+        const minR = Math.min(...radii);
+        const maxR = Math.max(...radii);
+        const stdDevRatio = stdDev / meanR;
+        const maxMinRatio = maxR / Math.max(1e-4, minR);
 
-      if (stdDev / meanR < 0.22 && maxR / Math.max(1e-4, minR) < 1.50) {
-        return {
-          type: "circle",
-          center,
-          radius: meanR,
-        };
-      }
-    }
-  }
+        // Hand-drawn circles typically have:
+        // - stdDevRatio <= 0.22 (22% variation)
+        // - maxMinRatio <= 1.65
+        // - bounding box aspect ratio <= 1.55 (not an elongated polygon or line)
+        if (stdDevRatio <= 0.22 && maxMinRatio <= 1.65 && bboxAspect <= 1.55) {
+          // Extra guard against squares:
+          // Check if simplifying with corner-finding yields clear sharp 4 corners
+          const rdpCorners = simplifyRDP(pts, diag * 0.12);
+          // A square simplifies to exactly 4 or 5 vertices with very low error,
+          // whereas a circle polyline maintains many smooth vertices (> 6)
+          const isClearSquare =
+            rdpCorners.length <= 5 &&
+            stdDevRatio > 0.09 &&
+            maxMinRatio > 1.35 &&
+            bboxAspect < 1.15;
 
-  // 2. Check Polygon (Triangle or Rectangle / Square) when closed or nearly closed
-  // Important: Gate with circularity < 0.83 so shapes resembling circles never get reduced into 4-corner quadrilaterals!
-  if (isClosedRoughly && pts.length >= 6 && circularity < 0.83) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const p of pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    const diag = Math.hypot(maxX - minX, maxY - minY);
-    if (diag > 0.3) {
-      // Test candidate epsilons to find clear corners
-      for (const epsFactor of [0.15, 0.12, 0.08, 0.18, 0.22]) {
-        const eps = diag * epsFactor;
-        const simplified = simplifyRDP(pts, eps);
-        // Since it's closed, first and last point are essentially the same vertex
-        let cornerCandidates = simplified.slice();
-        if (
-          cornerCandidates.length > 2 &&
-          dist2D(cornerCandidates[0], cornerCandidates[cornerCandidates.length - 1]) < diag * 0.35
-        ) {
-          cornerCandidates = cornerCandidates.slice(0, -1);
-        }
-
-        // Quadrilateral / Rectangle / Square: 4 vertices
-        if (cornerCandidates.length === 4) {
-          const [A, B, C, D] = cornerCandidates;
-          const ab = dist2D(A, B);
-          const bc = dist2D(B, C);
-          const cd = dist2D(C, D);
-          const da = dist2D(D, A);
-          if (ab > 0.1 && bc > 0.1 && cd > 0.1 && da > 0.1) {
+          if (!isClearSquare) {
             return {
-              type: "rectangle",
-              vertices: [A, B, C, D],
-            };
-          }
-        }
-
-        // Triangle: 3 vertices
-        if (cornerCandidates.length === 3) {
-          const [A, B, C] = cornerCandidates;
-          const ab = dist2D(A, B);
-          const bc = dist2D(B, C);
-          const ca = dist2D(C, A);
-          if (ab > 0.1 && bc > 0.1 && ca > 0.1) {
-            return {
-              type: "triangle",
-              vertices: [A, B, C],
+              type: "circle",
+              center,
+              radius: meanR,
             };
           }
         }
@@ -238,10 +288,58 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
     }
   }
 
+  // =========================================================================
+  // 2. Check Polygon (Triangle or Rectangle / Square)
+  // =========================================================================
+  if (isClosedRoughly && pts.length >= 6 && diag > 0.3) {
+    // Test candidate epsilons to find clear corners
+    for (const epsFactor of [0.15, 0.12, 0.08, 0.18, 0.22]) {
+      const eps = diag * epsFactor;
+      const simplified = simplifyRDP(pts, eps);
+      let cornerCandidates = simplified.slice();
+      if (
+        cornerCandidates.length > 2 &&
+        dist2D(cornerCandidates[0], cornerCandidates[cornerCandidates.length - 1]) <
+          diag * 0.35
+      ) {
+        cornerCandidates = cornerCandidates.slice(0, -1);
+      }
+
+      // Quadrilateral / Rectangle / Square: 4 vertices
+      if (cornerCandidates.length === 4) {
+        const [A, B, C, D] = cornerCandidates;
+        const ab = dist2D(A, B);
+        const bc = dist2D(B, C);
+        const cd = dist2D(C, D);
+        const da = dist2D(D, A);
+        if (ab > 0.1 && bc > 0.1 && cd > 0.1 && da > 0.1) {
+          return {
+            type: "rectangle",
+            vertices: [A, B, C, D],
+          };
+        }
+      }
+
+      // Triangle: 3 vertices
+      if (cornerCandidates.length === 3) {
+        const [A, B, C] = cornerCandidates;
+        const ab = dist2D(A, B);
+        const bc = dist2D(B, C);
+        const ca = dist2D(C, A);
+        if (ab > 0.1 && bc > 0.1 && ca > 0.1) {
+          return {
+            type: "triangle",
+            vertices: [A, B, C],
+          };
+        }
+      }
+    }
+  }
+
+  // =========================================================================
   // 3. Check Arrow: Main shaft + arrowhead at the end (or near end)
-  // An arrow typically has a line from pStart towards pEnd, and then at the end a hook or V
+  // =========================================================================
   if (!isClosedRoughly && pts.length >= 10 && arcLen > 0.5) {
-    // Check if the last 20% of points form an arrowhead barb
     const barbCutoff = Math.max(3, Math.floor(pts.length * 0.25));
     const mainPts = pts.slice(0, pts.length - barbCutoff);
     const headPts = pts.slice(pts.length - barbCutoff);
@@ -251,17 +349,17 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
     const straightDist = dist2D(mainStart, mainEnd);
     const mainArc = totalPathLength(mainPts);
 
-    // If main part is very straight
     if (straightDist / mainArc > 0.88) {
-      // And head turns sharply or branches backwards towards main shaft
       const headDir = { x: mainEnd.x - mainStart.x, y: mainEnd.y - mainStart.y };
       const headDirLen = Math.hypot(headDir.x, headDir.y);
       if (headDirLen > 1e-4) {
         const u = { x: headDir.x / headDirLen, y: headDir.y / headDirLen };
         let hasBacktrack = false;
         for (let i = 1; i < headPts.length; i++) {
-          const v = { x: headPts[i].x - headPts[i - 1].x, y: headPts[i].y - headPts[i - 1].y };
-          // dot product of step vector with main vector < 0 means backtracking
+          const v = {
+            x: headPts[i].x - headPts[i - 1].x,
+            y: headPts[i].y - headPts[i - 1].y,
+          };
           if (v.x * u.x + v.y * u.y < -0.3 * Math.hypot(v.x, v.y)) {
             hasBacktrack = true;
             break;
@@ -278,11 +376,11 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
     }
   }
 
+  // =========================================================================
   // 4. Check Straight Segment
+  // =========================================================================
   if (!isClosedRoughly && arcLen > 0.3) {
     const chordLen = dist2D(pStart, pEnd);
-    // If the path length is very close to straight line chord (ratio >= 0.93)
-    // and maximum deviation from chord is small
     if (chordLen / arcLen >= 0.92) {
       const simplified = simplifyRDP(pts, chordLen * 0.08);
       if (simplified.length <= 3) {
