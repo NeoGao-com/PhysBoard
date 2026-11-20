@@ -1701,22 +1701,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 ? "Đang khóa vừa màn hình (Bấm để mở khóa thu phóng)"
                 : "Tự động phóng to vừa màn hình & Khóa thu phóng"
             }
+            aria-label={isFitLocked ? "Mở khóa thu phóng" : "Khóa vừa màn hình"}
             aria-pressed={isFitLocked}
             style={{
               ...btnBaseStyle,
-              padding: "0 7px",
+              width: 26,
+              height: 26,
+              padding: 0,
+              justifyContent: "center",
               background: isFitLocked ? "#dbeafe" : "#f1f5f9",
-              color: isFitLocked ? "#1d4ed8" : "#475569",
+              color: isFitLocked ? "#1d4ed8" : "#64748b",
               border: `1px solid ${isFitLocked ? "#93c5fd" : "#cbd5e1"}`,
-              fontWeight: 600,
-              fontSize: 11,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
+              borderRadius: 6,
+              fontSize: 12,
             }}
           >
             <span aria-hidden="true">{isFitLocked ? "🔒" : "🔓"}</span>
-            <span>{isFitLocked ? "Đã khóa vừa" : "Vừa màn hình"}</span>
           </button>
         )}
 
@@ -1731,22 +1731,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 ? "Đang bật dòng chỉ dẫn cách sử dụng chức năng (Bấm để tắt)"
                 : "Bật dòng chỉ dẫn cách sử dụng chức năng (Từng bước khi chọn công cụ)"
             }
+            aria-label={isGuideEnabled ? "Tắt chỉ dẫn" : "Bật chỉ dẫn"}
             aria-pressed={isGuideEnabled}
             style={{
               ...btnBaseStyle,
-              padding: "0 7px",
+              width: 26,
+              height: 26,
+              padding: 0,
+              justifyContent: "center",
               background: isGuideEnabled ? "#fef3c7" : "#f1f5f9",
-              color: isGuideEnabled ? "#b45309" : "#64748b",
+              color: isGuideEnabled ? "#b45309" : "#94a3b8",
               border: `1px solid ${isGuideEnabled ? "#fcd34d" : "#cbd5e1"}`,
-              fontWeight: 600,
-              fontSize: 11,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
+              borderRadius: 6,
+              fontSize: 12,
+              opacity: isGuideEnabled ? 1 : 0.65,
             }}
           >
             <span aria-hidden="true">💡</span>
-            <span>{isGuideEnabled ? "Chỉ dẫn: Bật" : "Chỉ dẫn: Tắt"}</span>
           </button>
         )}
 

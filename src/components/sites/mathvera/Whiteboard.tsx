@@ -8929,17 +8929,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               type="button"
               onClick={toggleFitLock}
               style={{
+                width: 22,
+                height: 22,
+                padding: 0,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
                 background: isFitLocked ? "#dbeafe" : "#f1f5f9",
                 color: isFitLocked ? "#1d4ed8" : "#475569",
                 border: `1px solid ${isFitLocked ? "#93c5fd" : "#cbd5e1"}`,
-                borderRadius: 5,
-                padding: "2px 6px",
+                borderRadius: 4,
                 fontSize: 11,
-                fontWeight: 600,
                 cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 3,
               }}
               title={
                 isFitLocked
@@ -8947,7 +8948,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   : "Tự động vừa màn hình & Khóa thu phóng"
               }
             >
-              <span>{isFitLocked ? "🔒 Đã khóa vừa" : "🔓 Vừa màn hình"}</span>
+              <span aria-hidden="true">{isFitLocked ? "🔒" : "🔓"}</span>
             </button>
           )}
 
