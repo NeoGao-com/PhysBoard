@@ -19,6 +19,7 @@ export const StyleSchema = z.object({
   dash: z.boolean().optional(),
   hidden: z.boolean().optional(),
   layer: z.enum(["answer", "base"]).optional(),
+  locked: z.boolean().optional(),
 });
 export type Style = z.infer<typeof StyleSchema>;
 
@@ -29,6 +30,7 @@ export interface StyleProperties {
   dash?: boolean | null;
   opacity?: number;
   hidden?: boolean;
+  locked?: boolean;
 }
 
 // --- Meta ---

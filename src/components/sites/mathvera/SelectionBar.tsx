@@ -61,6 +61,7 @@ export interface SelectionBarProps {
   onSolidEdgePerpBisector?: () => void;
   onSolidSelectWhole?: () => void;
   onRotateSelection?: (deltaDeg: number) => void;
+  onLockSelection?: () => void;
   sidebarOpen?: boolean;
   isPortrait?: boolean;
 }
@@ -188,6 +189,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onSolidEdgePerpBisector,
   onSolidSelectWhole,
   onRotateSelection,
+  onLockSelection,
   sidebarOpen = false,
   isPortrait = false,
 }) => {
@@ -952,6 +954,25 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
         >
           ⧉ Nhân bản
         </button>
+
+        {/* Lock Selection onto Paper */}
+        {onLockSelection && (
+          <button
+            type="button"
+            data-action="lock-selection"
+            onClick={onLockSelection}
+            title="Khóa cố định đối tượng vào trang giấy (không thể chọn hay di chuyển)"
+            style={{
+              ...actionBtnStyle,
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              border: "1px solid #bfdbfe",
+              fontWeight: 600,
+            }}
+          >
+            🔒 Khóa vào trang
+          </button>
+        )}
 
         {!isPointsContext && (
           <>

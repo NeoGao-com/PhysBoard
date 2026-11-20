@@ -802,7 +802,7 @@ export function testMarqueeIntersection(
 
   return elements
     .filter((el) => {
-      if (el.style?.hidden) return false;
+      if (el.style?.hidden || el.props?.locked || el.style?.locked) return false;
       const box = getElementBoundingBox(el, {
         solved,
         byId,

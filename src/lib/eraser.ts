@@ -66,7 +66,7 @@ export function checkEraserCollision(
   };
 
   for (const el of elements) {
-    if (el.style?.hidden) continue;
+    if (el.style?.hidden || el.props?.locked || el.style?.locked) continue;
     let isHit = false;
 
     if (el.type === "Ink") {

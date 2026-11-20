@@ -25,6 +25,8 @@ export interface PageSidebarProps {
   onOpenFile?: () => void;
   onOpenCommandPalette?: () => void;
   boardConfig?: PageBoardConfig;
+  pagePdfStatus?: Record<number, { hasPdf: boolean; locked: boolean; elementId?: string }>;
+  onTogglePagePdfLock?: (page: number) => void;
   isOpen: boolean;
   onToggleOpen: () => void;
   isPortrait?: boolean;
@@ -50,6 +52,8 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onOpenFile,
   onOpenCommandPalette,
   boardConfig,
+  pagePdfStatus,
+  onTogglePagePdfLock,
   isOpen,
   onToggleOpen,
   isPortrait = false,
@@ -348,6 +352,44 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
                   >
                     Hiện tại
                   </div>
+                )}
+
+                {/* PDF Lock/Unlock button on thumbnail */}
+                {pagePdfStatus?.[p]?.hasPdf && (
+                  <button
+                    type="button"
+                    data-action="sidebar-toggle-pdf-lock"
+                    data-page={p}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTogglePagePdfLock?.(p);
+                    }}
+                    title={
+                      pagePdfStatus[p].locked
+                        ? `Trang ${p} đã khóa PDF vào giấy (Bấm để mở khóa di chuyển)`
+                        : `Trang ${p} đang mở khóa PDF (Bấm để khóa cố định vào giấy)`
+                    }
+                    style={{
+                      position: "absolute",
+                      bottom: 4,
+                      left: 4,
+                      background: pagePdfStatus[p].locked ? "rgba(15,23,42,0.78)" : "#fef3c7",
+                      color: pagePdfStatus[p].locked ? "#ffffff" : "#b45309",
+                      border: pagePdfStatus[p].locked ? "none" : "1px solid #f59e0b",
+                      borderRadius: 3,
+                      padding: "1px 4px",
+                      fontSize: 8.5,
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      cursor: "pointer",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                      zIndex: 2,
+                    }}
+                  >
+                    <span>{pagePdfStatus[p].locked ? "🔒 Khóa" : "🔓 Mở"}</span>
+                  </button>
                 )}
               </div>
 

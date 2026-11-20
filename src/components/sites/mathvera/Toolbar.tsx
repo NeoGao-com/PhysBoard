@@ -15,7 +15,7 @@ import {
 import { PageBar } from "./PageBar";
 import { FILL_PALETTE } from "@/lib/geometry";
 import type { ShortcutMap } from "@/lib/commands";
-import type { ImportedImageResult, ImportedPdfPage } from "@/lib/pdf-import";
+import { importPdfPages, type ImportedImageResult, type ImportedPdfPage } from "@/lib/pdf-import";
 import { RealWorldArtItem } from "@/lib/realworld-art";
 import type { PageBoardConfig } from "@/lib/board-themes";
 import { WhiteboardTool, SelectionStyleState } from "@/types/whiteboard";
@@ -48,6 +48,7 @@ import {
   IconPen,
   IconPencil,
   IconPhysics,
+  IconPdf,
   IconPoint,
   IconPolygon,
   IconRealWorld,
@@ -292,6 +293,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     return window.localStorage.getItem("physboard_toolbar_collapsed") === "true";
   });
   const headerRef = useRef<HTMLElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {
@@ -1355,6 +1357,39 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </button>
         )}
 
+        {/* Chèn PDF */}
+        {onInsertPdfPages && vis.toolInsertPdf && (
+          <>
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept="application/pdf"
+              style={{ display: "none" }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                try {
+                  const res = await importPdfPages(file);
+                  onInsertPdfPages(res.pages);
+                } catch (err) {
+                  console.error("Lỗi chèn PDF:", err);
+                }
+              }}
+            />
+            <button
+              type="button"
+              data-tool="insert-pdf"
+              onClick={() => pdfInputRef.current?.click()}
+              title="Chèn file PDF vào trang giấy (khớp khổ A4 và khóa cố định)"
+              style={btnBaseStyle}
+            >
+              <IconPdf size={14} color="#e11d48" />
+              <span>Chèn PDF</span>
+            </button>
+          </>
+        )}
+
         {dividerV}
         </div>
         )}
@@ -1767,7 +1802,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* Toggle Instruction Guide */}
-        {onToggleGuide && (
+        {!isPortrait && onToggleGuide && (
           <button
             type="button"
             data-tool="instruction-guide"
@@ -1824,21 +1859,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* Fullscreen */}
-        <button
-          type="button"
-          data-tool="fullscreen"
-          onClick={onToggleFullscreen}
-          title={
-            isFullscreen ? "Thoát toàn màn hình (Esc)" : "Toàn màn hình"
-          }
-          aria-label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
-          style={{ ...btnBaseStyle, padding: "0 5px" }}
-        >
-          <IconFullscreen exit={isFullscreen} size={14} />
-        </button>
+        {!isPortrait && (
+          <button
+            type="button"
+            data-tool="fullscreen"
+            onClick={onToggleFullscreen}
+            title={
+              isFullscreen ? "Thoát toàn màn hình (Esc)" : "Toàn màn hình"
+            }
+            aria-label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+            style={{ ...btnBaseStyle, padding: "0 5px" }}
+          >
+            <IconFullscreen exit={isFullscreen} size={14} />
+          </button>
+        )}
 
         {/* Toolbar Zoom / Size Pill */}
-        {!embedded && (
+        {!embedded && !isPortrait && (
           <div
             data-wb-toolbar-scale="true"
             style={{
@@ -1932,18 +1969,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             aria-label="Thu gọn thanh công cụ"
             style={{
               ...btnBaseStyle,
-              padding: "0 6px",
+              padding: isPortrait ? "0 4px" : "0 6px",
               background: "#f1f5f9",
               color: "#475569",
               borderRadius: 6,
               fontWeight: 600,
-              gap: 3,
+              gap: 2,
               fontSize: 11,
               marginLeft: 2,
             }}
           >
             <span>▲</span>
-            <span>Thu gọn</span>
+            {!isPortrait && <span>Thu gọn</span>}
           </button>
         )}
       </div>

@@ -98,6 +98,7 @@ import {
 import {
   type ImportedImageResult,
   type ImportedPdfPage,
+  importPdfPages,
   readImageFile,
 } from "@/lib/pdf-import";
 import {
@@ -117,6 +118,8 @@ import {
 import {
   BOARD_FORMAT_OPTIONS,
   BOARD_PAGES_YMAP,
+  type BoardFormatId,
+  DEFAULT_PAGE_BOARD_CONFIG,
   type PageBoardConfig,
   adaptElementForBoard,
   adaptStrokeForBoard,
@@ -1523,7 +1526,96 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [selectedElements, dispatcher]
   );
 
-  // Selection Actions (Delete with cascading deps, Duplicate, Copy, Cut, Paste, Hide)
+  // Selection Actions (Delete with cascading deps, Duplicate, Copy, Cut, Paste, Hide, Lock)
+  const handleLockSelection = useCallback(() => {
+    if (selectedIds.length === 0) return;
+    dispatcher.batch(() => {
+      for (const id of selectedIds) {
+        const el = byId.get(id);
+        dispatcher.dispatch({
+          type: "object.update",
+          params: {
+            id,
+            props: {
+              locked: true,
+              ...(el?.type === "Image" ? { isPdfPage: true } : {}),
+            },
+            style: { locked: true },
+          },
+        });
+      }
+    });
+    setSelectedIds([]);
+    setStatusHint(
+      "🔒 Đã khóa đối tượng vào trang giấy (không thể chọn hoặc di chuyển). Bấm nút 🔒 trên trang để mở khóa."
+    );
+  }, [selectedIds, dispatcher, byId]);
+
+  const handleTogglePagePdfLock = useCallback(
+    (targetPage: number) => {
+      const allEls = dispatcher.getAllElements();
+      const pdfEls = allEls.filter(
+        (el) =>
+          (el.type === "Image" || el.props?.isPdfPage) &&
+          (el.props?.isPdfPage || el.props?.locked || el.style?.locked) &&
+          ((el.meta?.page ?? 1) === targetPage)
+      );
+      if (pdfEls.length === 0) return;
+
+      const anyLocked = pdfEls.some(
+        (el) => el.props?.locked || el.style?.locked
+      );
+
+      dispatcher.batch(() => {
+        for (const el of pdfEls) {
+          dispatcher.dispatch({
+            type: "object.update",
+            params: {
+              id: el.id,
+              props: { locked: !anyLocked },
+              style: { locked: !anyLocked },
+            },
+          });
+        }
+      });
+
+      if (anyLocked) {
+        setSelectedIds(pdfEls.map((el) => el.id));
+        setStatusHint(
+          `✓ Đã mở khóa trang PDF trên trang ${targetPage}. Bạn có thể di chuyển, phóng to hoặc xoá.`
+        );
+      } else {
+        setSelectedIds([]);
+        setStatusHint(
+          `🔒 Đã khóa cố định trang PDF trên trang ${targetPage} vào giấy (không thể chọn hay di chuyển).`
+        );
+      }
+    },
+    [dispatcher]
+  );
+
+  const pagePdfStatus = useMemo(() => {
+    const status: Record<
+      number,
+      { hasPdf: boolean; locked: boolean; elementId: string }
+    > = {};
+    for (const el of elements) {
+      if (
+        el.type === "Image" &&
+        (el.props?.isPdfPage || el.props?.locked || el.style?.locked)
+      ) {
+        const p = el.meta?.page ?? 1;
+        const isLocked = Boolean(el.props?.locked || el.style?.locked);
+        status[p] = {
+          hasPdf: true,
+          locked: isLocked,
+          elementId: el.id,
+        };
+      }
+    }
+    return status;
+  }, [elements]);
+
   const handleDeleteSelected = useCallback(() => {
     if (selectedIds.length === 0) return;
     dispatcher.deleteObjects(selectedIds);
@@ -2671,49 +2763,95 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const handleInsertPdfPages = useCallback(
     (pages: ImportedPdfPage[]) => {
       if (pages.length === 0) return;
-      // When A4 format is active, center is (0, 0), otherwise use current view center
-      const isA4 = currentBoardConfig?.format === "a4_portrait" || currentBoardConfig?.format === "a4_landscape";
-      const targetPos = isA4 ? { x: 0, y: 0 } : getViewCenter();
+
+      // 1. Determine A4 format: landscape vs portrait based on the PDF aspect ratio
+      const isPdfLandscape = pages[0].pixelWidth > pages[0].pixelHeight;
+      const targetFormat: BoardFormatId = isPdfLandscape
+        ? "a4_landscape"
+        : "a4_portrait";
+
+      const a4Option =
+        BOARD_FORMAT_OPTIONS.find((f) => f.id === targetFormat) ||
+        BOARD_FORMAT_OPTIONS[1];
+      const pageW = a4Option.widthWorld;
+      const pageH = a4Option.heightWorld;
+      const pageGap = 0.8;
+      const pageStep = pageH + pageGap;
+
+      const targetBoardConfig: PageBoardConfig = {
+        ...(currentBoardConfig || DEFAULT_PAGE_BOARD_CONFIG),
+        format: targetFormat,
+      };
+
       const startPage = currentPage;
       let targetCount = pageCount;
 
       dispatcher.batch(() => {
+        // Ensure all existing pages up to current page have targetBoardConfig
+        for (let p = 1; p <= targetCount; p++) {
+          writePageBoardConfig(doc, p, targetBoardConfig);
+        }
+
         pages.forEach((pg, idx) => {
           const pageNum = startPage + idx;
           while (targetCount < pageNum) {
             const added = addYjsPage(doc);
             targetCount = added.count;
-            // Inherit the board configuration (e.g. A4 format, surface theme) to the newly created pages
-            if (currentBoardConfig) {
-              writePageBoardConfig(doc, pageNum, currentBoardConfig);
-            }
+            writePageBoardConfig(doc, pageNum, targetBoardConfig);
           }
-          // If inserting into current or existing page, also ensure its board format is consistent
-          if (currentBoardConfig && pageNum <= targetCount) {
-            writePageBoardConfig(doc, pageNum, currentBoardConfig);
+          if (pageNum <= targetCount) {
+            writePageBoardConfig(doc, pageNum, targetBoardConfig);
           }
+
+          // Exact math world coordinates matching paper sheet rect[data-page-rect=pageNum]
+          const pageTop = (pageNum - 1) * pageStep;
+          const targetY = -(pageTop + pageH / 2);
+
           dispatcher.dispatch({
             type: "object.create",
             params: {
               type: "Image",
               page: pageNum,
               transform: {
-                x: targetPos.x,
-                y: targetPos.y,
+                x: 0,
+                y: targetY,
                 scale: 1,
                 rotation: 0,
                 z: 0,
               },
-              props: { src: pg.src, w: pg.w, h: pg.h },
+              props: {
+                src: pg.src,
+                w: pageW,
+                h: pageH,
+                locked: true,
+                isPdfPage: true,
+                pageNumber: pg.pageNumber,
+              },
+              style: {
+                locked: true,
+              },
             },
           });
         });
       });
+
       setYjsCurrentPage(doc, startPage);
-      setStatusHint(`✓ Đã nhập thành công ${pages.length} trang PDF vào các trang bảng`);
+      setSelectedIds([]);
+      if (scrollToPage) {
+        scrollToPage(startPage);
+      }
+      setStatusHint(
+        `✓ Đã chèn ${pages.length} trang PDF vừa khít khổ giấy và tự động khóa cố định (bấm nút 🔒 trên trang để mở khóa).`
+      );
     },
-    [dispatcher, doc, currentPage, pageCount, getViewCenter, currentBoardConfig]
+    [dispatcher, doc, currentPage, pageCount, currentBoardConfig, scrollToPage]
   );
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as unknown as { __testInsertPdfPages?: (pages: ImportedPdfPage[]) => void }).__testInsertPdfPages = handleInsertPdfPages;
+    }
+  }, [handleInsertPdfPages]);
 
   const handleM3Action = useCallback(
     (action: M3MenuAction) => {
@@ -4441,6 +4579,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return;
       }
       if (activeTool === "erase") return;
+
+      // If clicked element is locked, skip selection and let canvas handle it
+      const targetEl = byId.get(elementId);
+      if (targetEl?.props?.locked || targetEl?.style?.locked) return;
+
       if (
         activeTool === null ||
         activeTool === "select" ||
@@ -6076,9 +6219,20 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
       const isImage = file.type.startsWith("image/");
       const isHtml = file.name.endsWith(".html") || file.name.endsWith(".htm") || file.type === "text/html";
-      if (!isImage && !isHtml) return;
+      const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+      if (!isImage && !isHtml && !isPdf) return;
 
       e.preventDefault();
+
+      if (isPdf) {
+        try {
+          const res = await importPdfPages(file);
+          handleInsertPdfPages(res.pages);
+        } catch (err) {
+          console.error("Lỗi đọc file PDF kéo thả:", err);
+        }
+        return;
+      }
       const rect = containerRef.current?.getBoundingClientRect();
       const pt = screenToWorld(
         e.clientX,
@@ -6144,7 +6298,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }
       }
     },
-    [containerRef, viewport, dispatcher, isA4Format, currentBoardConfig]
+    [containerRef, viewport, dispatcher, isA4Format, currentBoardConfig, handleInsertPdfPages]
   );
 
   // --- Shared Renderers (used in both Fullscreen Whiteboard & 50/50 Split Exam Mode) ---
@@ -6757,6 +6911,88 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               </g>
             );
           })}
+
+          {/* Continuous A4 Floating Lock Badges for PDF Pages */}
+          {isA4Format && a4Opt && (
+            <g data-export-skip="true" className="wb-pdf-page-locks">
+              {Array.from({ length: pageCount }, (_, idx) => {
+                const p = idx + 1;
+                const st = pagePdfStatus[p];
+                if (!st?.hasPdf) return null;
+                const pageTop = (p - 1) * (a4Opt.heightWorld + 0.8);
+                const isLocked = st.locked;
+                const btnW = 2.75;
+                const btnH = 0.58;
+                const btnX = a4Opt.widthWorld / 2 - btnW - 0.2;
+                const btnY = pageTop + 1.15;
+                const isDark = currentBoardTheme.isDark;
+
+                return (
+                  <g
+                    key={`pdf-lock-badge-${p}`}
+                    data-action="toggle-pdf-lock"
+                    data-page={p}
+                    data-locked={isLocked ? "true" : "false"}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTogglePagePdfLock(p);
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <rect
+                      x={btnX}
+                      y={btnY}
+                      width={btnW}
+                      height={btnH}
+                      rx={0.12}
+                      ry={0.12}
+                      fill={
+                        isDark
+                          ? isLocked
+                            ? "rgba(30, 41, 59, 0.95)"
+                            : "rgba(120, 53, 15, 0.95)"
+                          : isLocked
+                          ? "rgba(248, 250, 252, 0.96)"
+                          : "rgba(254, 243, 199, 0.96)"
+                      }
+                      stroke={
+                        isDark
+                          ? isLocked
+                            ? "rgba(255,255,255,0.22)"
+                            : "#f59e0b"
+                          : isLocked
+                          ? "#cbd5e1"
+                          : "#f59e0b"
+                      }
+                      strokeWidth={1.2 / (viewport.scale || 45)}
+                      style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.12))" }}
+                    />
+                    <text
+                      x={btnX + btnW / 2}
+                      y={btnY + btnH / 2 + 0.08}
+                      textAnchor="middle"
+                      fontSize={0.24}
+                      fontWeight={700}
+                      fontFamily="system-ui, -apple-system, sans-serif"
+                      fill={
+                        isDark
+                          ? isLocked
+                            ? "#e2e8f0"
+                            : "#fef08a"
+                          : isLocked
+                          ? "#475569"
+                          : "#b45309"
+                      }
+                      style={{ userSelect: "none", pointerEvents: "none" }}
+                    >
+                      {isLocked ? "🔒 Đã khóa PDF" : "🔓 Mở khóa PDF"}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          )}
         </>
       }
       cursorOverride={activeTool === "ink:laser" && laserConfig.mode === "dot" ? "none" : undefined}
@@ -7025,6 +7261,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           <PageSidebar
             currentPage={currentPage}
             totalPages={pageCount}
+            pagePdfStatus={pagePdfStatus}
+            onTogglePagePdfLock={handleTogglePagePdfLock}
             isOpen={pageSidebarOpen}
             isPortrait={isPortrait}
             onToggleOpen={() => setPageSidebarOpen((v) => !v)}
@@ -7898,6 +8136,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               handlePlotLabRegression(selectedPhysicsEl.id);
             }
           }}
+          onLockSelection={handleLockSelection}
           onUpdateInstrumentProps={handleUpdateElementProps}
         />
       )}

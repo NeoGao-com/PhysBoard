@@ -335,6 +335,9 @@ export const ImageElement: React.FC<ImageElementProps> = ({
 
   if (!src) return null;
 
+  const isLocked = Boolean(element.props?.locked || element.style?.locked);
+  const isPdf = Boolean(element.props?.isPdfPage);
+
   return (
     <g
       data-id={element.id}
@@ -342,9 +345,14 @@ export const ImageElement: React.FC<ImageElementProps> = ({
       data-element-type="Image"
       data-wb-type="Image"
       data-selected={isSelected ? "true" : undefined}
+      data-locked={isLocked ? "true" : undefined}
+      data-is-pdf={isPdf ? "true" : undefined}
       transform={`translate(${element.transform.x} ${-element.transform.y}) rotate(${element.transform.rotation || 0})`}
-      onPointerDown={onPointerDown}
-      style={{ cursor: "pointer" }}
+      onPointerDown={isLocked ? undefined : onPointerDown}
+      style={{
+        cursor: isLocked ? "default" : "pointer",
+        pointerEvents: isLocked ? "none" : "auto",
+      }}
     >
       <image
         href={src}
@@ -352,7 +360,8 @@ export const ImageElement: React.FC<ImageElementProps> = ({
         y={-h / 2}
         width={w}
         height={h}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio={isPdf ? "none" : "xMidYMid meet"}
+        style={{ pointerEvents: isLocked ? "none" : "auto" }}
       />
       {isSelected && (
         <rect
