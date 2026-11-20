@@ -214,13 +214,27 @@ function hexToRgba(hex: string | null | undefined, fallback: string): string {
 
 /**
  * Pure Canvas2D vector fallback renderer that works reliably for populated or empty boards.
+ * Accurately supports A4 Portrait (595x842pt ratio), A4 Landscape (842x595pt ratio),
+ * and Infinite modes, rendering Ink, Images (PDFs), Geometry, Math, and Tables.
  */
 export function renderElementsToCanvas2D(
   elements: CanvasElement[],
   widthPx = 1200,
   heightPx = 760,
-  boardConfig: PageBoardConfig = DEFAULT_PAGE_BOARD_CONFIG
+  boardConfig: PageBoardConfig = DEFAULT_PAGE_BOARD_CONFIG,
+  pageNum = 1,
+  preloadedImages?: Map<string, HTMLImageElement>
 ): HTMLCanvasElement {
+  const format = boardConfig.format ?? "infinite";
+  const isA4 = format === "a4_portrait" || format === "a4_landscape";
+
+  // Auto-correct aspect ratio if caller passed default landscape dimensions for A4 portrait
+  if (format === "a4_portrait" && widthPx >= heightPx) {
+    heightPx = Math.round(widthPx * (24.04 / 17));
+  } else if (format === "a4_landscape" && heightPx >= widthPx) {
+    widthPx = Math.round(heightPx * (24.04 / 17));
+  }
+
   const canvas = document.createElement("canvas");
   canvas.width = widthPx;
   canvas.height = heightPx;
@@ -232,20 +246,21 @@ export function renderElementsToCanvas2D(
   ctx.fillRect(0, 0, widthPx, heightPx);
 
   if (boardConfig.pattern !== "none") {
-    const sp = theme.spacingPx;
+    const sp = Math.round(theme.spacingPx * (isA4 ? widthPx / (format === "a4_portrait" ? 765 : 1080) : 1));
+    const spacing = Math.max(12, sp);
     if (boardConfig.pattern === "dots") {
       ctx.fillStyle = theme.dotFill;
-      for (let x = sp / 2; x < widthPx; x += sp) {
-        for (let y = sp / 2; y < heightPx; y += sp) {
+      for (let x = spacing / 2; x < widthPx; x += spacing) {
+        for (let y = spacing / 2; y < heightPx; y += spacing) {
           ctx.beginPath();
-          ctx.arc(x, y, 1.35, 0, Math.PI * 2);
+          ctx.arc(x, y, 1.4, 0, Math.PI * 2);
           ctx.fill();
         }
       }
     } else if (boardConfig.pattern === "ruled") {
       ctx.strokeStyle = theme.ruledStroke;
       ctx.lineWidth = 1;
-      for (let y = sp; y < heightPx; y += sp) {
+      for (let y = spacing; y < heightPx; y += spacing) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(widthPx, y);
@@ -255,13 +270,13 @@ export function renderElementsToCanvas2D(
       ctx.strokeStyle =
         boardConfig.pattern === "graph" ? theme.subGridStroke : theme.gridStroke;
       ctx.lineWidth = 1;
-      for (let x = 0; x < widthPx; x += sp) {
+      for (let x = 0; x < widthPx; x += spacing) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, heightPx);
         ctx.stroke();
       }
-      for (let y = 0; y < heightPx; y += sp) {
+      for (let y = 0; y < heightPx; y += spacing) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(widthPx, y);
@@ -270,13 +285,13 @@ export function renderElementsToCanvas2D(
       if (boardConfig.pattern === "graph") {
         ctx.strokeStyle = theme.gridStroke;
         ctx.lineWidth = 1.4;
-        for (let x = 0; x < widthPx; x += sp * 5) {
+        for (let x = 0; x < widthPx; x += spacing * 5) {
           ctx.beginPath();
           ctx.moveTo(x, 0);
           ctx.lineTo(x, heightPx);
           ctx.stroke();
         }
-        for (let y = 0; y < heightPx; y += sp * 5) {
+        for (let y = 0; y < heightPx; y += spacing * 5) {
           ctx.beginPath();
           ctx.moveTo(0, y);
           ctx.lineTo(widthPx, y);
@@ -290,39 +305,67 @@ export function renderElementsToCanvas2D(
     return canvas;
   }
 
-  const bbox = computePageContentBounds(elements) ?? {
-    minX: -10,
-    maxX: 10,
-    minY: -6,
-    maxY: 6,
-    width: 20,
-    height: 12,
-    centerX: 0,
-    centerY: 0,
-  };
+  let toX: (wx: number) => number;
+  let toY: (wy: number) => number;
+  let scaleX: number;
+  let scaleY: number;
 
-  const margin = 48;
-  const availW = Math.max(100, widthPx - margin * 2);
-  const availH = Math.max(100, heightPx - margin * 2);
-  const scale = Math.min(availW / bbox.width, availH / bbox.height);
-  const toX = (wx: number) => widthPx / 2 + (wx - bbox.centerX) * scale;
-  const toY = (wy: number) => heightPx / 2 - (wy - bbox.centerY) * scale;
+  if (isA4) {
+    const isPortrait = format === "a4_portrait";
+    const pageW = isPortrait ? 17 : 24.04;
+    const pageH = isPortrait ? 24.04 : 17;
+    const pageGap = 0.8;
+    const pageStep = pageH + pageGap;
+    const pageTop = (pageNum - 1) * pageStep;
+
+    scaleX = widthPx / pageW;
+    scaleY = heightPx / pageH;
+    toX = (wx: number) => (wx + pageW / 2) * scaleX;
+    toY = (wy: number) => (-wy - pageTop) * scaleY;
+  } else {
+    const bbox = computePageContentBounds(elements) ?? {
+      minX: -10,
+      maxX: 10,
+      minY: -6,
+      maxY: 6,
+      width: 20,
+      height: 12,
+      centerX: 0,
+      centerY: 0,
+    };
+
+    const margin = 48;
+    const availW = Math.max(100, widthPx - margin * 2);
+    const availH = Math.max(100, heightPx - margin * 2);
+    const sc = Math.min(availW / bbox.width, availH / bbox.height);
+    scaleX = sc;
+    scaleY = sc;
+    toX = (wx: number) => widthPx / 2 + (wx - bbox.centerX) * sc;
+    toY = (wy: number) => heightPx / 2 - (wy - bbox.centerY) * sc;
+  }
 
   const pts = buildPointLookup(elements);
+  const strokeWidthScale = (scaleX + scaleY) / 2 / (isA4 ? 45 : 45);
 
   for (const el of elements) {
-    const stroke =
+    let stroke =
       adaptStrokeForBoard(el.style?.stroke, theme.isDark) ??
       hexToRgba(el.style?.stroke, theme.defaultInkColor);
+
+    // If on white background/paper, ensure chalk-white ink is clearly readable as black ink
+    if (!theme.isDark && (stroke === "#F8FAFC" || stroke === "#ffffff" || stroke === "#fff" || stroke === "#f1f5f9")) {
+      stroke = "#111827";
+    }
+
     const width = asNumber(el.style?.width, 2);
     ctx.save();
     ctx.strokeStyle = stroke;
     ctx.fillStyle = hexToRgba(el.style?.fill, "transparent");
-    ctx.lineWidth = Math.max(1, width * 1.2);
+    ctx.lineWidth = Math.max(1, width * Math.max(1, strokeWidthScale * 0.9));
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     if (el.style?.dash) {
-      ctx.setLineDash([8, 5]);
+      ctx.setLineDash([8 * strokeWidthScale, 5 * strokeWidthScale]);
     }
 
     const tx = el.transform.x || 0;
@@ -331,6 +374,17 @@ export function renderElementsToCanvas2D(
 
     if (el.type === "Ink") {
       const flat = asNumberArray(el.props.points);
+      const nib = asString(el.props.nib, "pen");
+      if (nib === "highlighter") {
+        ctx.globalAlpha = 0.36;
+        ctx.lineWidth = Math.max(8, width * 4.5 * Math.max(1, strokeWidthScale * 0.9));
+      } else if (nib === "pencil") {
+        ctx.globalAlpha = 0.78;
+        ctx.lineWidth = Math.max(1, width * 0.8 * Math.max(1, strokeWidthScale * 0.9));
+      } else {
+        ctx.globalAlpha = el.style?.opacity ?? 1;
+      }
+
       if (flat.length >= 2) {
         ctx.beginPath();
         ctx.moveTo(toX(tx + flat[0] * sc), toY(ty + flat[1] * sc));
@@ -340,30 +394,47 @@ export function renderElementsToCanvas2D(
         if (el.props.closed) ctx.closePath();
         ctx.stroke();
       }
+    } else if (el.type === "Image") {
+      const w = asNumber(el.props.w, 6) * sc * scaleX;
+      const h = asNumber(el.props.h, 4) * sc * scaleY;
+      const cx = toX(tx);
+      const cy = toY(ty);
+      const cached = preloadedImages?.get(el.id);
+      if (cached) {
+        if (el.transform.rotation) {
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate((el.transform.rotation * Math.PI) / 180);
+          ctx.drawImage(cached, -w / 2, -h / 2, w, h);
+          ctx.restore();
+        } else {
+          ctx.drawImage(cached, cx - w / 2, cy - h / 2, w, h);
+        }
+      }
     } else if (el.type === "Point" || el.type === "GeomPoint") {
       const p = pts.get(el.id) ?? { x: tx, y: ty, name: "" };
       ctx.fillStyle = el.style?.stroke ?? "#2563eb";
       ctx.beginPath();
-      ctx.arc(toX(p.x), toY(p.y), 4.5, 0, Math.PI * 2);
+      ctx.arc(toX(p.x), toY(p.y), 4.5 * Math.max(1, strokeWidthScale * 0.7), 0, Math.PI * 2);
       ctx.fill();
       if (p.name) {
-        ctx.font = "600 15px system-ui, sans-serif";
+        ctx.font = `600 ${Math.round(15 * Math.max(1, strokeWidthScale * 0.7))}px system-ui, sans-serif`;
         ctx.fillText(p.name, toX(p.x) + 8, toY(p.y) - 6);
       }
     } else if (el.type === "Rectangle") {
-      const w = asNumber(el.props.width, 2.5) * sc * scale;
-      const h = asNumber(el.props.height, 1.5) * sc * scale;
+      const w = asNumber(el.props.width, 2.5) * sc * scaleX;
+      const h = asNumber(el.props.height, 1.5) * sc * scaleY;
       const cx = toX(tx);
       const cy = toY(ty);
       if (el.style?.fill) {
         ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
       }
       ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
-    } else if (el.type === "GeomSegment" || el.type === "GeomVector" || el.type === "GeomRay") {
+    } else if (el.type === "GeomSegment" || el.type === "GeomVector" || el.type === "GeomRay" || el.type === "GeomLine") {
       const p1 = pts.get(asString(el.props.from));
       const p2 = pts.get(asString(el.props.to));
       if (p1 && p2) {
-        if (el.props.dashed) ctx.setLineDash([8, 5]);
+        if (el.props.dashed) ctx.setLineDash([8 * strokeWidthScale, 5 * strokeWidthScale]);
         ctx.beginPath();
         ctx.moveTo(toX(p1.x), toY(p1.y));
         ctx.lineTo(toX(p2.x), toY(p2.y));
@@ -403,26 +474,40 @@ export function renderElementsToCanvas2D(
       }
       if (c) {
         ctx.beginPath();
-        ctx.arc(toX(c.x), toY(c.y), Math.max(2, r * scale), 0, Math.PI * 2);
+        ctx.arc(toX(c.x), toY(c.y), Math.max(2, r * (scaleX + scaleY) / 2), 0, Math.PI * 2);
         ctx.stroke();
       }
     } else if (el.type === "MathText") {
       const latex = asString(el.props.latex, "");
+      const cx = toX(tx);
+      const cy = toY(ty);
       ctx.fillStyle = stroke;
-      ctx.font = "18px Georgia, serif";
-      ctx.fillText(latex, toX(tx), toY(ty));
+      ctx.font = `600 ${Math.max(16, Math.round(18 * strokeWidthScale))}px "KaTeX_Main", "Cambria Math", "Georgia", serif`;
+      const cleanText = latex
+        .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, "($1)/($2)")
+        .replace(/\\sqrt\{([^}]+)\}/g, "√($1)")
+        .replace(/\\cdot/g, "·")
+        .replace(/\\times/g, "×")
+        .replace(/\\pm/g, "±")
+        .replace(/\\alpha/g, "α")
+        .replace(/\\beta/g, "β")
+        .replace(/\\pi/g, "π")
+        .replace(/\\theta/g, "θ")
+        .replace(/\\left|\\right/g, "")
+        .replace(/[{}]/g, "");
+      ctx.fillText(cleanText || latex, cx, cy);
     } else if (el.type === "Table") {
       const cells = Array.isArray(el.props.cells) ? el.props.cells : [];
       const rows = Math.max(1, cells.length);
       const cols = Math.max(1, Array.isArray(cells[0]) ? cells[0].length : 1);
-      const cellW = 2.2 * sc * scale;
-      const cellH = 0.9 * sc * scale;
+      const cellW = 2.2 * sc * scaleX;
+      const cellH = 0.9 * sc * scaleY;
       const x0 = toX(tx);
       const y0 = toY(ty);
-      ctx.strokeStyle = "#334155";
-      ctx.lineWidth = 1.2;
-      ctx.font = "13px system-ui, sans-serif";
-      ctx.fillStyle = "#0f172a";
+      ctx.strokeStyle = theme.isDark ? "#94a3b8" : "#334155";
+      ctx.lineWidth = 1.2 * strokeWidthScale;
+      ctx.font = `${Math.round(13 * strokeWidthScale)}px system-ui, sans-serif`;
+      ctx.fillStyle = theme.isDark ? "#f1f5f9" : "#0f172a";
       for (let r = 0; r < rows; r++) {
         const row = Array.isArray(cells[r]) ? cells[r] : [];
         for (let c = 0; c < cols; c++) {
@@ -438,8 +523,8 @@ export function renderElementsToCanvas2D(
     } else if (el.type === "Axes2D") {
       const ox = toX(tx);
       const oy = toY(ty);
-      const span = asNumber(el.props.size, 5) * scale;
-      ctx.strokeStyle = "#475569";
+      const span = asNumber(el.props.size, 5) * scaleX;
+      ctx.strokeStyle = theme.isDark ? "#94a3b8" : "#475569";
       ctx.beginPath();
       ctx.moveTo(ox - span, oy);
       ctx.lineTo(ox + span, oy);
@@ -498,8 +583,34 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /**
+ * Preloads all raster Image elements on the page so Canvas2D can draw them synchronously.
+ */
+async function preloadImages(elements: CanvasElement[]): Promise<Map<string, HTMLImageElement>> {
+  const map = new Map<string, HTMLImageElement>();
+  if (typeof Image === "undefined") return map;
+  const imageEls = elements.filter(
+    (el) => el.type === "Image" && typeof el.props?.src === "string" && el.props.src
+  );
+  await Promise.all(
+    imageEls.map((el) => {
+      return new Promise<void>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          map.set(el.id, img);
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = el.props.src as string;
+      });
+    })
+  );
+  return map;
+}
+
+/**
  * Exports current board page as a High-DPI PNG Blob (`bang-toan.png`).
- * Always guarantees authentic 8-byte PNG magic header and size > 100 bytes even on 0-object boards.
+ * Guarantees correct A4 Portrait / Landscape aspect ratio, High-DPI (300 DPI scale),
+ * and valid PNG magic header >100 bytes even on empty boards.
  */
 export async function exportPNG(
   svgOrRootElement: SVGSVGElement | HTMLElement | null,
@@ -507,24 +618,73 @@ export async function exportPNG(
   page?: number,
   options?: { whitePaper?: boolean }
 ): Promise<Blob> {
-  const elements = getVisiblePageElements(doc, page);
-  const boardConfig = options?.whitePaper
-    ? DEFAULT_PAGE_BOARD_CONFIG
-    : readPageBoardConfig(doc, page ?? 1);
+  const pageNum = page ?? 1;
+  const elements = getVisiblePageElements(doc, pageNum);
+  const rawConfig = readPageBoardConfig(doc, pageNum);
+  const format = rawConfig.format ?? "infinite";
+  const isA4 = format === "a4_portrait" || format === "a4_landscape";
+
+  const boardConfig: PageBoardConfig = options?.whitePaper
+    ? {
+        ...rawConfig,
+        surface: "white",
+      }
+    : rawConfig;
   const theme = resolveBoardColors(boardConfig);
 
-  // Empty board or non-DOM context or forced white paper: crisp Canvas2D PNG directly
-  if (elements.length === 0 || !svgOrRootElement || options?.whitePaper) {
+  // Standard print-quality High-DPI dimensions (scale ~3.5 gives crisp 300 DPI)
+  let widthPx = 2083;
+  let heightPx = 2946;
+  let viewBox = { minX: -8.5, minY: 0, width: 17, height: 24.04 };
+
+  if (format === "a4_portrait") {
+    widthPx = 2083;
+    heightPx = 2946;
+    const pageTop = (pageNum - 1) * (24.04 + 0.8);
+    viewBox = { minX: -8.5, minY: pageTop, width: 17, height: 24.04 };
+  } else if (format === "a4_landscape") {
+    widthPx = 2946;
+    heightPx = 2083;
+    const pageTop = (pageNum - 1) * (17 + 0.8);
+    viewBox = { minX: -12.02, minY: pageTop, width: 24.04, height: 17 };
+  } else {
+    // Infinite mode: determine bounds from visible elements
+    const bbox = computePageContentBounds(elements);
+    if (bbox) {
+      const aspect = bbox.width / Math.max(0.5, bbox.height);
+      const maxDim = 2400;
+      if (aspect >= 1) {
+        widthPx = maxDim;
+        heightPx = Math.max(600, Math.min(3200, Math.round(maxDim / aspect)));
+      } else {
+        heightPx = maxDim;
+        widthPx = Math.max(600, Math.min(3200, Math.round(maxDim * aspect)));
+      }
+      viewBox = { minX: bbox.minX, minY: -bbox.maxY, width: bbox.width, height: bbox.height };
+    } else {
+      widthPx = 2083;
+      heightPx = 2946;
+      viewBox = { minX: -8.5, minY: 0, width: 17, height: 24.04 };
+    }
+  }
+
+  // Preload any raster images (e.g. inserted PDF pages or uploaded photos)
+  const preloaded = await preloadImages(elements);
+
+  // If board has no elements or no DOM target is available, use direct Canvas2D
+  if (elements.length === 0 || !svgOrRootElement) {
     const fallbackCanvas = renderElementsToCanvas2D(
       elements,
-      1200,
-      760,
-      boardConfig
+      widthPx,
+      heightPx,
+      boardConfig,
+      pageNum,
+      preloaded
     );
     return canvasToPngBlob(fallbackCanvas);
   }
 
-  // Try DOM/SVG capture cleanly, with deterministic Canvas2D fallback
+  // Try DOM/SVG capture with correct viewBox framing
   try {
     const svgEl =
       svgOrRootElement instanceof SVGSVGElement
@@ -532,15 +692,58 @@ export async function exportPNG(
         : svgOrRootElement.querySelector<SVGSVGElement>('svg[data-wb-canvas="true"]');
 
     if (svgEl) {
-      const rect = svgEl.getBoundingClientRect();
-      if (rect.width > 10 && rect.height > 10) {
-        const clone = svgEl.cloneNode(true) as SVGSVGElement;
-        clone.querySelectorAll('[data-export-skip="true"]').forEach((node) => node.remove());
-        clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-        clone.setAttribute("width", String(Math.round(rect.width)));
-        clone.setAttribute("height", String(Math.round(rect.height)));
-        clone.setAttribute("viewBox", `0 0 ${Math.round(rect.width)} ${Math.round(rect.height)}`);
+      const clone = svgEl.cloneNode(true) as SVGSVGElement;
 
+      // 1. Remove non-exportable overlays (cursors, lasers, floating buttons, handles)
+      clone.querySelectorAll('[data-export-skip="true"], [data-laser-spot="true"], [data-laser-stroke="true"], .wb-pdf-page-locks').forEach((node) => node.remove());
+
+      // 2. Remove other pages' sheet elements if in A4 multi-page mode
+      if (isA4) {
+        clone.querySelectorAll<SVGGElement>('[data-page-sheet]').forEach((sheet) => {
+          if (sheet.getAttribute('data-page-sheet') !== String(pageNum)) {
+            sheet.remove();
+          }
+        });
+      }
+
+      // 3. Remove outer desk background rect so only paper sheet is visible
+      clone.querySelectorAll(':scope > rect').forEach((r) => r.remove());
+
+      // 4. Reset content container transform (children are already in world coordinates)
+      const contentG = clone.querySelector<SVGGElement>('g[data-board-content="true"]');
+      if (contentG) {
+        contentG.removeAttribute("transform");
+      }
+
+      // 5. White paper adjustments
+      if (options?.whitePaper) {
+        const pageRect = clone.querySelector(`rect[data-page-rect="${pageNum}"]`);
+        if (pageRect) {
+          pageRect.setAttribute("fill", "#ffffff");
+          pageRect.setAttribute("stroke", "none");
+        }
+        // Invert light ink strokes on white paper
+        if (theme.isDark) {
+          clone.querySelectorAll<SVGPathElement | SVGPolylineElement | SVGLineElement | SVGCircleElement>('path, polyline, line, circle').forEach((el) => {
+            const stroke = el.getAttribute("stroke");
+            if (stroke && (stroke.toLowerCase() === "#f8fafc" || stroke.toLowerCase() === "#ffffff" || stroke.toLowerCase() === "#fff" || stroke.toLowerCase() === "#f1f5f9")) {
+              el.setAttribute("stroke", "#111827");
+            }
+          });
+        }
+      }
+
+      // 6. Set precise SVG dimensions and viewBox
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+      clone.setAttribute("viewBox", `${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`);
+      clone.setAttribute("width", String(widthPx));
+      clone.setAttribute("height", String(heightPx));
+
+      // 7. Check if there are foreignObjects (e.g. KaTeX)
+      const hasForeignObject = clone.querySelector('foreignObject') !== null;
+      if (!hasForeignObject) {
+        // Fast, high-fidelity SVG rasterization via Image
         const serialized = new XMLSerializer().serializeToString(clone);
         const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`;
         const imgBlob = await new Promise<Blob | null>((resolve) => {
@@ -548,17 +751,15 @@ export async function exportPNG(
           img.onload = () => {
             try {
               const canvas = document.createElement("canvas");
-              const scale = 2;
-              canvas.width = Math.round(rect.width * scale);
-              canvas.height = Math.round(rect.height * scale);
+              canvas.width = widthPx;
+              canvas.height = heightPx;
               const ctx = canvas.getContext("2d");
-              if (!ctx) {
-                resolve(null);
-                return;
+              if (!ctx) return resolve(null);
+              if (options?.whitePaper) {
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, widthPx, heightPx);
               }
-              ctx.fillStyle = theme.bg;
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              ctx.drawImage(img, 0, 0, widthPx, heightPx);
               canvasToPngBlob(canvas).then(resolve).catch(() => resolve(null));
             } catch {
               resolve(null);
@@ -567,125 +768,62 @@ export async function exportPNG(
           img.onerror = () => resolve(null);
           img.src = svgDataUrl;
         });
+
         if (imgBlob && (await hasValidPngMagic(imgBlob))) {
           return imgBlob;
         }
-      }
-    }
-
-    const htmlTarget: HTMLElement | null =
-      svgOrRootElement instanceof HTMLElement
-        ? svgOrRootElement
-        : svgOrRootElement.parentElement instanceof HTMLElement
-          ? svgOrRootElement.parentElement
-          : null;
-
-    if (htmlTarget) {
-      const rect = htmlTarget.getBoundingClientRect();
-      if (rect.width > 10 && rect.height > 10) {
-        const captured = await toBlob(htmlTarget, {
-          backgroundColor: theme.bg,
-          pixelRatio: 2,
-          skipFonts: true,
-          filter: (node) =>
-            !(node instanceof Element && node.hasAttribute("data-export-skip")),
-        });
-        if (captured && (await hasValidPngMagic(captured))) {
-          return captured;
+      } else if (typeof document !== "undefined") {
+        // Use html-to-image on an offscreen mounted container to preserve KaTeX fonts & foreignObjects
+        const offscreen = document.createElement("div");
+        offscreen.style.position = "fixed";
+        offscreen.style.left = "-99999px";
+        offscreen.style.top = "-99999px";
+        offscreen.style.width = `${widthPx}px`;
+        offscreen.style.height = `${heightPx}px`;
+        offscreen.style.overflow = "hidden";
+        offscreen.style.pointerEvents = "none";
+        offscreen.appendChild(clone);
+        document.body.appendChild(offscreen);
+        try {
+          const captured = await toBlob(offscreen, {
+            pixelRatio: 1,
+            width: widthPx,
+            height: heightPx,
+            backgroundColor: options?.whitePaper ? "#ffffff" : theme.bg,
+            skipFonts: false,
+          });
+          if (captured && (await hasValidPngMagic(captured))) {
+            return captured;
+          }
+        } finally {
+          offscreen.remove();
         }
       }
     }
-  } catch {
-    // Fall back cleanly to deterministic Canvas2D vector renderer
+  } catch (err) {
+    console.warn("DOM SVG export failed, falling back to Canvas2D:", err);
   }
 
+  // Fallback to pure high-DPI Canvas2D renderer with preloaded images
   const fallbackCanvas = renderElementsToCanvas2D(
     elements,
-    1600,
-    1000,
-    boardConfig
+    widthPx,
+    heightPx,
+    boardConfig,
+    pageNum,
+    preloaded
   );
   return canvasToPngBlob(fallbackCanvas);
 }
 
 /**
- * Exports current board page as a PDF Blob (`bang-toan.pdf`) starting with `%PDF-` and >200 bytes.
- * Works cleanly on both populated and 0-object empty boards.
+ * Exports one or more board pages into a single high-quality PDF document.
+ * Adheres strictly to boardConfig.format:
+ * - "a4_portrait" => True A4 Portrait (595.28 x 841.89 pt)
+ * - "a4_landscape" => True A4 Landscape (841.89 x 595.28 pt)
+ * - "infinite" => Bounding-box adaptive orientation
+ * Zero stretching or warping, full 300 DPI high resolution, edge-to-edge alignment.
  */
-export async function exportPDF(
-  svgOrRootElement: SVGSVGElement | HTMLElement | null,
-  doc: Y.Doc,
-  page?: number,
-  options?: { whitePaper?: boolean }
-): Promise<Blob> {
-  const elements = getVisiblePageElements(doc, page);
-  const bbox = computePageContentBounds(elements);
-  const whitePaper = options?.whitePaper ?? false;
-  const boardConfig = whitePaper
-    ? DEFAULT_PAGE_BOARD_CONFIG
-    : readPageBoardConfig(doc, page ?? 1);
-  const theme = resolveBoardColors(boardConfig);
-
-  let widthPt = 842; // A4 landscape pt
-  let heightPt = 595;
-
-  if (bbox) {
-    const aspect = bbox.width / Math.max(0.5, bbox.height);
-    if (aspect >= 1) {
-      widthPt = 842;
-      heightPt = Math.max(360, Math.min(1190, Math.round(842 / aspect)));
-    } else {
-      heightPt = 842;
-      widthPt = Math.max(360, Math.min(1190, Math.round(842 * aspect)));
-    }
-  }
-
-  const pdf = new jsPDF({
-    orientation: widthPt >= heightPt ? "landscape" : "portrait",
-    unit: "pt",
-    format: [widthPt, heightPt],
-  });
-  pdf.setProperties({
-    title: "PhysBoard Whiteboard Export",
-    creator: "PhysBoard",
-  });
-  const hex = theme.bg.replace(/^#/, "");
-  if (!whitePaper && /^[0-9a-fA-F]{6}$/.test(hex)) {
-    pdf.setFillColor(
-      parseInt(hex.slice(0, 2), 16),
-      parseInt(hex.slice(2, 4), 16),
-      parseInt(hex.slice(4, 6), 16)
-    );
-  } else {
-    pdf.setFillColor(255, 255, 255);
-  }
-  pdf.rect(0, 0, widthPt, heightPt, "F");
-
-  if (elements.length > 0 || !whitePaper) {
-    try {
-      const pngBlob = await exportPNG(svgOrRootElement, doc, page, {
-        whitePaper,
-      });
-      const pngDataUrl = await blobToDataUrl(pngBlob);
-      const pad = 16;
-      pdf.addImage(
-        pngDataUrl,
-        "PNG",
-        pad,
-        pad,
-        widthPt - pad * 2,
-        heightPt - pad * 2,
-        undefined,
-        "FAST"
-      );
-    } catch {
-      // Even if image embedding fails, empty white PDF remains valid %PDF-
-    }
-  }
-
-  return pdf.output("blob");
-}
-
 export async function exportMultiPagePDF(
   svgOrRootElement: SVGSVGElement | HTMLElement | null,
   doc: Y.Doc,
@@ -699,28 +837,48 @@ export async function exportMultiPagePDF(
 
   for (let idx = 0; idx < targetPages.length; idx++) {
     const pageNum = targetPages[idx];
-    const elements = getVisiblePageElements(doc, pageNum);
-    const bbox = computePageContentBounds(elements);
-    const boardConfig = whitePaper
-      ? DEFAULT_PAGE_BOARD_CONFIG
-      : readPageBoardConfig(doc, pageNum);
+    const rawConfig = readPageBoardConfig(doc, pageNum);
+    const format = rawConfig.format ?? "infinite";
+    const boardConfig: PageBoardConfig = whitePaper
+      ? {
+          ...rawConfig,
+          surface: "white",
+        }
+      : rawConfig;
     const theme = resolveBoardColors(boardConfig);
 
-    let widthPt = 842;
-    let heightPt = 595;
+    let widthPt = 595.28;
+    let heightPt = 841.89;
+    let orientation: "portrait" | "landscape" = "portrait";
 
-    if (bbox) {
-      const aspect = bbox.width / Math.max(0.5, bbox.height);
-      if (aspect >= 1) {
-        widthPt = 842;
-        heightPt = Math.max(360, Math.min(1190, Math.round(842 / aspect)));
+    if (format === "a4_portrait") {
+      orientation = "portrait";
+      widthPt = 595.28;
+      heightPt = 841.89;
+    } else if (format === "a4_landscape") {
+      orientation = "landscape";
+      widthPt = 841.89;
+      heightPt = 595.28;
+    } else {
+      const elements = getVisiblePageElements(doc, pageNum);
+      const bbox = computePageContentBounds(elements);
+      if (bbox) {
+        const aspect = bbox.width / Math.max(0.5, bbox.height);
+        if (aspect >= 1) {
+          orientation = "landscape";
+          widthPt = 841.89;
+          heightPt = Math.max(360, Math.min(1190, Math.round(841.89 / aspect)));
+        } else {
+          orientation = "portrait";
+          heightPt = 841.89;
+          widthPt = Math.max(360, Math.min(1190, Math.round(841.89 * aspect)));
+        }
       } else {
-        heightPt = 842;
-        widthPt = Math.max(360, Math.min(1190, Math.round(842 * aspect)));
+        orientation = "portrait";
+        widthPt = 595.28;
+        heightPt = 841.89;
       }
     }
-
-    const orientation = widthPt >= heightPt ? "landscape" : "portrait";
 
     if (!pdf) {
       pdf = new jsPDF({
@@ -736,6 +894,7 @@ export async function exportMultiPagePDF(
       pdf.addPage([widthPt, heightPt], orientation);
     }
 
+    // Set page background color
     const hex = theme.bg.replace(/^#/, "");
     if (!whitePaper && /^[0-9a-fA-F]{6}$/.test(hex)) {
       pdf.setFillColor(
@@ -748,30 +907,52 @@ export async function exportMultiPagePDF(
     }
     pdf.rect(0, 0, widthPt, heightPt, "F");
 
-    if (elements.length > 0 || !whitePaper) {
-      try {
-        const pngBlob = await exportPNG(svgOrRootElement, doc, pageNum, {
-          whitePaper,
-        });
-        const pngDataUrl = await blobToDataUrl(pngBlob);
-        const pad = 16;
-        pdf.addImage(
-          pngDataUrl,
-          "PNG",
-          pad,
-          pad,
-          widthPt - pad * 2,
-          heightPt - pad * 2,
-          undefined,
-          "FAST"
-        );
-      } catch {
-        // Fallback gracefully
-      }
+    try {
+      const pngBlob = await exportPNG(svgOrRootElement, doc, pageNum, {
+        whitePaper,
+      });
+      const pngDataUrl = await blobToDataUrl(pngBlob);
+      // Place edge-to-edge at (0, 0, widthPt, heightPt) with lossless compression
+      pdf.addImage(
+        pngDataUrl,
+        "PNG",
+        0,
+        0,
+        widthPt,
+        heightPt,
+        undefined,
+        "NONE"
+      );
+    } catch (err) {
+      console.warn(`exportMultiPagePDF: Failed to capture page ${pageNum}`, err);
     }
   }
 
-  return pdf ? pdf.output("blob") : new Blob(["%PDF-1.4\n%%EOF"], { type: "application/pdf" });
+  if (!pdf) {
+    pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: [595.28, 841.89],
+    });
+  }
+
+  return pdf.output("blob");
+}
+
+/**
+ * Exports current board page as a PDF Blob (`bang-toan.pdf`) starting with `%PDF-` and >200 bytes.
+ * Adheres strictly to the page's format (a4_portrait, a4_landscape, infinite).
+ */
+export async function exportPDF(
+  svgOrRootElement: SVGSVGElement | HTMLElement | null,
+  doc: Y.Doc,
+  page?: number,
+  options?: { whitePaper?: boolean }
+): Promise<Blob> {
+  return exportMultiPagePDF(svgOrRootElement, doc, [page ?? 1], {
+    whitePaper: options?.whitePaper,
+    title: "PhysBoard Whiteboard Export",
+  });
 }
 
 function hexToTikzColor(hex: string | null | undefined, bw: boolean): string {

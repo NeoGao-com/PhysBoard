@@ -259,9 +259,17 @@ export class ToolbarDriver {
     const exportTab = this.page.locator('button:has-text("Xuất file & Đề thi")');
     if (await exportTab.isVisible()) await exportTab.click();
     const exportBtn = this.page.locator(
-      `button:has-text("${format}"), [data-action="export-${format.toLowerCase()}"]`
+      `[data-action="export-${format.toLowerCase()}"]`
     ).first();
     await exportBtn.click();
+
+    if (format === 'PDF') {
+      const confirmPdfBtn = this.page.locator(
+        'button[data-action="confirm-export-pdf"]'
+      ).first();
+      await confirmPdfBtn.waitFor({ state: 'visible', timeout: 5000 });
+      await confirmPdfBtn.click();
+    }
   }
 
   /**

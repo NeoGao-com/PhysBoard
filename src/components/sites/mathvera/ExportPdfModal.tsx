@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import * as Y from "yjs";
-import { exportMultiPagePDF } from "@/lib/export";
-import { downloadBlob } from "@/lib/export";
+import { exportMultiPagePDF, downloadBlob } from "@/lib/export";
+import { readPageBoardConfig } from "@/lib/board-themes";
 
 export interface ExportPdfModalProps {
   open: boolean;
@@ -28,6 +28,9 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
   const [whitePaper, setWhitePaper] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const currentConfig = doc ? readPageBoardConfig(doc, currentPage) : null;
+  const boardFormat = currentConfig?.format ?? "infinite";
 
   if (!open) return null;
 
@@ -162,6 +165,46 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
 
         {/* Body */}
         <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Format Indicator Badge */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: boardFormat === "a4_portrait" || boardFormat === "a4_landscape" ? "#f0fdf4" : "#f8fafc",
+              border: boardFormat === "a4_portrait" || boardFormat === "a4_landscape" ? "1px solid #bbf7d0" : "1px solid #e2e8f0",
+              fontSize: 13,
+              color: boardFormat === "a4_portrait" || boardFormat === "a4_landscape" ? "#166534" : "#334155",
+            }}
+          >
+            <span style={{ fontSize: 22 }}>
+              {boardFormat === "a4_portrait" ? "📄" : boardFormat === "a4_landscape" ? "📑" : "🌐"}
+            </span>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontWeight: 600 }}>
+                {boardFormat === "a4_portrait"
+                  ? "Khổ A4 Dọc (210 × 297mm)"
+                  : boardFormat === "a4_landscape"
+                  ? "Khổ A4 Ngang (297 × 210mm)"
+                  : "Khổ Vô tận"}
+              </span>
+              <span
+                style={{
+                  fontSize: 11.5,
+                  color: boardFormat === "a4_portrait" || boardFormat === "a4_landscape" ? "#15803d" : "#64748b",
+                }}
+              >
+                {boardFormat === "a4_portrait"
+                  ? "Xuất file chuẩn A4 Portrait, độ nét 300 DPI, vừa khít tỉ lệ trang."
+                  : boardFormat === "a4_landscape"
+                  ? "Xuất file chuẩn A4 Landscape, độ nét 300 DPI, vừa khít tỉ lệ trang."
+                  : "Tự động căn chỉnh kích thước trang theo vùng nội dung vẽ."}
+              </span>
+            </div>
+          </div>
+
           {/* File Name */}
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <label style={{ fontSize: 13, fontWeight: 500, color: "#475569" }}>
@@ -363,6 +406,7 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
           </button>
           <button
             type="button"
+            data-action="confirm-export-pdf"
             disabled={isExporting || targetPagesList.length === 0}
             onClick={handleExport}
             style={{

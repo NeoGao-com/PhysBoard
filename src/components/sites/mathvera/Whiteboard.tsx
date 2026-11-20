@@ -2850,8 +2850,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   useEffect(() => {
     if (typeof window !== "undefined") {
       (window as unknown as { __testInsertPdfPages?: (pages: ImportedPdfPage[]) => void }).__testInsertPdfPages = handleInsertPdfPages;
+      (window as unknown as { __testSetBoardFormat?: (fmt: BoardFormatId) => void }).__testSetBoardFormat = (fmt: BoardFormatId) => {
+        writePageBoardConfig(doc, currentPage, {
+          ...(currentBoardConfig || DEFAULT_PAGE_BOARD_CONFIG),
+          format: fmt,
+        });
+      };
     }
-  }, [handleInsertPdfPages]);
+  }, [handleInsertPdfPages, doc, currentPage, currentBoardConfig]);
 
   const handleM3Action = useCallback(
     (action: M3MenuAction) => {
