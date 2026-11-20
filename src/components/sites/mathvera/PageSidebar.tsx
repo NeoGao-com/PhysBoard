@@ -353,45 +353,52 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
                     Hiện tại
                   </div>
                 )}
-
-                {/* PDF Lock/Unlock button on thumbnail */}
-                {pagePdfStatus?.[p]?.hasPdf && (
-                  <button
-                    type="button"
-                    data-action="sidebar-toggle-pdf-lock"
-                    data-page={p}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onTogglePagePdfLock?.(p);
-                    }}
-                    title={
-                      pagePdfStatus[p].locked
-                        ? `Trang ${p} đã khóa PDF vào giấy (Bấm để mở khóa di chuyển)`
-                        : `Trang ${p} đang mở khóa PDF (Bấm để khóa cố định vào giấy)`
-                    }
-                    style={{
-                      position: "absolute",
-                      bottom: 4,
-                      left: 4,
-                      background: pagePdfStatus[p].locked ? "rgba(15,23,42,0.78)" : "#fef3c7",
-                      color: pagePdfStatus[p].locked ? "#ffffff" : "#b45309",
-                      border: pagePdfStatus[p].locked ? "none" : "1px solid #f59e0b",
-                      borderRadius: 3,
-                      padding: "1px 4px",
-                      fontSize: 8.5,
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      cursor: "pointer",
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-                      zIndex: 2,
-                    }}
-                  >
-                    <span>{pagePdfStatus[p].locked ? "🔒 Khóa" : "🔓 Mở"}</span>
-                  </button>
-                )}
               </div>
+
+              {/* PDF Lock/Unlock button in SỔ TAY */}
+              {pagePdfStatus?.[p]?.hasPdf && (
+                <button
+                  type="button"
+                  data-action="sidebar-toggle-pdf-lock"
+                  data-page={p}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTogglePagePdfLock?.(p);
+                  }}
+                  title={
+                    pagePdfStatus[p].locked
+                      ? `Trang ${p} đã khóa PDF vào giấy (Bấm để mở khóa di chuyển)`
+                      : `Trang ${p} đang mở khóa PDF (Bấm để khóa cố định vào giấy)`
+                  }
+                  style={{
+                    marginTop: 5,
+                    width: 104,
+                    padding: "4px 6px",
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4,
+                    cursor: "pointer",
+                    background: pagePdfStatus[p].locked ? "#ffffff" : "#fef3c7",
+                    color: pagePdfStatus[p].locked ? "#1e293b" : "#b45309",
+                    border: pagePdfStatus[p].locked
+                      ? "1px solid #cbd5e1"
+                      : "1px solid #f59e0b",
+                    boxShadow: "0 1px 3px rgba(15,23,42,0.08)",
+                    transition: "all 0.15s ease",
+                    userSelect: "none",
+                  }}
+                >
+                  <span>
+                    {pagePdfStatus[p].locked
+                      ? "🔒 Đã khóa PDF"
+                      : "🔓 Mở khóa PDF"}
+                  </span>
+                </button>
+              )}
 
               {/* Delete button (if totalPages > 1) */}
               {totalPages > 1 && (

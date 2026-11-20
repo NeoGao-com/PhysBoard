@@ -214,16 +214,19 @@ test.describe("Tier 1: 13 Insert PDF Fit to Paper & Lock Controls", () => {
     const pdfEl = page.locator('g[data-element-type="Image"]').first();
     await expect(pdfEl).toHaveAttribute("data-locked", "true");
 
-    // 1. Floating lock badge on canvas
-    const lockBadge = page.locator('[data-action="toggle-pdf-lock"][data-page="1"]');
-    await expect(lockBadge).toBeVisible();
-    await expect(lockBadge).toHaveAttribute("data-locked", "true");
-    await expect(lockBadge).toContainText("Đã khóa PDF");
+    // 1. Verify canvas has no floating lock badge (only exists in SỔ TAY sidebar)
+    await expect(page.locator('[data-action="toggle-pdf-lock"]')).toHaveCount(0);
 
-    // 2. Click lock badge to unlock
-    await lockBadge.click();
-    await expect(lockBadge).toHaveAttribute("data-locked", "false");
-    await expect(lockBadge).toContainText("Mở khóa PDF");
+    // 2. Lock button in SỔ TAY sidebar
+    const sidebarLockBtn = page.locator(
+      '[data-action="sidebar-toggle-pdf-lock"][data-page="1"]'
+    );
+    await expect(sidebarLockBtn).toBeVisible();
+    await expect(sidebarLockBtn).toContainText("Đã khóa PDF");
+
+    // 3. Click sidebar lock button to unlock
+    await sidebarLockBtn.click();
+    await expect(sidebarLockBtn).toContainText("Mở khóa PDF");
 
     // PDF element is now unlocked and selected
     await expect(pdfEl).not.toHaveAttribute("data-locked", "true");
@@ -233,12 +236,11 @@ test.describe("Tier 1: 13 Insert PDF Fit to Paper & Lock Controls", () => {
     const lockSelectionBtn = page.locator('[data-action="lock-selection"]');
     await expect(lockSelectionBtn).toBeVisible();
 
-    // 3. Click "Khóa vào trang" to lock back
+    // 4. Click "Khóa vào trang" to lock back
     await lockSelectionBtn.click();
     await expect(pdfEl).toHaveAttribute("data-locked", "true");
     await expect(pdfEl).not.toHaveAttribute("data-selected", "true");
-    await expect(lockBadge).toHaveAttribute("data-locked", "true");
-    await expect(lockBadge).toContainText("Đã khóa PDF");
+    await expect(sidebarLockBtn).toContainText("Đã khóa PDF");
   });
 
   test("TC-13-04: PageSidebar thumbnail card displays PDF lock status and allows toggle", async ({
@@ -266,23 +268,23 @@ test.describe("Tier 1: 13 Insert PDF Fit to Paper & Lock Controls", () => {
       { src: sampleDataUrl }
     );
 
-    // Sidebar button for page 1 PDF lock
+    // Sidebar button for page 1 PDF lock in SỔ TAY
     const sidebarLockBtn = page.locator(
       '[data-action="sidebar-toggle-pdf-lock"][data-page="1"]'
     );
     await expect(sidebarLockBtn).toBeVisible();
-    await expect(sidebarLockBtn).toContainText("Khóa");
+    await expect(sidebarLockBtn).toContainText("Đã khóa PDF");
 
     // Click sidebar lock button to unlock
     await sidebarLockBtn.click();
-    await expect(sidebarLockBtn).toContainText("Mở");
+    await expect(sidebarLockBtn).toContainText("Mở khóa PDF");
 
     const pdfEl = page.locator('g[data-element-type="Image"]').first();
     await expect(pdfEl).not.toHaveAttribute("data-locked", "true");
 
     // Click again to lock
     await sidebarLockBtn.click();
-    await expect(sidebarLockBtn).toContainText("Khóa");
+    await expect(sidebarLockBtn).toContainText("Đã khóa PDF");
     await expect(pdfEl).toHaveAttribute("data-locked", "true");
   });
 });
