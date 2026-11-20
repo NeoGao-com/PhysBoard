@@ -827,6 +827,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {/* Undo */}
         <button
           type="button"
+          data-action="undo"
           onClick={onUndo}
           disabled={!canUndo}
           title="Hoàn tác (Ctrl+Z)"
@@ -838,6 +839,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {/* Redo */}
         <button
           type="button"
+          data-action="redo"
           onClick={onRedo}
           disabled={!canRedo}
           title="Làm lại (Ctrl+Y)"
@@ -1264,6 +1266,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <IconEraser size={14} />
           <span>Tẩy</span>
         </button>
+        )}
+
+        {/* Undo & Redo */}
+        {vis.groupSelection && vis.toolUndoRedo && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+            <button
+              type="button"
+              data-action="undo"
+              onClick={onUndo}
+              disabled={!canUndo}
+              title="Hoàn tác (Ctrl+Z)"
+              aria-label="Hoàn tác"
+              style={{ ...btnBaseStyle, padding: "0 4px", color: canUndo ? "#334155" : "#cbd5e1" }}
+            >
+              <IconUndo size={14} />
+            </button>
+            <button
+              type="button"
+              data-action="redo"
+              onClick={onRedo}
+              disabled={!canRedo}
+              title="Làm lại (Ctrl+Y)"
+              aria-label="Làm lại"
+              style={{ ...btnBaseStyle, padding: "0 4px", color: canRedo ? "#334155" : "#cbd5e1" }}
+            >
+              <IconRedo size={14} />
+            </button>
+          </div>
         )}
 
         {/* StylePicker (Color & Width) */}
@@ -1764,6 +1794,32 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             }}
           >
             <span aria-hidden="true">💡</span>
+          </button>
+        )}
+
+        {/* Settings & More */}
+        {onOpenSettings && (
+          <button
+            type="button"
+            data-action="more"
+            data-tool="settings"
+            onClick={onOpenSettings}
+            title="Tùy chọn thanh công cụ & cài đặt nâng cao"
+            aria-label="Cài đặt"
+            style={{
+              ...btnBaseStyle,
+              width: 26,
+              height: 26,
+              padding: 0,
+              justifyContent: "center",
+              background: "#f1f5f9",
+              color: "#475569",
+              border: "1px solid #cbd5e1",
+              borderRadius: 6,
+              fontSize: 12,
+            }}
+          >
+            <span aria-hidden="true">⚙️</span>
           </button>
         )}
 

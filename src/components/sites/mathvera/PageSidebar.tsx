@@ -166,6 +166,44 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           SỔ TAY ({totalPages})
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {/* Quick prev / next navigation buttons */}
+          <button
+            type="button"
+            data-action="prev-page"
+            onClick={() => onSelectPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage <= 1}
+            title="Trang trước"
+            aria-label="Trang trước"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: currentPage <= 1 ? "#cbd5e1" : "#64748b",
+              fontSize: 12,
+              cursor: currentPage <= 1 ? "default" : "pointer",
+              padding: "2px 4px",
+            }}
+          >
+            ◀
+          </button>
+          <button
+            type="button"
+            data-action="next-page"
+            onClick={() => onSelectPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage >= totalPages}
+            title="Trang sau"
+            aria-label="Trang sau"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: currentPage >= totalPages ? "#cbd5e1" : "#64748b",
+              fontSize: 12,
+              cursor: currentPage >= totalPages ? "default" : "pointer",
+              padding: "2px 4px",
+            }}
+          >
+            ▶
+          </button>
+
           {onOpenPageManager && (
             <button
               type="button"
@@ -634,6 +672,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           type="button"
           onClick={onAddPage}
           data-wb-add-page="true"
+          data-action="add-page"
           style={{
             width: "100%",
             background: "#2563eb",

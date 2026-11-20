@@ -1708,6 +1708,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
   const handleAddPage = useCallback(() => {
     const added = addYjsPage(doc);
+    setYjsCurrentPage(doc, added.count);
     if (isA4Format) {
       setTimeout(() => {
         scrollToPage(added.count);

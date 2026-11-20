@@ -48,7 +48,9 @@ export function addYjsPage(doc: Y.Doc): PageState {
   const { count, current } = getYjsPageState(doc);
   const nextCount = count + 1;
   const currentConfig = readPageBoardConfig(doc, current);
-  writePageBoardConfig(doc, nextCount, currentConfig);
+  if (currentConfig.format === "a4_portrait" || currentConfig.format === "a4_landscape") {
+    writePageBoardConfig(doc, nextCount, currentConfig);
+  }
   doc.transact(() => {
     pagesMap.set("count", nextCount);
     pagesMap.set("cur", nextCount);

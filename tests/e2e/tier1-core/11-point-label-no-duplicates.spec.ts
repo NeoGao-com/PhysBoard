@@ -4,8 +4,8 @@ import { ToolbarDriver } from '../helpers/toolbar-driver';
 import {
   collectUsedPointNames,
   getNextPointName,
-  type CanvasElement,
 } from '../../../src/lib/geometry';
+import type { CanvasElement } from '../../../src/types/whiteboard';
 import { createSolid3DElement } from '../../../src/lib/geometry3d';
 
 test.describe('Point tool automatic naming: No duplicate letters on existing shapes', () => {
@@ -28,13 +28,13 @@ test.describe('Point tool automatic naming: No duplicate letters on existing sha
     expect(p1).toBe('M');
 
     // Add point M to elements
-    const ptM: CanvasElement = {
+    const ptM = {
       id: 'pt_m',
       type: 'GeomPoint',
       transform: { x: 1, y: 1, scale: 1, rotation: 0, z: 0 },
       style: {},
       props: { name: 'M' },
-    };
+    } as unknown as CanvasElement;
     elementsWithPyramid.push(ptM);
 
     const p2 = getNextPointName(elementsWithPyramid, edgePointPreferred);

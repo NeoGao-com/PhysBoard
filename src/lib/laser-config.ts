@@ -13,7 +13,7 @@ export interface LaserConfig {
 export const LASER_STORAGE_KEY = "physboard_laser_config";
 
 export const DEFAULT_LASER_CONFIG: LaserConfig = {
-  mode: "dot",
+  mode: "trail",
   dotSize: 14,
   trailWidth: 4.5,
   color: "#ef4444",
