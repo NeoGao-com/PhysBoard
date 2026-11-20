@@ -60,9 +60,6 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install dependencies
         run: npm ci
 
@@ -112,4 +109,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
           files: release-assets/*
+          name: PhysBoard ${{ github.ref_name }} (Windows & Android)
+          draft: false
+          prerelease: false
           generate_release_notes: true
