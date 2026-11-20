@@ -719,6 +719,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const liveStrokePressuresRef = useRef<number[]>([]);
   const filterXRef = useRef(new OneEuroFilter(1.2, 0.06, 1.0));
   const filterYRef = useRef(new OneEuroFilter(1.2, 0.06, 1.0));
+  const liveStrokeRafRef = useRef<number | null>(null);
+  const liveStrokeStyleRef = useRef<Style | undefined>(undefined);
+  const liveStrokeNibRef = useRef<InkProps["nib"] | undefined>(undefined);
+  const containerRectRef = useRef<DOMRect | null>(null);
   const [liveStroke, setLiveStroke] = useState<{
     points: number[];
     pressures?: number[];
@@ -4566,7 +4570,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return;
       }
       e.stopPropagation();
-      const rect = containerRef.current?.getBoundingClientRect();
+      const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
+      if (!containerRectRef.current && rect) {
+        containerRectRef.current = rect;
+      }
       const worldPos = screenToWorld(
         e.clientX,
         e.clientY,
@@ -4606,7 +4613,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         e.stopPropagation();
         let resolvedId = elementId;
         let nextSubSel: SolidSubSelection | null = null;
-        const rect = containerRef.current?.getBoundingClientRect();
+        const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
+      if (!containerRectRef.current && rect) {
+        containerRectRef.current = rect;
+      }
         const worldPos = screenToWorld(
           e.clientX,
           e.clientY,
@@ -4745,7 +4755,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }
       }
 
-      const rect = containerRef.current?.getBoundingClientRect();
+      const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
+      if (!containerRectRef.current && rect) {
+        containerRectRef.current = rect;
+      }
       const worldPos = screenToWorld(
         e.clientX,
         e.clientY,
@@ -5436,7 +5449,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       // Ink / Multi-nib Pens
       if (isPenTool(activeTool)) {
         if (activeTool === "ink:laser") {
-          const rect = containerRef.current?.getBoundingClientRect();
+          const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
+      if (!containerRectRef.current && rect) {
+        containerRectRef.current = rect;
+      }
           setLiveLaserScreenPos({
             x: e.clientX - (rect?.left ?? 0),
             y: e.clientY - (rect?.top ?? 0),
@@ -5473,6 +5489,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             : currentStyle;
         liveStrokePointsRef.current = [x, y];
         liveStrokePressuresRef.current = [e.pressure || 0.5];
+        liveStrokeStyleRef.current = effectiveStyle;
+        liveStrokeNibRef.current = nib;
         setLiveStroke({
           points: [x, y],
           pressures: [e.pressure || 0.5],
@@ -5513,7 +5531,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     (e: React.PointerEvent<SVGSVGElement>) => {
       navPointerMove(e);
 
-      const rect = containerRef.current?.getBoundingClientRect();
+      const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
+      if (!containerRectRef.current && rect) {
+        containerRectRef.current = rect;
+      }
 
       // Track laser screen position when active
       if (activeTool === "ink:laser") {
@@ -5889,13 +5910,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       if (
         isPenTool(activeTool) &&
         e.buttons === 1 &&
-        liveStroke
+        liveStrokePointsRef.current.length > 0
       ) {
         // Magnetic snap to Ruler or Set Square edges if nearby
         const instrumentSnap = snapPointToInstruments(worldPos, pageElements, 0.45);
         const drawPt = instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
 
-        const nib = resolvePenNib(activeTool) ?? undefined;
+        const nib = liveStrokeNibRef.current ?? resolvePenNib(activeTool) ?? undefined;
         const smooth = nib === "fountain" || nib === "brush";
         const ts = performance.now();
         const x = smooth
@@ -5906,12 +5927,21 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           : drawPt.y;
         liveStrokePointsRef.current.push(x, y);
         liveStrokePressuresRef.current.push(e.pressure || 0.5);
-        setLiveStroke({
-          points: [...liveStrokePointsRef.current],
-          pressures: [...liveStrokePressuresRef.current],
-          nib,
-          style: liveStroke.style,
-        });
+
+        // Throttle React DOM re-renders using requestAnimationFrame to guarantee smooth 60/120fps on mobile
+        if (!liveStrokeRafRef.current) {
+          liveStrokeRafRef.current = requestAnimationFrame(() => {
+            liveStrokeRafRef.current = null;
+            if (liveStrokePointsRef.current.length > 0 && liveStrokeStyleRef.current) {
+              setLiveStroke({
+                points: [...liveStrokePointsRef.current],
+                pressures: [...liveStrokePressuresRef.current],
+                nib: liveStrokeNibRef.current,
+                style: liveStrokeStyleRef.current,
+              });
+            }
+          });
+        }
       }
     },
     [
@@ -5921,7 +5951,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       dispatcher,
       activeTool,
       pageElements,
-      liveStroke,
       laserConfig,
     ]
   );
@@ -5968,7 +5997,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
 
       if (draftTwoPtRef.current) {
-        const rect = containerRef.current?.getBoundingClientRect();
+        const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
+      if (!containerRectRef.current && rect) {
+        containerRectRef.current = rect;
+      }
         const worldPos = screenToWorld(
           e.clientX,
           e.clientY,
@@ -6142,9 +6174,16 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             });
           }
         }
+        if (liveStrokeRafRef.current) {
+          cancelAnimationFrame(liveStrokeRafRef.current);
+          liveStrokeRafRef.current = null;
+        }
         dispatcher.gesture(false);
         liveStrokePointsRef.current = [];
         liveStrokePressuresRef.current = [];
+        liveStrokeStyleRef.current = undefined;
+        liveStrokeNibRef.current = undefined;
+        containerRectRef.current = null;
         setLiveStroke(null);
       }
 
@@ -6209,9 +6248,16 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
 
       if (liveStroke) {
+        if (liveStrokeRafRef.current) {
+          cancelAnimationFrame(liveStrokeRafRef.current);
+          liveStrokeRafRef.current = null;
+        }
         dispatcher.gesture(false);
         liveStrokePointsRef.current = [];
         liveStrokePressuresRef.current = [];
+        liveStrokeStyleRef.current = undefined;
+        liveStrokeNibRef.current = undefined;
+        containerRectRef.current = null;
         setLiveStroke(null);
       }
       if (spenActiveOverrideRef.current && spenPreviousToolRef.current) {
@@ -6247,7 +6293,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }
         return;
       }
-      const rect = containerRef.current?.getBoundingClientRect();
+      const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
+      if (!containerRectRef.current && rect) {
+        containerRectRef.current = rect;
+      }
       const pt = screenToWorld(
         e.clientX,
         e.clientY,
@@ -6369,7 +6418,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               }
               e.stopPropagation();
               setSelectedIds([id]);
-              const rect = containerRef.current?.getBoundingClientRect();
+              const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
+      if (!containerRectRef.current && rect) {
+        containerRectRef.current = rect;
+      }
               const startWorld = screenToWorld(
                 e.clientX,
                 e.clientY,

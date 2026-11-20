@@ -3,7 +3,10 @@
   "appName": "PhysBoard",
   "webDir": "out",
   "bundledWebRuntime": false,
+  "backgroundColor": "#ffffff",
   "android": {
-    "allowMixedContent": true
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
   }
 }

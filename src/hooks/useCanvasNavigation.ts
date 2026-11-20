@@ -642,6 +642,11 @@ export function useCanvasNavigation(
         });
       }
 
+      // Fast path: if not panning and not multi-touch pinching, skip all calculations & layout reads
+      if (!panStartRef.current && (!pinchStateRef.current || activePointersRef.current.size < 2)) {
+        return;
+      }
+
       const rect = containerRef.current?.getBoundingClientRect();
 
       // Multi-touch pinch handling

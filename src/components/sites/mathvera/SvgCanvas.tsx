@@ -126,7 +126,7 @@ export function SvgCanvas({
       data-board-surface={boardConfig.surface}
       data-board-pattern={boardConfig.pattern}
       data-board-dark={theme.isDark ? "true" : "false"}
-      className={`${contained ? "absolute" : "fixed"} overflow-hidden select-none ${className}`}
+      className={`wb-viewport-container ${contained ? "absolute" : "fixed"} overflow-hidden select-none ${className}`}
       style={{
         position: contained ? "absolute" : "fixed",
         top: 0,
@@ -139,6 +139,8 @@ export function SvgCanvas({
         userSelect: "none",
         WebkitUserSelect: "none",
         touchAction: "none",
+        transform: "translateZ(0)",
+        willChange: "transform",
       }}
     >
       <svg
