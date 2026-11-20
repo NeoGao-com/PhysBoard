@@ -46,6 +46,8 @@ test.describe('SettingsModal Responsive Redesign (Desktop Master-Detail & Mobile
     await expect(toolbarTab).toBeVisible();
     await expect(laserTab).toBeVisible();
     await expect(exportTab).toBeVisible();
+    const updateTab = sidebar.locator('button:has-text("Cập nhật ứng dụng")');
+    await expect(updateTab).toBeVisible();
 
     // Click "Khổ & Nền bảng" and verify board options appear
     await boardTab.click();
@@ -66,6 +68,11 @@ test.describe('SettingsModal Responsive Redesign (Desktop Master-Detail & Mobile
     await exportTab.click();
     const pdfExport = page.locator('[data-action="export-pdf"]');
     await expect(pdfExport).toBeVisible();
+
+    // Click "Cập nhật ứng dụng" and verify update controls appear
+    await updateTab.click();
+    const checkUpdateBtn = page.locator('button[data-action="check-update"]');
+    await expect(checkUpdateBtn).toBeVisible();
 
     // Close via modal close button
     const closeBtn = modal.locator('button[aria-label="Đóng cài đặt"]');

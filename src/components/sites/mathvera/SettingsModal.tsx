@@ -23,6 +23,12 @@ import {
 } from "@/lib/board-themes";
 import { exportPNG, downloadBlob } from "@/lib/export";
 import { SPenConfig, DEFAULT_SPEN_CONFIG, SPenButtonAction, SPenButtonBehavior } from "@/types/whiteboard";
+import {
+  APP_VERSION,
+  type AppReleaseInfo,
+  fetchLatestRelease,
+  GITHUB_RELEASES_URL,
+} from "@/lib/app-version";
 
 export interface SettingsModalProps {
   open: boolean;
@@ -86,7 +92,8 @@ type SettingsTab =
   | "scale"
   | "toolbar"
   | "laser"
-  | "export";
+  | "export"
+  | "update";
 
 interface TabMeta {
   id: SettingsTab;
@@ -137,6 +144,12 @@ const TAB_DEFS: TabMeta[] = [
     label: "Xuất file & Đề thi",
     icon: "💾",
     subtitle: "Soạn đề thi A4, xuất PDF, PNG, TikZ, lưu JSON",
+  },
+  {
+    id: "update",
+    label: "Cập nhật ứng dụng",
+    icon: "🔄",
+    subtitle: "Kiểm tra phiên bản mới, lịch sử cập nhật & tải về",
   },
 ];
 
@@ -202,6 +215,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [isMobile, setIsMobile] = useState(false);
   const [busyPng, setBusyPng] = useState(false);
+
+  // Check for updates state
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppReleaseInfo | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [lastCheckedTime, setLastCheckedTime] = useState<string | null>(null);
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateError(null);
+    try {
+      const info = await fetchLatestRelease(APP_VERSION);
+      setUpdateInfo(info);
+      setLastCheckedTime(
+        new Date().toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      );
+    } catch (err: unknown) {
+      setUpdateError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "update" && !updateInfo && !checkingUpdate && !updateError) {
+      handleCheckUpdate();
+    }
+  }, [activeTab]);
 
   // Accordion state for toolbar config groups
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -675,6 +720,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             {/* ==================== TAB 1: CHUNG & THAO TÁC ==================== */}
             {activeTab === "general" && (
               <>
+                {/* Thông tin phiên bản & Cập nhật nhanh */}
+                <div style={CARD_BOX_STYLE}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <div style={CARD_TITLE_STYLE}>
+                      <span>🔄</span>
+                      <span>Phiên bản: PhysBoard v{APP_VERSION}</span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          background: "#ecfdf5",
+                          color: "#059669",
+                          border: "1px solid #a7f3d0",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Chính thức
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab("update");
+                          handleCheckUpdate();
+                        }}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          border: "1px solid #2563eb",
+                          background: "#2563eb",
+                          color: "#ffffff",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <span>🔄</span>
+                        <span>Kiểm tra cập nhật</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>
+                    PhysBoard hỗ trợ kiểm tra và cập nhật tự động cho bản cài đặt Windows (.exe) và Android (.apk).
+                  </div>
+                </div>
+
                 {/* Tự động quay lại công cụ */}
                 <div style={CARD_BOX_STYLE}>
                   <div style={CARD_TITLE_STYLE}>
@@ -2290,6 +2386,328 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span style={{ fontSize: 18 }}>💾</span>
                       <span>Lưu / Nạp file JSON</span>
                     </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ==================== TAB 8: CẬP NHẬT ỨNG DỤNG ==================== */}
+            {activeTab === "update" && (
+              <>
+                {/* Trạng thái phiên bản hiện tại */}
+                <div style={CARD_BOX_STYLE}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                    <div style={CARD_TITLE_STYLE}>
+                      <span style={{ fontSize: 18 }}>🚀</span>
+                      <div>
+                        <div>PhysBoard v{APP_VERSION}</div>
+                        <div style={{ fontSize: 12, fontWeight: 400, color: "#64748b" }}>
+                          Phiên bản hiện tại đang được sử dụng
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      data-action="check-update"
+                      onClick={handleCheckUpdate}
+                      disabled={checkingUpdate}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: checkingUpdate ? "#93c5fd" : "#2563eb",
+                        color: "#ffffff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: checkingUpdate ? "default" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
+                      }}
+                    >
+                      <span>🔄</span>
+                      <span>{checkingUpdate ? "Đang kiểm tra..." : "Kiểm tra cập nhật ngay"}</span>
+                    </button>
+                  </div>
+
+                  {lastCheckedTime && (
+                    <div style={{ fontSize: 11.5, color: "#94a3b8" }}>
+                      Lần kiểm tra gần nhất: {lastCheckedTime}
+                    </div>
+                  )}
+                </div>
+
+                {/* Kết quả kiểm tra cập nhật */}
+                {updateError && (
+                  <div
+                    style={{
+                      ...CARD_BOX_STYLE,
+                      background: "#fef2f2",
+                      borderColor: "#fecaca",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#991b1b", fontWeight: 600, fontSize: 13.5 }}>
+                      <span>⚠️</span>
+                      <span>Không thể kiểm tra bản cập nhật</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: "#b91c1c" }}>
+                      {updateError}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <button
+                        type="button"
+                        onClick={handleCheckUpdate}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          background: "#ffffff",
+                          border: "1px solid #f87171",
+                          color: "#991b1b",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Thử lại
+                      </button>
+                      <a
+                        href={GITHUB_RELEASES_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          background: "#ffffff",
+                          border: "1px solid #cbd5e1",
+                          color: "#475569",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          textDecoration: "none",
+                        }}
+                      >
+                        Xem trực tiếp trên GitHub
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {updateInfo && !updateError && (
+                  <>
+                    {updateInfo.isNewer ? (
+                      /* Có bản cập nhật mới */
+                      <div
+                        style={{
+                          ...CARD_BOX_STYLE,
+                          background: "#eff6ff",
+                          borderColor: "#bfdbfe",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#1e40af", fontWeight: 700, fontSize: 15 }}>
+                          <span>🎉</span>
+                          <span>Đã có phiên bản mới: v{updateInfo.version}</span>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "#1e3a8a", lineHeight: 1.5 }}>
+                          Phiên bản mới nhất mang đến các nâng cấp về hiệu năng vẽ, sửa lỗi và tính năng mới.
+                        </div>
+
+                        {/* Download buttons */}
+                        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 10, marginTop: 6 }}>
+                          {updateInfo.windowsSetupUrl && (
+                            <a
+                              href={updateInfo.windowsSetupUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              style={{
+                                flex: 1,
+                                padding: "10px 14px",
+                                borderRadius: 8,
+                                background: "#2563eb",
+                                color: "#ffffff",
+                                textDecoration: "none",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                textAlign: "center",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 8,
+                                boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
+                              }}
+                            >
+                              <span>🪟</span>
+                              <span>Tải bản cài đặt Windows (Setup .exe)</span>
+                            </a>
+                          )}
+
+                          {updateInfo.androidApkUrl && (
+                            <a
+                              href={updateInfo.androidApkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                              style={{
+                                flex: 1,
+                                padding: "10px 14px",
+                                borderRadius: 8,
+                                background: "#059669",
+                                color: "#ffffff",
+                                textDecoration: "none",
+                                fontSize: 13,
+                                fontWeight: 600,
+                                textAlign: "center",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 8,
+                                boxShadow: "0 2px 6px rgba(5,150,105,0.25)",
+                              }}
+                            >
+                              <span>🤖</span>
+                              <span>Tải bản Android (.apk)</span>
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Release body preview */}
+                        {updateInfo.body && (
+                          <div
+                            style={{
+                              marginTop: 10,
+                              padding: "10px 14px",
+                              background: "#ffffff",
+                              borderRadius: 8,
+                              border: "1px solid #dbeafe",
+                              fontSize: 12,
+                              color: "#334155",
+                              lineHeight: 1.6,
+                              maxHeight: 160,
+                              overflowY: "auto",
+                              whiteSpace: "pre-wrap",
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, marginBottom: 4, color: "#1e40af" }}>
+                              Nội dung cập nhật:
+                            </div>
+                            {updateInfo.body}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Đã ở bản mới nhất */
+                      <div
+                        style={{
+                          ...CARD_BOX_STYLE,
+                          background: "#f0fdf4",
+                          borderColor: "#bbf7d0",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#166534", fontWeight: 700, fontSize: 14 }}>
+                          <span>✅</span>
+                          <span>Bạn đang sử dụng phiên bản mới nhất (v{APP_VERSION})</span>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "#15803d", lineHeight: 1.5 }}>
+                          Ứng dụng của bạn đã được cập nhật tất cả tính năng tối ưu hoá mượt mà và sửa lỗi mới nhất từ nhà phát triển.
+                        </div>
+                        {/* Download links anyway for reinstalling */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                          {updateInfo.windowsSetupUrl && (
+                            <a
+                              href={updateInfo.windowsSetupUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: 6,
+                                background: "#ffffff",
+                                border: "1px solid #86efac",
+                                color: "#166534",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                textDecoration: "none",
+                              }}
+                            >
+                              🪟 Tải lại Setup Windows (.exe)
+                            </a>
+                          )}
+                          {updateInfo.androidApkUrl && (
+                            <a
+                              href={updateInfo.androidApkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: 6,
+                                background: "#ffffff",
+                                border: "1px solid #86efac",
+                                color: "#166534",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                textDecoration: "none",
+                              }}
+                            >
+                              🤖 Tải lại Android (.apk)
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Hướng dẫn cài đặt & cập nhật */}
+                <div style={CARD_BOX_STYLE}>
+                  <div style={CARD_TITLE_STYLE}>
+                    <span>💡</span>
+                    <span>Hướng dẫn cài đặt & cập nhật không bị lỗi</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.6, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div>
+                      <strong>🪟 Trên máy tính Windows:</strong>
+                      <br />
+                      Tải file <code>PhysBoard-Setup-*.exe</code> và mở file để cài đặt. Bộ cài đặt NSIS sẽ tự động cập nhật đè lên bản cũ, tạo lối tắt (shortcut) ngoài màn hình Desktop và trong menu Start để bạn mở app trực tiếp từ icon mà không cần chạy lại file setup.
+                    </div>
+                    <div>
+                      <strong>🤖 Trên điện thoại / máy tính bảng Android:</strong>
+                      <br />
+                      Tải file <code>PhysBoard-Android.apk</code> về máy và bấm cài đặt để nâng cấp trực tiếp.
+                      <br />
+                      <span style={{ color: "#d97706", fontWeight: 600 }}>
+                        ⚠️ Lưu ý quan trọng khi nâng cấp từ bản cũ v1.0.4 trở xuống:
+                      </span>{" "}
+                      Do các bản thử nghiệm trước dùng chữ ký tự sinh ngẫu nhiên của CI dẫn đến lỗi <em>&ldquo;Gói không tương thích&rdquo;</em>, bạn chỉ cần gỡ bỏ bản cũ một lần duy nhất trước khi cài đặt v1.0.5. Từ bản v1.0.5 trở đi, ứng dụng đã được khóa cố định chứng chỉ bảo mật, mọi bản cập nhật sau này sẽ được cài đè trực tiếp mượt mà.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Liên kết GitHub */}
+                <div style={CARD_BOX_STYLE}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ fontSize: 12.5, color: "#64748b" }}>
+                      Mã nguồn mở và các bản phát hành được lưu trữ công khai tại GitHub:
+                    </div>
+                    <a
+                      href={GITHUB_RELEASES_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        padding: "6px 14px",
+                        borderRadius: 6,
+                        border: "1px solid #cbd5e1",
+                        background: "#ffffff",
+                        color: "#1e293b",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        textDecoration: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <span>🌐</span>
+                      <span>Trang GitHub Releases</span>
+                    </a>
                   </div>
                 </div>
               </>
