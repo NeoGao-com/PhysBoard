@@ -538,6 +538,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     saveToolbarVisibilityConfig(cfg);
   }, []);
   const [liveLaserScreenPos, setLiveLaserScreenPos] = useState<{ x: number; y: number } | null>(null);
+  const [isLaserPressed, setIsLaserPressed] = useState(false);
+
+  useEffect(() => {
+    if (activeTool !== "ink:laser") {
+      setLiveLaserScreenPos(null);
+      setIsLaserPressed(false);
+    }
+  }, [activeTool]);
 
   const handleUpdateLaserConfig = useCallback((newCfg: LaserConfig) => {
     setLaserConfig(newCfg);
@@ -5234,6 +5242,17 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
       // Ink / Multi-nib Pens
       if (isPenTool(activeTool)) {
+        if (activeTool === "ink:laser") {
+          const rect = containerRef.current?.getBoundingClientRect();
+          setLiveLaserScreenPos({
+            x: e.clientX - (rect?.left ?? 0),
+            y: e.clientY - (rect?.top ?? 0),
+          });
+          if (laserConfig.mode === "dot") {
+            setIsLaserPressed(true);
+            return;
+          }
+        }
         dispatcher.gesture(true);
         // Magnetic snap to Ruler or Set Square edges if nearby
         const instrumentSnap = snapPointToInstruments(worldPos, pageElements, 0.45);
@@ -5292,6 +5311,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       isA4Format,
       currentBoardConfig,
       spenConfig,
+      laserConfig,
     ]
   );
 
@@ -5308,6 +5328,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           x: e.clientX - (rect?.left ?? 0),
           y: e.clientY - (rect?.top ?? 0),
         });
+        if (laserConfig.mode === "dot") {
+          return;
+        }
       } else if (liveLaserScreenPos !== null) {
         setLiveLaserScreenPos(null);
       }
@@ -5706,6 +5729,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       activeTool,
       pageElements,
       liveStroke,
+      laserConfig,
     ]
   );
 
@@ -5779,6 +5803,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           draftTwoPtRef.current.dragging = false;
         }
         return;
+      }
+
+      if (activeTool === "ink:laser" && laserConfig.mode === "dot") {
+        setIsLaserPressed(false);
       }
 
       if (liveStroke) {
@@ -5956,6 +5984,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       activeTool,
       resetToolAfterEraser,
       spenConfig,
+      laserConfig,
     ]
   );
 
@@ -5982,6 +6011,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       setMarqueeRect(null);
       draftTwoPtRef.current = null;
       setDraftPreviewLine(null);
+      if (activeTool === "ink:laser" && laserConfig.mode === "dot") {
+        setIsLaserPressed(false);
+      }
+
       if (liveStroke) {
         dispatcher.gesture(false);
         liveStrokePointsRef.current = [];
@@ -6598,7 +6631,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
       onPointerCancel={handleCanvasPointerCancel}
-      onPointerLeave={navPointerLeave}
+      onPointerLeave={() => {
+        navPointerLeave();
+        setLiveLaserScreenPos(null);
+        setIsLaserPressed(false);
+      }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDropOnCanvas}
       gridEnabled={gridEnabled}
@@ -6700,11 +6737,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             <div
               data-laser-spot="true"
               data-export-skip="true"
+              data-laser-pressed={isLaserPressed ? "true" : "false"}
               style={{
                 position: "absolute",
                 left: 0,
                 top: 0,
-                transform: `translate3d(${liveLaserScreenPos.x}px, ${liveLaserScreenPos.y}px, 0) translate(-50%, -50%)`,
+                transform: `translate3d(${liveLaserScreenPos.x}px, ${liveLaserScreenPos.y}px, 0) translate(-50%, -50%) scale(${isLaserPressed ? 1.25 : 1})`,
+                transition: "transform 60ms ease-out",
                 pointerEvents: "none",
                 zIndex: 99999,
                 display: "flex",
@@ -6716,12 +6755,25 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               <div
                 style={{
                   position: "absolute",
-                  width: laserConfig.dotSize * 2.2,
-                  height: laserConfig.dotSize * 2.2,
+                  width: laserConfig.dotSize * (isLaserPressed ? 3.2 : 2.4),
+                  height: laserConfig.dotSize * (isLaserPressed ? 3.2 : 2.4),
                   borderRadius: "50%",
                   background: laserConfig.color || "#ef4444",
-                  opacity: 0.28,
-                  filter: "blur(4px)",
+                  opacity: isLaserPressed ? 0.45 : 0.28,
+                  filter: "blur(5px)",
+                  transition: "all 60ms ease-out",
+                }}
+              />
+              {/* Middle bright halo */}
+              <div
+                style={{
+                  position: "absolute",
+                  width: laserConfig.dotSize * 1.5,
+                  height: laserConfig.dotSize * 1.5,
+                  borderRadius: "50%",
+                  background: laserConfig.color || "#ef4444",
+                  opacity: 0.55,
+                  filter: "blur(2px)",
                 }}
               />
               {/* Core intense laser spot */}
@@ -6730,9 +6782,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   width: laserConfig.dotSize,
                   height: laserConfig.dotSize,
                   borderRadius: "50%",
-                  background: laserConfig.color || "#ef4444",
-                  boxShadow: `0 0 6px ${laserConfig.color || "#ef4444"}, 0 0 14px #fbbf24`,
-                  border: "1.5px solid #ffffff",
+                  background: "#ffffff",
+                  backgroundColor: laserConfig.color || "#ef4444",
+                  boxShadow: `0 0 8px ${laserConfig.color || "#ef4444"}, 0 0 16px ${laserConfig.color || "#ef4444"}, 0 0 24px #fbbf24`,
+                  border: "2px solid #ffffff",
                 }}
               />
             </div>
@@ -6868,6 +6921,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       autoSwitchTarget={autoSwitchTarget}
       onToggleAutoSwitchTarget={handleToggleAutoSwitchTarget}
       laserConfig={laserConfig}
+      onChangeLaserConfig={handleUpdateLaserConfig}
       onOpenLaserSettings={() => setLaserSettingsOpen(true)}
       toolbarVisibility={toolbarConfig}
       modularConfig={modularConfig}

@@ -65,7 +65,7 @@ const PEN_VARIANTS = [
   { tool: "ink:highlighter", label: "Bút dạ quang", short: "Dạ quang", desc: "Tô sáng nổi bật" },
   { tool: "ink:brush", label: "Bút lông (Cọ vẽ)", short: "Bút lông", desc: "Nét mềm bản rộng" },
   { tool: "ink:dashed", label: "Bút nét đứt", short: "Nét đứt", desc: "Vẽ tay nét đứt" },
-  { tool: "ink:laser", label: "Bút chỉ Laser (Tự mờ)", short: "Laser", desc: "Vệt sáng tự tan biến sau 1.5s" },
+  { tool: "ink:laser", label: "Bút chỉ Laser (Dấu chấm / Vệt sáng)", short: "Laser", desc: "Dấu chấm hoặc Vệt sáng tự mờ" },
 ] as const;
 
 const PEN_TOOL_SET = new Set<string>(PEN_VARIANTS.map((v) => v.tool));
@@ -178,6 +178,7 @@ export interface ToolbarProps {
   autoSwitchTarget?: "select" | "ink" | "off";
   onToggleAutoSwitchTarget?: () => void;
   laserConfig?: LaserConfig;
+  onChangeLaserConfig?: (cfg: LaserConfig) => void;
   onOpenLaserSettings?: () => void;
   toolbarVisibility?: ToolbarVisibilityConfig;
   modularConfig?: ModularLayoutConfig;
@@ -261,6 +262,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   autoSwitchTarget = "select",
   onToggleAutoSwitchTarget,
   laserConfig,
+  onChangeLaserConfig,
   onOpenLaserSettings,
   toolbarVisibility,
   modularConfig = DEFAULT_MODULAR_LAYOUT,
@@ -1175,7 +1177,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             data-tool="ink:laser"
             data-active={activeTool === "ink:laser" ? "true" : undefined}
             aria-pressed={activeTool === "ink:laser"}
-            onClick={() => onSelectTool("ink:laser")}
+            onClick={() => {
+              if (activeTool === "ink:laser" && onChangeLaserConfig && laserConfig) {
+                const nextMode = laserConfig.mode === "dot" ? "trail" : "dot";
+                onChangeLaserConfig({ ...laserConfig, mode: nextMode });
+              } else {
+                onSelectTool("ink:laser");
+              }
+            }}
             style={
               activeTool === "ink:laser"
                 ? {
@@ -1195,8 +1204,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             }
             title={
               laserConfig?.mode === "dot"
-                ? `Bút chỉ Laser (Dấu chấm ${laserConfig.dotSize}px)`
-                : "Bút chỉ Laser (Vệt sáng tan biến sau 1.5s)"
+                ? `Bút chỉ Laser: Đang ở chế độ DẤU CHẤM (Bấm để đổi sang Vệt sáng, bấm ⚙ để chỉnh cỡ ${laserConfig.dotSize}px & màu)`
+                : "Bút chỉ Laser: Đang ở chế độ VỆT SÁNG (Bấm để đổi sang Dấu chấm, bấm ⚙ để chỉnh độ rộng & màu)"
             }
           >
             {laserConfig?.mode === "dot" ? (
@@ -1207,13 +1216,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   height: 9,
                   borderRadius: "50%",
                   background: laserConfig?.color || "#ef4444",
-                  boxShadow: `0 0 4px ${laserConfig?.color || "#ef4444"}`,
+                  boxShadow: `0 0 5px ${laserConfig?.color || "#ef4444"}`,
                 }}
               />
             ) : (
               <IconLaser size={14} color={activeTool === "ink:laser" ? "#b91c1c" : laserConfig?.color || "#ef4444"} />
             )}
-            <span>Laser</span>
+            <span>{laserConfig?.mode === "dot" ? "Laser (Chấm)" : "Laser (Vệt)"}</span>
           </button>
           <button
             type="button"
@@ -2227,11 +2236,32 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
           <button
             type="button"
-            onClick={() => onSelectTool("ink:laser")}
+            onClick={() => {
+              if (activeTool === "ink:laser" && onChangeLaserConfig && laserConfig) {
+                const nextMode = laserConfig.mode === "dot" ? "trail" : "dot";
+                onChangeLaserConfig({ ...laserConfig, mode: nextMode });
+              } else {
+                onSelectTool("ink:laser");
+              }
+            }}
             style={activeTool === "ink:laser" ? { ...activeStyle, background: "#fee2e2", color: "#b91c1c" } : btnBaseStyle}
-            title="Laser"
+            title={laserConfig?.mode === "dot" ? "Laser (Dấu chấm)" : "Laser (Vệt sáng)"}
           >
-            <IconLaser size={14} color="#ef4444" /> <span>Laser</span>
+            {laserConfig?.mode === "dot" ? (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 9,
+                  height: 9,
+                  borderRadius: "50%",
+                  background: laserConfig?.color || "#ef4444",
+                  boxShadow: `0 0 5px ${laserConfig?.color || "#ef4444"}`,
+                }}
+              />
+            ) : (
+              <IconLaser size={14} color="#ef4444" />
+            )}
+            <span>{laserConfig?.mode === "dot" ? "Laser (Chấm)" : "Laser (Vệt)"}</span>
           </button>
 
           {vis.groupSelection && vis.toolEraser && (

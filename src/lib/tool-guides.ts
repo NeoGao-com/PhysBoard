@@ -92,9 +92,9 @@ export const TOOL_GUIDE_CATALOG: Record<string, ToolGuideInfo> = {
     title: "Bút chỉ Laser trình chiếu",
     badge: "Laser",
     icon: "🔴",
-    desc: "Rê chuột hoặc kéo vệt sáng để trỏ bài giảng cho học sinh. Vệt laser sẽ tự động mờ dần và biến mất sau 1–2 giây.",
+    desc: "Chiếu dấu chấm laser đỏ vào nội dung bài giảng (chế độ Dấu chấm, không vẽ nét) hoặc kéo vệt sáng tự mờ dần sau 1.5s (chế độ Vệt sáng). Bấm lại nút Laser để chuyển đổi chế độ.",
     shortcut: "L",
-    tips: "Có thể đổi màu tia laser và thời gian tan biến trong Cài đặt Laser.",
+    tips: "Bấm ⚙ cạnh nút Laser để chỉnh màu sắc và kích cỡ dấu chấm / vệt sáng.",
   },
   erase: {
     title: "Tẩy / Cục gôm xóa",
