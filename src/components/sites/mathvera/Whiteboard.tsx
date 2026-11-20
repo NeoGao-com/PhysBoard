@@ -776,6 +776,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   } = useCanvasNavigation({
     currentTool: activeTool,
     isA4: isA4Format,
+    isSidebarOpen: pageSidebarOpen,
     totalPages: pageCount,
     pageWidthWorld: a4Opt?.widthWorld,
     pageHeightWorld: a4Opt?.heightWorld,
@@ -6547,6 +6548,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       isPanning={isPanning}
       isSpacePressed={isSpacePressed}
       contained={contained}
+      isSidebarOpen={!contained && pageSidebarOpen}
       boardConfig={currentBoardConfig}
       totalPages={pageCount}
       currentPage={currentPage}
@@ -6945,7 +6947,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           style={{
             position: "fixed",
             top: 56,
-            left: "50%",
+            left: pageSidebarOpen ? "calc(50% + 70px)" : "50%",
             transform: "translateX(-50%)",
             zIndex: 70,
             background: "#0f172a",

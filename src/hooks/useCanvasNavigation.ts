@@ -22,6 +22,7 @@ export interface UseCanvasNavigationOptions {
   maxScale?: number;
   currentTool?: string | null;
   isA4?: boolean;
+  isSidebarOpen?: boolean;
   totalPages?: number;
   pageWidthWorld?: number;
   pageHeightWorld?: number;
@@ -66,6 +67,7 @@ export function useCanvasNavigation(
     maxScale = MAX_SCALE,
     currentTool = null,
     isA4 = false,
+    isSidebarOpen = false,
     totalPages = 1,
     pageWidthWorld = 17,
     pageHeightWorld = 24.04,
@@ -82,7 +84,7 @@ export function useCanvasNavigation(
     scale: initialScale,
   });
 
-  const [isFitLocked, setIsFitLocked] = useState(false);
+  const [isFitLocked, setIsFitLocked] = useState(isA4);
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [cursorWorld, setCursorWorld] = useState<Point | null>(null);
@@ -124,8 +126,11 @@ export function useCanvasNavigation(
     ): ViewportTransform => {
       if (!isA4) return vp;
 
-      const viewW = rect?.width ?? 1200;
-      const viewH = rect?.height ?? 800;
+      const sidebarW = isSidebarOpen ? 140 : 26;
+      const defaultW = typeof window !== "undefined" ? window.innerWidth - sidebarW : 1200;
+      const defaultH = typeof window !== "undefined" ? window.innerHeight : 800;
+      const viewW = rect && rect.width > 0 ? rect.width : defaultW;
+      const viewH = rect && rect.height > 0 ? rect.height : defaultH;
 
       let targetScale = vp.scale;
       let targetTx = vp.tx;
@@ -147,23 +152,30 @@ export function useCanvasNavigation(
         ty: clampedTy,
       };
     },
-    [isA4, isFitLocked, pW, totalH]
+    [isA4, isFitLocked, isSidebarOpen, pW, totalH]
   );
 
   const fitToScreen = useCallback(() => {
+    const sidebarW = isSidebarOpen ? 140 : 26;
+    const defaultW = typeof window !== "undefined" ? window.innerWidth - sidebarW : 1200;
+    const defaultH = typeof window !== "undefined" ? window.innerHeight : 800;
     const rect = containerRef.current?.getBoundingClientRect();
-    const viewW = rect?.width ?? 1200;
-    const viewH = rect?.height ?? 800;
+    const viewW = rect && rect.width > 0 ? rect.width : defaultW;
+    const viewH = rect && rect.height > 0 ? rect.height : defaultH;
     const fitScale = viewW / pW;
     const totalHPx = totalH * fitScale;
     const minTy = Math.min(0, viewH - totalHPx);
 
-    setViewport((prev) => ({
-      scale: fitScale,
-      tx: viewW / 2,
-      ty: Math.max(minTy, Math.min(0, prev.ty)),
-    }));
-  }, [pW, totalH]);
+    setViewport((prev) => {
+      const ratio = prev.scale > 0 ? fitScale / prev.scale : 1;
+      const newTy = prev.ty * ratio;
+      return {
+        scale: fitScale,
+        tx: viewW / 2,
+        ty: Math.max(minTy, Math.min(0, newTy)),
+      };
+    });
+  }, [isSidebarOpen, pW, totalH]);
 
   const toggleFitLock = useCallback(() => {
     setIsFitLocked((prev) => {
@@ -174,6 +186,70 @@ export function useCanvasNavigation(
       return next;
     });
   }, [fitToScreen]);
+
+  // Auto-enable fit lock when switching to A4 format
+  useEffect(() => {
+    if (isA4) {
+      setIsFitLocked(true);
+    }
+  }, [isA4]);
+
+  // Handle sidebar open/close & window resize:
+  // Automatically shrinks down when sidebar opens, and expands back when sidebar closes
+  useEffect(() => {
+    if (!isA4) return;
+    const svgEl = containerRef.current;
+
+    const adaptToNewSize = () => {
+      const sidebarW = isSidebarOpen ? 140 : 26;
+      const defaultW = typeof window !== "undefined" ? window.innerWidth - sidebarW : 1200;
+      const defaultH = typeof window !== "undefined" ? window.innerHeight : 800;
+      const rect = svgEl?.getBoundingClientRect();
+      const viewW = rect && rect.width > 0 ? rect.width : defaultW;
+      const viewH = rect && rect.height > 0 ? rect.height : defaultH;
+
+      const fitScale = viewW / pW;
+      const totalHPx = totalH * fitScale;
+      const minTy = Math.min(0, viewH - totalHPx);
+
+      setViewport((prev) => {
+        const oldSidebarW = isSidebarOpen ? 26 : 140;
+        const oldW = typeof window !== "undefined" ? window.innerWidth - oldSidebarW : viewW;
+        const oldFitScale = oldW / pW;
+        const wasFitted = Math.abs(prev.scale - oldFitScale) / oldFitScale < 0.15;
+
+        if (isFitLocked || wasFitted) {
+          const ratio = prev.scale > 0 ? fitScale / prev.scale : 1;
+          const newTy = prev.ty * ratio;
+          return {
+            scale: fitScale,
+            tx: viewW / 2,
+            ty: Math.max(minTy, Math.min(0, newTy)),
+          };
+        } else {
+          return {
+            ...prev,
+            tx: viewW / 2,
+            ty: Math.max(minTy, Math.min(0, prev.ty)),
+          };
+        }
+      });
+    };
+
+    adaptToNewSize();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && svgEl) {
+      ro = new ResizeObserver(() => {
+        adaptToNewSize();
+      });
+      ro.observe(svgEl);
+    }
+
+    return () => {
+      ro?.disconnect();
+    };
+  }, [isSidebarOpen, isA4, isFitLocked, pW, totalH]);
 
   // Sync state changes with callback
   useEffect(() => {
@@ -443,9 +519,12 @@ export function useCanvasNavigation(
   }, []);
 
   const resetView = useCallback(() => {
+    const sidebarW = isSidebarOpen ? 140 : 26;
+    const defaultW = typeof window !== "undefined" ? window.innerWidth - sidebarW : 1000;
+    const defaultH = typeof window !== "undefined" ? window.innerHeight : 640;
     const rect = containerRef.current?.getBoundingClientRect();
-    const width = rect?.width ?? 1000;
-    const height = rect?.height ?? 640;
+    const width = rect && rect.width > 0 ? rect.width : defaultW;
+    const height = rect && rect.height > 0 ? rect.height : defaultH;
     if (isA4) {
       if (isFitLocked) {
         fitToScreen();
@@ -465,7 +544,7 @@ export function useCanvasNavigation(
         scale: DEFAULT_SCALE,
       });
     }
-  }, [isA4, isFitLocked, fitToScreen, totalH]);
+  }, [isA4, isFitLocked, fitToScreen, totalH, isSidebarOpen]);
 
   const zoomIn = useCallback(() => {
     if (isA4 && isFitLocked) return;
@@ -527,9 +606,12 @@ export function useCanvasNavigation(
 
   const scrollToPage = useCallback(
     (p: number) => {
+      const sidebarW = isSidebarOpen ? 140 : 26;
+      const defaultW = typeof window !== "undefined" ? window.innerWidth - sidebarW : 1200;
+      const defaultH = typeof window !== "undefined" ? window.innerHeight : 800;
       const rect = containerRef.current?.getBoundingClientRect();
-      const viewW = rect?.width ?? 1200;
-      const viewH = rect?.height ?? 800;
+      const viewW = rect && rect.width > 0 ? rect.width : defaultW;
+      const viewH = rect && rect.height > 0 ? rect.height : defaultH;
       setViewport((prev) => {
         const scale = isFitLocked ? viewW / pW : prev.scale;
         const totalHPx = totalH * scale;
@@ -543,7 +625,7 @@ export function useCanvasNavigation(
         };
       });
     },
-    [isFitLocked, pW, pStep, totalH]
+    [isSidebarOpen, isFitLocked, pW, pStep, totalH]
   );
 
   return {

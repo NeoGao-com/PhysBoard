@@ -16,6 +16,7 @@ export interface SvgCanvasProps {
   isPanning?: boolean;
   isSpacePressed?: boolean;
   contained?: boolean;
+  isSidebarOpen?: boolean;
   boardConfig?: PageBoardConfig;
   onPointerDown?: (e: React.PointerEvent<SVGSVGElement>) => void;
   onPointerMove?: (e: React.PointerEvent<SVGSVGElement>) => void;
@@ -41,6 +42,7 @@ export function SvgCanvas({
   isPanning = false,
   isSpacePressed = false,
   contained = false,
+  isSidebarOpen = false,
   boardConfig = DEFAULT_PAGE_BOARD_CONFIG,
   onPointerDown,
   onPointerMove,
@@ -115,6 +117,8 @@ export function SvgCanvas({
   const a4SubStrokeW = 0.85 / (viewport.scale || 45);
   const a4DotR = 1.35 / (viewport.scale || 45);
 
+  const sidebarW = contained ? 0 : isSidebarOpen ? 140 : 26;
+
   return (
     <div
       onDragOver={onDragOver}
@@ -122,10 +126,13 @@ export function SvgCanvas({
       data-board-surface={boardConfig.surface}
       data-board-pattern={boardConfig.pattern}
       data-board-dark={theme.isDark ? "true" : "false"}
-      className={`${contained ? "absolute inset-0" : "fixed inset-0"} overflow-hidden select-none ${className}`}
+      className={`${contained ? "absolute" : "fixed"} overflow-hidden select-none ${className}`}
       style={{
         position: contained ? "absolute" : "fixed",
-        inset: 0,
+        top: 0,
+        bottom: 0,
+        left: sidebarW,
+        right: 0,
         overflow: "hidden",
         backgroundColor: theme.bg,
         transition: "background-color 180ms ease",
