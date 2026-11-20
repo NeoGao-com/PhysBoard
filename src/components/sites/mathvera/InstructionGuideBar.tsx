@@ -195,7 +195,7 @@ export const InstructionGuideBar: React.FC<InstructionGuideBarProps> = ({
         <button
           type="button"
           onClick={onToggleEnabled}
-          title="Tắt dòng chỉ dẫn (bạn có thể bấm nút 💡 trên thanh công cụ để bật lại bất cứ lúc nào)"
+          title="Tắt dòng chỉ dẫn (bạn có thể bật lại trong Cài đặt hệ thống bất cứ lúc nào)"
           style={{
             border: "none",
             background: "#f1f5f9",

@@ -815,6 +815,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                     <input
                       type="checkbox"
+                      data-setting="tool-guides"
                       checked={isGuideEnabled}
                       onChange={() => onToggleGuide?.()}
                       style={{

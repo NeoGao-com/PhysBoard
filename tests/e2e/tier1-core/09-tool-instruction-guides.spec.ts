@@ -196,10 +196,14 @@ test.describe("Tool Instruction Guides Coverage Audit", () => {
     await closeBtn.click();
     await expect(guideBar).not.toBeVisible();
 
-    // Toggle back on via Toolbar button
-    const toolbarToggle = page.locator('button[data-tool="instruction-guide"]');
-    await expect(toolbarToggle).toBeVisible();
-    await toolbarToggle.click();
+    // Toggle back on via Settings modal
+    const settingsBtn = page.locator('button[data-action="more"]').first();
+    await settingsBtn.click();
+    const modal = page.locator('[data-testid="settings-modal"]');
+    await expect(modal).toBeVisible();
+    const guideCheckbox = page.locator('input[type="checkbox"][data-setting="tool-guides"]');
+    await guideCheckbox.click();
+    await page.keyboard.press("Escape");
 
     // Guide bar should be visible again
     await expect(guideBar).toBeVisible();

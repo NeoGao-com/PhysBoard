@@ -128,6 +128,36 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           <span style={{ fontSize: 11 }}>📑</span>
           <span>SỔ TAY ({currentPage}/{totalPages})</span>
         </div>
+
+        {onOpenSettings && (
+          <button
+            type="button"
+            data-action="more"
+            data-action-open-settings="true"
+            data-tool="settings"
+            onClick={onOpenSettings}
+            title="Cài đặt hệ thống & thanh công cụ"
+            aria-label="Cài đặt"
+            style={{
+              marginTop: "auto",
+              marginBottom: 8,
+              background: "#ffffff",
+              border: "1px solid #cbd5e1",
+              borderRadius: 4,
+              width: 20,
+              height: 24,
+              fontSize: 11,
+              color: "#2563eb",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+            }}
+          >
+            <IconSettings size={12} />
+          </button>
+        )}
       </aside>
     );
   }
@@ -523,8 +553,12 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           {onOpenSettings && (
             <button
               type="button"
+              data-action="more"
+              data-action-open-settings="true"
+              data-tool="settings"
               onClick={onOpenSettings}
               title="Cài đặt hệ thống & thanh công cụ"
+              aria-label="Cài đặt"
               style={{
                 flex: 1,
                 height: 28,

@@ -247,7 +247,7 @@ export class ToolbarDriver {
    * Open the More menu ("⋯")
    */
   async openMoreMenu() {
-    const moreBtn = this.toolbar.locator('button[data-action="more"], button:has-text("⋯")').first();
+    const moreBtn = this.page.locator('button[data-action="more"], button[data-action="open-settings"], button:has-text("⋯")').first();
     await moreBtn.click();
   }
 
