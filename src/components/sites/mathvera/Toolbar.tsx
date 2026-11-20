@@ -891,20 +891,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       className="wb-toolbar"
       style={{
         position: embedded ? "relative" : "fixed",
-        top: embedded ? undefined : toolbarPos ? toolbarPos.y : 8,
+        top: embedded ? undefined : (!isPortrait && toolbarPos) ? toolbarPos.y : 8,
         left: embedded
           ? undefined
-          : toolbarPos
+          : (!isPortrait && toolbarPos)
           ? `max(${sidebarOffset}px, ${toolbarPos.x}px)`
+          : isPortrait
+          ? "50%"
           : isSidebarOpen
           ? `calc(50% + 70px)`
           : "50%",
-        transform: embedded ? undefined : toolbarPos ? undefined : "translateX(-50%)",
-        width: isPortrait && !embedded ? "min(96vw, 760px)" : "max-content",
+        transform: embedded ? undefined : (!isPortrait && toolbarPos) ? undefined : "translateX(-50%)",
+        width: isPortrait && !embedded ? "calc(100vw - 32px)" : "max-content",
         maxWidth: embedded
           ? undefined
           : isPortrait
-          ? "96vw"
+          ? "calc(100vw - 32px)"
           : `calc(100vw - ${sidebarOffset + 16}px)`,
         zoom: embedded ? undefined : toolbarScale,
         transition: "left 0.22s ease, max-width 0.22s ease",
@@ -913,8 +915,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        flexWrap: isPortrait && !embedded ? "wrap" : "nowrap",
-        gap: isPortrait ? 3 : 4,
+        flexWrap: "nowrap",
+        gap: isPortrait ? 2 : 4,
         padding: isPortrait ? "4px 6px" : "4px 8px",
         background: "rgba(255, 255, 255, 0.97)",
         backdropFilter: "blur(10px)",
@@ -959,11 +961,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         style={{
           display: "flex",
           alignItems: "center",
-          flexWrap: isPortrait && !embedded ? "wrap" : "nowrap",
-          gap: isPortrait ? 3 : 2,
+          flexWrap: "nowrap",
+          gap: isPortrait ? 2 : 2,
           minWidth: 0,
           flex: "1 1 auto",
-          overflowX: isPortrait ? "visible" : "auto",
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none",
         }}
       >

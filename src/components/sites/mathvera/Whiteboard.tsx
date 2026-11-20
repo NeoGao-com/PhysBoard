@@ -3484,7 +3484,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       if (tool === "c:onedge") {
         const snapped = snapPointAtCursor(worldPos, 30);
         const pos = snapped.point;
-        const name = getNextPointName(pageElements);
+        const name = getNextPointName(pageElements, [
+          "M",
+          "N",
+          "P",
+          "Q",
+          "K",
+          "H",
+          "E",
+          "F",
+          "I",
+          "J",
+        ]);
         dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -4653,8 +4664,23 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
       // Point Tool (`point` / `geometry.point`)
       if (activeTool === "point" || activeTool === "geometry.point") {
+        // If clicking directly on an existing vertex or point, select it instead of creating a duplicate overlapping point
+        const nearPt = findNearestPoint(worldPos, 14);
+        if (nearPt) {
+          if (nearPt.id && byId.has(nearPt.id)) {
+            setSelectedIds([nearPt.id]);
+          } else if (nearPt.polygonId && byId.has(nearPt.polygonId)) {
+            setSelectedIds([nearPt.polygonId]);
+          }
+          return;
+        }
+
         const snapped = snapPointAtCursor(worldPos, 16);
-        const name = getNextPointName(pageElements);
+        const preferredPool =
+          snapped.constraint.kind !== "free"
+            ? ["M", "N", "P", "Q", "K", "H", "E", "F", "I", "J"]
+            : [];
+        const name = getNextPointName(pageElements, preferredPool);
         dispatcher.dispatch({
           type: "object.create",
           params: {

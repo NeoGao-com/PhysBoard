@@ -1283,18 +1283,83 @@ export function stepPointScale(current: number, delta: 1 | -1): number {
 
 export function collectUsedPointNames(elements: CanvasElement[]): Set<string> {
   const used = new Set<string>();
+
+  const addName = (val: unknown) => {
+    if (typeof val === "string") {
+      const trimmed = val.trim();
+      if (trimmed) {
+        used.add(trimmed);
+      }
+    }
+  };
+
   for (const el of elements) {
+    if (!el || !el.props) continue;
+
+    // 1. GeomPoint / Point
     if (el.type === "GeomPoint" || el.type === "Point") {
-      const name = typeof el.props.name === "string" ? el.props.name.trim() : "";
-      if (name) used.add(name);
-    } else if (el.type === "GeomPolygon" && Array.isArray(el.props.points)) {
-      for (const pt of el.props.points as EmbeddedVertex[]) {
-        if (pt && typeof pt.name === "string" && pt.name.trim()) {
-          used.add(pt.name.trim());
+      addName(el.props.name);
+      addName(el.props.label);
+    }
+    // 2. GeomPolygon
+    else if (el.type === "GeomPolygon") {
+      if (Array.isArray(el.props.points)) {
+        for (const pt of el.props.points as EmbeddedVertex[]) {
+          if (pt && typeof pt === "object") {
+            addName(pt.name);
+            addName((pt as { label?: string }).label);
+          }
+        }
+      }
+      if (Array.isArray(el.props.vertexNames)) {
+        for (const nm of el.props.vertexNames) addName(nm);
+      }
+      addName(el.props.label);
+    }
+    // 3. Solid3D (3D shapes: pyramid, prism, box, cube, cone, cylinder, sphere...)
+    else if (el.type === "Solid3D") {
+      if (Array.isArray(el.props.vertexNames) && el.props.vertexNames.length > 0) {
+        for (const nm of el.props.vertexNames) addName(nm);
+      } else {
+        const kind = String(el.props.kind ?? "pyramid");
+        const ptCount = Array.isArray(el.props.points) ? el.props.points.length : 0;
+        const letter = (i: number) => String.fromCharCode(65 + (i % 26));
+        if (kind === "box" || kind === "cube" || kind === "prism" || kind === "frustum") {
+          const half = Math.max(3, Math.floor(ptCount / 2) || 4);
+          for (let i = 0; i < half; i++) {
+            used.add(letter(i));
+            used.add(`${letter(i)}'`);
+          }
+        } else if (kind === "pyramid") {
+          used.add("S");
+          const baseCount = Math.max(3, (ptCount || 5) - 1);
+          for (let i = 0; i < baseCount; i++) {
+            used.add(letter(i));
+          }
+        } else if (kind === "cone") {
+          used.add("S");
+          used.add("O");
+        } else if (kind === "cylinder") {
+          used.add("O");
+          used.add("O'");
+        } else if (kind === "sphere") {
+          used.add("O");
         }
       }
     }
+    // 4. Coordinate Axes & Trig Circle
+    else if (el.type === "Axes3D" || el.type === "Axes2D" || el.type === "TrigCircle") {
+      used.add("O");
+    }
+
+    // 5. Generic checks on any element (SpaceFigure, Vector, etc.)
+    addName(el.props.name);
+    addName(el.props.label);
+    if (Array.isArray(el.props.vertexNames)) {
+      for (const nm of el.props.vertexNames) addName(nm);
+    }
   }
+
   return used;
 }
 

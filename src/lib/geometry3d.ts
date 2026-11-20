@@ -9,6 +9,7 @@ import {
   type PointConstraint,
   bisectorFoot2D,
   circumcenter2D,
+  collectUsedPointNames,
   dist2D,
   footOfPerpendicular,
   getNextPointName,
@@ -953,11 +954,7 @@ export function createSolid3DElement(
 ): CanvasElement {
   const id = options.id ?? `solid_${kind}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
   const preset = buildSolidPresetGeometry(kind, center.x, center.y, options);
-  const used = new Set(
-    existingElements
-      .filter((e) => e.type === "GeomPoint" && typeof e.props.name === "string")
-      .map((e) => String(e.props.name))
-  );
+  const used = collectUsedPointNames(existingElements);
   const sub = "₀₁₂₃₄₅₆₇₈₉";
   const withSub = (n: number) =>
     n === 0
