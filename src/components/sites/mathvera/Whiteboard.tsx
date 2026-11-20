@@ -802,6 +802,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     ? BOARD_FORMAT_OPTIONS.find((f) => f.id === currentBoardConfig?.format)
     : null;
 
+  const handleAddPageRef = useRef<() => void>(() => {});
+
   const {
     viewport,
     containerRef,
@@ -810,6 +812,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     cursorWorld,
     isFitLocked,
     toggleFitLock,
+    overscrollState,
     handlePointerDown: navPointerDown,
     handlePointerMove: navPointerMove,
     handlePointerUp: navPointerUp,
@@ -834,6 +837,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setYjsCurrentPage(doc, p);
       }
     },
+    onOverscrollAddPage: () => handleAddPageRef.current?.(),
+    enableOverscrollAddPage: true,
   });
 
   // Track which A4 page is being drawn on
@@ -1809,6 +1814,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     setSelectedIds([]);
     setOrbitActiveId(null);
   }, [doc, isA4Format, scrollToPage]);
+
+  handleAddPageRef.current = handleAddPage;
 
   // --- Physics Teaching Suite Handlers ---
   const handlePhysicsAction = useCallback(
@@ -2856,6 +2863,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           format: fmt,
         });
       };
+      (window as unknown as { __testTriggerOverscrollAddPage?: () => void }).__testTriggerOverscrollAddPage = handleAddPage;
     }
   }, [handleInsertPdfPages, doc, currentPage, currentBoardConfig]);
 
@@ -7335,6 +7343,138 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             setDraftPreviewLine(null);
           }}
         />
+      )}
+
+      {/* Continuous A4 Overscroll Hold To Add Page Floating Indicator */}
+      {isA4Format && overscrollState.isOverscrolling && (
+        <div
+          data-testid="overscroll-add-page-indicator"
+          data-status={overscrollState.status}
+          data-export-skip="true"
+          style={{
+            position: "fixed",
+            bottom: 24,
+            left: pageSidebarOpen ? "calc(50% + 70px)" : "50%",
+            transform: "translateX(-50%)",
+            zIndex: 85,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 18px",
+            borderRadius: 9999,
+            boxShadow:
+              "0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            border:
+              overscrollState.status === "added"
+                ? "1px solid #34d399"
+                : "1px solid rgba(255, 255, 255, 0.2)",
+            background:
+              overscrollState.status === "added"
+                ? "rgba(5, 150, 105, 0.95)"
+                : "rgba(15, 23, 42, 0.92)",
+            color: "#ffffff",
+            pointerEvents: "none",
+            userSelect: "none",
+            transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+            fontFamily:
+              'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+          }}
+        >
+          {overscrollState.status === "added" ? (
+            <>
+              <svg
+                width="20"
+                height="20"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.8}
+                style={{ color: "#a7f3d0" }}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  letterSpacing: 0.2,
+                }}
+              >
+                Đã thêm trang mới!
+              </span>
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  position: "relative",
+                  width: 22,
+                  height: 22,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  style={{ transform: "rotate(-90deg)" }}
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9.5"
+                    fill="none"
+                    stroke="rgba(255, 255, 255, 0.25)"
+                    strokeWidth="2.5"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9.5"
+                    fill="none"
+                    stroke="#38bdf8"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 9.5}
+                    strokeDashoffset={
+                      2 * Math.PI * 9.5 * (1 - overscrollState.progress)
+                    }
+                    style={{ transition: "stroke-dashoffset 0.05s linear" }}
+                  />
+                </svg>
+                <span
+                  style={{
+                    position: "absolute",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#7dd3fc",
+                    lineHeight: 1,
+                  }}
+                >
+                  +
+                </span>
+              </div>
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: "#f8fafc",
+                }}
+              >
+                Giữ để thêm trang mới (
+                {Math.round(overscrollState.progress * 100)}%)
+              </span>
+            </>
+          )}
+        </div>
       )}
 
       {/* Fallback Construction Status Hint Pill (when guide is disabled but active construction is in progress) */}

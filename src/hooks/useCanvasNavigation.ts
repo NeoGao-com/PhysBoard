@@ -31,6 +31,14 @@ export interface UseCanvasNavigationOptions {
   onViewportChange?: (viewport: ViewportTransform) => void;
   onCursorMove?: (worldPos: Point) => void;
   onPageChange?: (page: number) => void;
+  onOverscrollAddPage?: () => void;
+  enableOverscrollAddPage?: boolean;
+}
+
+export interface OverscrollAddPageState {
+  isOverscrolling: boolean;
+  progress: number; // 0 to 1
+  status: "idle" | "holding" | "added";
 }
 
 export interface UseCanvasNavigationReturn {
@@ -44,6 +52,7 @@ export interface UseCanvasNavigationReturn {
   toggleFitLock: () => void;
   setFitLocked: (locked: boolean) => void;
   fitToScreen: () => void;
+  overscrollState: OverscrollAddPageState;
   handlePointerDown: (e: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerMove: (e: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerUp: (e: React.PointerEvent<SVGSVGElement>) => void;
@@ -76,6 +85,8 @@ export function useCanvasNavigation(
     onViewportChange,
     onCursorMove,
     onPageChange,
+    onOverscrollAddPage,
+    enableOverscrollAddPage = true,
   } = options;
 
   const [viewport, setViewport] = useState<ViewportTransform>({
@@ -88,6 +99,30 @@ export function useCanvasNavigation(
   const [isPanning, setIsPanning] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [cursorWorld, setCursorWorld] = useState<Point | null>(null);
+
+  const [overscrollState, setOverscrollState] = useState<OverscrollAddPageState>({
+    isOverscrolling: false,
+    progress: 0,
+    status: "idle",
+  });
+
+  const overscrollSessionRef = useRef<{
+    startTime: number | null;
+    lastInputTime: number;
+    rafId: number | null;
+    resetTimeoutId: NodeJS.Timeout | null;
+    isTriggered: boolean;
+    source: "wheel" | "pointer" | null;
+    pullOffset: number;
+  }>({
+    startTime: null,
+    lastInputTime: 0,
+    rafId: null,
+    resetTimeoutId: null,
+    isTriggered: false,
+    source: null,
+    pullOffset: 0,
+  });
 
   const containerRef = useRef<SVGSVGElement | null>(null);
   const panStartRef = useRef<{
@@ -154,6 +189,131 @@ export function useCanvasNavigation(
     },
     [isA4, isFitLocked, isSidebarOpen, pW, totalH]
   );
+
+  // Overscroll Cancel Helper
+  const cancelOverscroll = useCallback(
+    (afterTrigger = false) => {
+      const session = overscrollSessionRef.current;
+      if (session.rafId !== null) {
+        cancelAnimationFrame(session.rafId);
+        session.rafId = null;
+      }
+      if (session.resetTimeoutId !== null) {
+        clearTimeout(session.resetTimeoutId);
+        session.resetTimeoutId = null;
+      }
+      session.startTime = null;
+      session.source = null;
+      session.pullOffset = 0;
+
+      if (!afterTrigger) {
+        session.isTriggered = false;
+        setOverscrollState({
+          isOverscrolling: false,
+          progress: 0,
+          status: "idle",
+        });
+      } else {
+        setOverscrollState({
+          isOverscrolling: false,
+          progress: 0,
+          status: "idle",
+        });
+        session.resetTimeoutId = setTimeout(() => {
+          session.isTriggered = false;
+          session.resetTimeoutId = null;
+        }, 600);
+      }
+
+      setViewport((prev) => clampA4Viewport(prev, isFitLocked));
+    },
+    [clampA4Viewport, isFitLocked]
+  );
+
+  // Overscroll Hold Animation Frame Loop
+  const updateOverscrollTick = useCallback(() => {
+    const session = overscrollSessionRef.current;
+    if (session.startTime === null) return;
+
+    const now = performance.now();
+
+    // Wheel inputs timeout: if user stops rolling mouse wheel for > 350ms before triggering
+    if (session.source === "wheel" && now - session.lastInputTime > 350 && !session.isTriggered) {
+      cancelOverscroll(false);
+      return;
+    }
+
+    const elapsed = now - session.startTime;
+    const progress = Math.min(1, elapsed / 650);
+
+    if (progress >= 1 && !session.isTriggered) {
+      session.isTriggered = true;
+      setOverscrollState({
+        isOverscrolling: true,
+        progress: 1,
+        status: "added",
+      });
+
+      onOverscrollAddPage?.();
+
+      session.resetTimeoutId = setTimeout(() => {
+        cancelOverscroll(true);
+      }, 600);
+      return;
+    }
+
+    if (!session.isTriggered) {
+      setOverscrollState({
+        isOverscrolling: true,
+        progress,
+        status: "holding",
+      });
+      session.rafId = requestAnimationFrame(updateOverscrollTick);
+    }
+  }, [onOverscrollAddPage, cancelOverscroll]);
+
+  // Overscroll Start Helper
+  const startOverscroll = useCallback(
+    (source: "wheel" | "pointer", pullAmount = 0) => {
+      if (!isA4 || enableOverscrollAddPage === false || !onOverscrollAddPage) return;
+      const session = overscrollSessionRef.current;
+      if (session.isTriggered) return;
+
+      const now = performance.now();
+      session.lastInputTime = now;
+      session.source = source;
+      session.pullOffset = Math.min(45, pullAmount);
+
+      if (session.startTime === null) {
+        session.startTime = now;
+        setOverscrollState({
+          isOverscrolling: true,
+          progress: 0,
+          status: "holding",
+        });
+        if (session.rafId !== null) {
+          cancelAnimationFrame(session.rafId);
+        }
+        session.rafId = requestAnimationFrame(updateOverscrollTick);
+      }
+    },
+    [isA4, enableOverscrollAddPage, onOverscrollAddPage, updateOverscrollTick]
+  );
+
+  // Cleanup on unmount or format switch
+  useEffect(() => {
+    return () => {
+      const session = overscrollSessionRef.current;
+      if (session.rafId !== null) cancelAnimationFrame(session.rafId);
+      if (session.resetTimeoutId !== null) clearTimeout(session.resetTimeoutId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isA4 && overscrollSessionRef.current.startTime !== null) {
+      cancelOverscroll(false);
+    }
+  }, [isA4, cancelOverscroll]);
 
   const fitToScreen = useCallback(() => {
     const sidebarW = isSidebarOpen ? 140 : 26;
@@ -340,6 +500,39 @@ export function useCanvasNavigation(
             const totalHPx = totalH * scale;
             const minTy = Math.min(0, viewH - totalHPx);
             const nextTy = prev.ty - e.deltaY;
+
+            // Check if attempting to scroll down past bottom:
+            const isAtBottom = prev.ty <= minTy + 2;
+            const isScrollingDown = e.deltaY > 0;
+
+            if (
+              isAtBottom &&
+              isScrollingDown &&
+              enableOverscrollAddPage !== false &&
+              onOverscrollAddPage
+            ) {
+              const session = overscrollSessionRef.current;
+              const newPull = Math.min(
+                42,
+                (session.pullOffset || 0) + Math.min(6, e.deltaY * 0.1)
+              );
+              startOverscroll("wheel", newPull);
+              const nextTx = isFitLocked
+                ? viewW / 2
+                : e.shiftKey
+                ? prev.tx - e.deltaY
+                : prev.tx - (e.deltaX || 0);
+              return {
+                scale,
+                tx: nextTx,
+                ty: minTy - newPull,
+              };
+            }
+
+            if (e.deltaY < 0 && overscrollSessionRef.current.startTime !== null) {
+              cancelOverscroll(false);
+            }
+
             const clampedTy = Math.max(minTy, Math.min(0, nextTy));
             const nextTx = isFitLocked
               ? viewW / 2
@@ -375,7 +568,18 @@ export function useCanvasNavigation(
     return () => {
       svgEl.removeEventListener("wheel", onWheel);
     };
-  }, [minScale, maxScale, isA4, isFitLocked, pW, totalH]);
+  }, [
+    minScale,
+    maxScale,
+    isA4,
+    isFitLocked,
+    pW,
+    totalH,
+    enableOverscrollAddPage,
+    onOverscrollAddPage,
+    startOverscroll,
+    cancelOverscroll,
+  ]);
 
   // Pointer Down
   const handlePointerDown = useCallback(
@@ -471,10 +675,50 @@ export function useCanvasNavigation(
       if (panStart) {
         const dx = isA4 && isFitLocked ? 0 : e.clientX - panStart.sx;
         const dy = e.clientY - panStart.sy;
+        const rawTy = panStart.ty + dy;
+
+        if (isA4) {
+          const sidebarW = isSidebarOpen ? 140 : 26;
+          const defaultW =
+            typeof window !== "undefined" ? window.innerWidth - sidebarW : 1200;
+          const defaultH = typeof window !== "undefined" ? window.innerHeight : 800;
+          const viewW = rect && rect.width > 0 ? rect.width : defaultW;
+          const viewH = rect && rect.height > 0 ? rect.height : defaultH;
+          const scale = isFitLocked ? viewW / pW : viewport.scale;
+          const totalHPx = totalH * scale;
+          const minTy = Math.min(0, viewH - totalHPx);
+
+          if (
+            rawTy < minTy &&
+            enableOverscrollAddPage !== false &&
+            onOverscrollAddPage
+          ) {
+            const overscrollDist = minTy - rawTy;
+            if (overscrollDist > 6) {
+              const pullAmount = Math.min(
+                50,
+                Math.pow(overscrollDist, 0.65) * 2.8
+              );
+              startOverscroll("pointer", pullAmount);
+              setViewport({
+                scale,
+                tx: isFitLocked ? viewW / 2 : panStart.tx + dx,
+                ty: minTy - pullAmount,
+              });
+              return;
+            }
+          } else if (
+            rawTy >= minTy &&
+            overscrollSessionRef.current.startTime !== null
+          ) {
+            cancelOverscroll(false);
+          }
+        }
+
         const nextVp = {
           ...viewport,
           tx: panStart.tx + dx,
-          ty: panStart.ty + dy,
+          ty: rawTy,
         };
         setViewport(isA4 ? clampA4Viewport(nextVp, isFitLocked, rect) : nextVp);
       }
@@ -496,7 +740,22 @@ export function useCanvasNavigation(
         onCursorMove?.(worldPos);
       }
     },
-    [minScale, maxScale, viewport, onCursorMove, isA4, isFitLocked, clampA4Viewport]
+    [
+      minScale,
+      maxScale,
+      viewport,
+      onCursorMove,
+      isA4,
+      isFitLocked,
+      clampA4Viewport,
+      isSidebarOpen,
+      pW,
+      totalH,
+      enableOverscrollAddPage,
+      onOverscrollAddPage,
+      startOverscroll,
+      cancelOverscroll,
+    ]
   );
 
   // Pointer Up / Cancel
@@ -508,8 +767,14 @@ export function useCanvasNavigation(
       }
       panStartRef.current = null;
       setIsPanning(false);
+
+      if (overscrollSessionRef.current.source === "pointer") {
+        if (!overscrollSessionRef.current.isTriggered) {
+          cancelOverscroll(false);
+        }
+      }
     },
-    []
+    [cancelOverscroll]
   );
 
   const handlePointerCancel = handlePointerUp;
@@ -614,7 +879,9 @@ export function useCanvasNavigation(
       const viewH = rect && rect.height > 0 ? rect.height : defaultH;
       setViewport((prev) => {
         const scale = isFitLocked ? viewW / pW : prev.scale;
-        const totalHPx = totalH * scale;
+        const effectiveCount = Math.max(count, p);
+        const effectiveTotalH = (effectiveCount - 1) * pStep + pH;
+        const totalHPx = effectiveTotalH * scale;
         const minTy = Math.min(0, viewH - totalHPx);
         const targetTy = -(p - 1) * pStep * scale;
         const clampedTy = Math.max(minTy, Math.min(0, targetTy));
@@ -625,7 +892,7 @@ export function useCanvasNavigation(
         };
       });
     },
-    [isSidebarOpen, isFitLocked, pW, pStep, totalH]
+    [isSidebarOpen, isFitLocked, pW, pStep, pH, count]
   );
 
   return {
@@ -639,6 +906,7 @@ export function useCanvasNavigation(
     toggleFitLock,
     setFitLocked: setIsFitLocked,
     fitToScreen,
+    overscrollState,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
