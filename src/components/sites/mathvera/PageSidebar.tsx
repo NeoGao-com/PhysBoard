@@ -27,6 +27,7 @@ export interface PageSidebarProps {
   boardConfig?: PageBoardConfig;
   isOpen: boolean;
   onToggleOpen: () => void;
+  isPortrait?: boolean;
 }
 
 export const PageSidebar: React.FC<PageSidebarProps> = ({
@@ -51,6 +52,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   boardConfig,
   isOpen,
   onToggleOpen,
+  isPortrait = false,
 }) => {
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -138,10 +140,12 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
         width: 140,
         background: "#f1f5f9",
         borderRight: "1px solid #cbd5e1",
-        zIndex: 80,
+        zIndex: isPortrait ? 120 : 80,
         display: "flex",
         flexDirection: "column",
-        boxShadow: "2px 0 12px rgba(15,23,42,0.06)",
+        boxShadow: isPortrait
+          ? "4px 0 24px rgba(15,23,42,0.22)"
+          : "2px 0 12px rgba(15,23,42,0.06)",
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >

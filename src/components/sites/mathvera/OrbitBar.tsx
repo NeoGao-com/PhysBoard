@@ -8,6 +8,7 @@ export interface OrbitBarProps {
   elevation: number;
   isAutoSpin?: boolean;
   overlayActive?: boolean;
+  isPortrait?: boolean;
   onChangeAzimuth: (deg: number) => void;
   onChangeElevation: (deg: number) => void;
   onOrbitDrag?: (dx: number, dy: number) => void;
@@ -35,6 +36,7 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
   elevation,
   isAutoSpin = false,
   overlayActive = false,
+  isPortrait = false,
   onChangeAzimuth,
   onChangeElevation,
   onOrbitDrag,
@@ -96,16 +98,16 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
         className="wb-orbit-bar"
         style={{
           position: "fixed",
-          right: 14,
-          top: "50%",
+          right: isPortrait ? 8 : 14,
+          top: isPortrait ? "42%" : "50%",
           transform: "translateY(-50%)",
           zIndex: 56,
           display: "flex",
           flexDirection: "column",
           alignItems: "stretch",
-          gap: 10,
-          width: 154,
-          padding: "14px 12px",
+          gap: isPortrait ? 6 : 10,
+          width: isPortrait ? 134 : 154,
+          padding: isPortrait ? "10px 8px" : "14px 12px",
           borderRadius: 18,
           background: "rgba(15, 23, 42, 0.90)",
           backdropFilter: "blur(12px)",

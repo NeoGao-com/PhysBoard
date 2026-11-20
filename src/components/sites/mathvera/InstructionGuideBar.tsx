@@ -8,6 +8,7 @@ export interface InstructionGuideBarProps {
   enabled: boolean;
   onToggleEnabled: () => void;
   isSidebarOpen?: boolean;
+  isPortrait?: boolean;
   hasActiveStatusHint?: boolean;
   onClearStatusHint?: () => void;
 }
@@ -17,6 +18,7 @@ export const InstructionGuideBar: React.FC<InstructionGuideBarProps> = ({
   enabled,
   onToggleEnabled,
   isSidebarOpen = false,
+  isPortrait = false,
   hasActiveStatusHint = false,
   onClearStatusHint,
 }) => {
@@ -32,8 +34,8 @@ export const InstructionGuideBar: React.FC<InstructionGuideBarProps> = ({
       aria-label="Chỉ dẫn sử dụng chức năng"
       style={{
         position: "fixed",
-        top: 56,
-        left: isSidebarOpen ? "calc(50% + 70px)" : "50%",
+        top: isPortrait ? 96 : 56,
+        left: isPortrait ? "50%" : isSidebarOpen ? "calc(50% + 70px)" : "50%",
         transform: "translateX(-50%)",
         zIndex: 65,
         display: "inline-flex",

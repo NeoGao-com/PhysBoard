@@ -185,6 +185,7 @@ export interface ToolbarProps {
   onChangeModularConfig?: (cfg: ModularLayoutConfig) => void;
   onOpenSettings?: () => void;
   isSidebarOpen?: boolean;
+  isPortrait?: boolean;
   isGuideEnabled?: boolean;
   onToggleGuide?: () => void;
 }
@@ -269,6 +270,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onChangeModularConfig,
   onOpenSettings,
   isSidebarOpen = false,
+  isPortrait = false,
   isGuideEnabled = true,
   onToggleGuide,
 }) => {
@@ -898,9 +900,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           ? `calc(50% + 70px)`
           : "50%",
         transform: embedded ? undefined : toolbarPos ? undefined : "translateX(-50%)",
-        width: "max-content",
+        width: isPortrait && !embedded ? "min(96vw, 760px)" : "max-content",
         maxWidth: embedded
           ? undefined
+          : isPortrait
+          ? "96vw"
           : `calc(100vw - ${sidebarOffset + 16}px)`,
         zoom: embedded ? undefined : toolbarScale,
         transition: "left 0.22s ease, max-width 0.22s ease",
@@ -909,9 +913,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        flexWrap: "nowrap",
-        gap: 4,
-        padding: "4px 8px",
+        flexWrap: isPortrait && !embedded ? "wrap" : "nowrap",
+        gap: isPortrait ? 3 : 4,
+        padding: isPortrait ? "4px 6px" : "4px 8px",
         background: "rgba(255, 255, 255, 0.97)",
         backdropFilter: "blur(10px)",
         border: "1px solid rgba(203, 213, 225, 0.85)",
@@ -955,11 +959,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         style={{
           display: "flex",
           alignItems: "center",
-          flexWrap: "nowrap",
-          gap: 2,
+          flexWrap: isPortrait && !embedded ? "wrap" : "nowrap",
+          gap: isPortrait ? 3 : 2,
           minWidth: 0,
           flex: "1 1 auto",
-          overflowX: "auto",
+          overflowX: isPortrait ? "visible" : "auto",
           scrollbarWidth: "none",
         }}
       >

@@ -19,6 +19,7 @@ import {
   SPenConfig,
   DEFAULT_SPEN_CONFIG,
 } from "@/types/whiteboard";
+import { useWindowOrientation } from "@/hooks/useWindowOrientation";
 import { screenToWorld } from "@/lib/coordinates";
 import { OneEuroFilter } from "@/lib/ink";
 import { checkEraserCollision } from "@/lib/eraser";
@@ -682,7 +683,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   );
   const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false);
   const [examOpen, setExamOpen] = useState(false);
+  const isPortrait = useWindowOrientation();
   const [pageSidebarOpen, setPageSidebarOpen] = useState(true);
+
+  // Automatically collapse sidebar when screen orientation is portrait to preserve max drawing width
+  useEffect(() => {
+    if (isPortrait) {
+      setPageSidebarOpen(false);
+    }
+  }, [isPortrait]);
   const [pageManagerOpen, setPageManagerOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -6928,6 +6937,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onChangeModularConfig={handleUpdateModularConfig}
       onOpenSettings={() => setSettingsModalOpen(true)}
       isSidebarOpen={pageSidebarOpen}
+      isPortrait={isPortrait}
       isGuideEnabled={guideEnabled}
       onToggleGuide={toggleGuide}
     />
@@ -6989,6 +6999,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             currentPage={currentPage}
             totalPages={pageCount}
             isOpen={pageSidebarOpen}
+            isPortrait={isPortrait}
             onToggleOpen={() => setPageSidebarOpen((v) => !v)}
             onOpenPageManager={() => setPageManagerOpen(true)}
             onInsertPdfPages={handleInsertPdfPages}
@@ -7044,6 +7055,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           enabled={guideEnabled}
           onToggleEnabled={toggleGuide}
           isSidebarOpen={pageSidebarOpen}
+          isPortrait={isPortrait}
           hasActiveStatusHint={Boolean(statusHint)}
           onClearStatusHint={() => {
             setStatusHint(null);
@@ -7061,8 +7073,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           data-export-skip="true"
           style={{
             position: "fixed",
-            top: 56,
-            left: pageSidebarOpen ? "calc(50% + 70px)" : "50%",
+            top: isPortrait ? 96 : 56,
+            left: isPortrait ? "50%" : pageSidebarOpen ? "calc(50% + 70px)" : "50%",
             transform: "translateX(-50%)",
             zIndex: 70,
             background: "#0f172a",
@@ -7273,6 +7285,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       {!examOpen && (
         <SelectionBar
           sidebarOpen={pageSidebarOpen}
+          isPortrait={isPortrait}
           selectedCount={selectedIds.length}
           hiddenCount={hiddenCount}
           selectedAxes2D={selectedAxes2D}
@@ -7866,6 +7879,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       {activeOrbitElement && !examOpen && (
         <OrbitBar
           visible={true}
+          isPortrait={isPortrait}
           azimuth={activeOrbitAngles.azimuth}
           elevation={activeOrbitAngles.elevation}
           isAutoSpin={isAutoSpin}

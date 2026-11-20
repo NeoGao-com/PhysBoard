@@ -62,6 +62,7 @@ export interface SelectionBarProps {
   onSolidSelectWhole?: () => void;
   onRotateSelection?: (deltaDeg: number) => void;
   sidebarOpen?: boolean;
+  isPortrait?: boolean;
 }
 
 const actionBtnStyle: React.CSSProperties = {
@@ -188,6 +189,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onSolidSelectWhole,
   onRotateSelection,
   sidebarOpen = false,
+  isPortrait = false,
 }) => {
   const [moreAxesOpen, setMoreAxesOpen] = useState(false);
   const moreWrapRef = useRef<HTMLDivElement>(null);
@@ -447,17 +449,22 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
       <div
         data-export-skip="true"
         data-wb-selection-bar="true"
+        className="wb-selection-scroll"
         style={{
           position: "fixed",
-          left: barLeft,
+          left: isPortrait ? 12 : barLeft,
           bottom: 12,
           zIndex: 10000,
           display: "flex",
-          flexWrap: "wrap",
+          flexWrap: isPortrait ? "nowrap" : "wrap",
+          overflowX: isPortrait ? "auto" : "visible",
+          WebkitOverflowScrolling: "touch",
+          paddingBottom: isPortrait ? 4 : 0,
           alignItems: "center",
           gap: 8,
-          maxWidth: `calc(100vw - ${barLeft + 12}px)`,
+          maxWidth: isPortrait ? "calc(100vw - 24px)" : `calc(100vw - ${barLeft + 12}px)`,
           transition: "left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          scrollbarWidth: "none",
         }}
       >
         {/* Delete button (Red) */}
