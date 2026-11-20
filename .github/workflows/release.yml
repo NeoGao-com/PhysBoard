@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows Portable EXE
+    name: Build Windows Installer & Portable EXE
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -29,8 +29,8 @@ jobs:
       - name: Build Next.js App
         run: npm run build
 
-      - name: Package Windows Portable EXE
-        run: npx electron-builder --win portable
+      - name: Package Windows Installer & Portable EXE
+        run: npx electron-builder --win nsis portable
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

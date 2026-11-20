@@ -27,7 +27,7 @@
     "check": "npm run lint && npm run typecheck && npm run build",
     "icons:generate": "node scripts/generate-icons.mjs",
     "electron:dev": "npm run build && electron .",
-    "build:exe": "npm run build && electron-builder --win portable",
+    "build:exe": "npm run build && electron-builder --win nsis portable",
     "build:android": "npm run build && npx cap sync android",
     "test:e2e": "playwright test",
     "test:tier1": "playwright test tests/e2e/tier1-core",
@@ -48,8 +48,30 @@
       "build/**/*"
     ],
     "win": {
-      "target": "portable",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
       "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "PhysBoard",
+      "runAfterFinish": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
     }
   },
   "dependencies": {
