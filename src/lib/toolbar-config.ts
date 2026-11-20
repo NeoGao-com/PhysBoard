@@ -46,7 +46,7 @@ export const DEFAULT_TOOLBAR_VISIBILITY: ToolbarVisibilityConfig = {
   groupDrawing: true,
   toolPen: true,
   toolFormula: true,
-  toolInsertPdf: true,
+  toolInsertPdf: false,
 
   groupPlaneGeometry: true,
   toolPoint: true,

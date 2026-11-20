@@ -1186,6 +1186,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <button
             type="button"
             data-tool="ink:laser"
+            data-laser-mode={laserConfig?.mode || "trail"}
             data-active={activeTool === "ink:laser" ? "true" : undefined}
             aria-pressed={activeTool === "ink:laser"}
             onClick={() => {
@@ -1233,7 +1234,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             ) : (
               <IconLaser size={14} color={activeTool === "ink:laser" ? "#b91c1c" : laserConfig?.color || "#ef4444"} />
             )}
-            <span>{laserConfig?.mode === "dot" ? "Laser (Chấm)" : "Laser (Vệt)"}</span>
+            <span>Laser</span>
           </button>
           <button
             type="button"
@@ -1355,39 +1356,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <IconFormula size={14} />
           <span>Công thức</span>
         </button>
-        )}
-
-        {/* Chèn PDF */}
-        {onInsertPdfPages && vis.toolInsertPdf && (
-          <>
-            <input
-              ref={pdfInputRef}
-              type="file"
-              accept="application/pdf"
-              style={{ display: "none" }}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (!file) return;
-                try {
-                  const res = await importPdfPages(file);
-                  onInsertPdfPages(res.pages);
-                } catch (err) {
-                  console.error("Lỗi chèn PDF:", err);
-                }
-              }}
-            />
-            <button
-              type="button"
-              data-tool="insert-pdf"
-              onClick={() => pdfInputRef.current?.click()}
-              title="Chèn file PDF vào trang giấy (khớp khổ A4 và khóa cố định)"
-              style={btnBaseStyle}
-            >
-              <IconPdf size={14} color="#e11d48" />
-              <span>Chèn PDF</span>
-            </button>
-          </>
         )}
 
         {dividerV}
@@ -2361,7 +2329,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             ) : (
               <IconLaser size={14} color="#ef4444" />
             )}
-            <span>{laserConfig?.mode === "dot" ? "Laser (Chấm)" : "Laser (Vệt)"}</span>
+            <span>Laser</span>
           </button>
 
           {vis.groupSelection && vis.toolEraser && (

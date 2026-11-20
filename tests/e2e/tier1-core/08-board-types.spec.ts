@@ -82,7 +82,7 @@ test.describe("Tier 1: 08 Board Types, Patterns & Dark Contrast", () => {
     await page.keyboard.press("Escape");
 
     // Go back to page 1 -> now uses cream + graph
-    await page.locator('[data-action="prev-page"]').click();
+    await page.locator('[data-page-index="1"]').click();
     await expect(svg).toHaveAttribute("data-board-surface", "cream");
     await expect(svg).toHaveAttribute("data-board-pattern", "graph");
   });

@@ -21,8 +21,9 @@ test.describe('Laser Pointer Modes: Dot Spot vs Light Trail', () => {
     await expect(laserBtn).toBeVisible();
     await laserBtn.click();
 
-    // Verify button shows Laser (Vệt) by default
-    await expect(laserBtn).toContainText('Vệt');
+    // Verify button shows clean text "Laser" and data-laser-mode="trail"
+    await expect(laserBtn).toContainText('Laser');
+    await expect(laserBtn).toHaveAttribute('data-laser-mode', 'trail');
 
     // In Trail mode, dragging on canvas draws a fading laser stroke
     const center = await canvas.getCanvasCenter();
@@ -36,11 +37,13 @@ test.describe('Laser Pointer Modes: Dot Spot vs Light Trail', () => {
     const laserBtn = page.locator('button[data-tool="ink:laser"]');
     await expect(laserBtn).toBeVisible();
     await laserBtn.click();
-    await expect(laserBtn).toContainText('Vệt');
+    await expect(laserBtn).toContainText('Laser');
+    await expect(laserBtn).toHaveAttribute('data-laser-mode', 'trail');
 
     // Click again to toggle to Dot mode
     await laserBtn.click();
-    await expect(laserBtn).toContainText('Chấm');
+    await expect(laserBtn).toHaveAttribute('data-laser-mode', 'dot');
+    await expect(laserBtn).toContainText('Laser');
 
     // In dot mode: moving pointer shows spot and dragging does NOT create any ink or laser strokes
     const center = await canvas.getCanvasCenter();
@@ -57,6 +60,7 @@ test.describe('Laser Pointer Modes: Dot Spot vs Light Trail', () => {
 
     // Click again to toggle back to Trail mode
     await laserBtn.click();
-    await expect(laserBtn).toContainText('Vệt');
+    await expect(laserBtn).toHaveAttribute('data-laser-mode', 'trail');
+    await expect(laserBtn).toContainText('Laser');
   });
 });
