@@ -50,6 +50,9 @@ export interface SettingsModalProps {
   // Grid
   gridEnabled: boolean;
   onChangeGridEnabled: (val: boolean) => void;
+  // Tool Instruction Guide
+  isGuideEnabled?: boolean;
+  onToggleGuide?: () => void;
 
   // Board settings (from MoreMenu)
   doc?: Y.Doc | null;
@@ -124,6 +127,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeLaserConfig,
   gridEnabled,
   onChangeGridEnabled,
+  isGuideEnabled = true,
+  onToggleGuide,
   doc,
   page = 1,
   getBoardElement,
@@ -404,6 +409,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <div style={{ fontWeight: 500 }}>Chế độ chỉ viết bằng bút Stylus (Pen-Only Mode)</div>
                     <div style={{ fontSize: 11.5, color: "#64748b" }}>
                       Khi bật, ngón tay chỉ dùng để cuộn, di chuyển bảng và chọn hình; chỉ có bút cảm ứng mới để lại nét mực.
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              {/* Chỉ dẫn sử dụng chức năng */}
+              <div style={SECTION_BOX_STYLE}>
+                <div style={SECTION_TITLE_STYLE}>
+                  <span>💡</span>
+                  <span>Chỉ dẫn sử dụng chức năng (Tool Guide)</span>
+                </div>
+                <label style={CHECKBOX_LABEL_STYLE}>
+                  <input
+                    type="checkbox"
+                    checked={isGuideEnabled}
+                    onChange={() => onToggleGuide?.()}
+                    style={{ accentColor: "#2563eb" }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 500 }}>Hiển thị dòng chỉ dẫn từng bước khi chọn công cụ</div>
+                    <div style={{ fontSize: 11.5, color: "#64748b" }}>
+                      Khi bật, mỗi khi bạn chọn một công cụ (bút, thước, hình học, 3D, vật lý...), hệ thống sẽ hiển thị một dòng hướng dẫn chi tiết cách vẽ và phím tắt tương ứng.
                     </div>
                   </div>
                 </label>

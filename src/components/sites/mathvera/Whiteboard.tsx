@@ -198,6 +198,8 @@ import { HtmlSimElement } from "./elements/HtmlSimElement";
 import { HtmlSimModal } from "./HtmlSimModal";
 import { LaserSettingsModal } from "./LaserSettingsModal";
 import { SettingsModal } from "./SettingsModal";
+import { InstructionGuideBar } from "./InstructionGuideBar";
+import { getToolGuide } from "@/lib/tool-guides";
 import {
   ToolbarVisibilityConfig,
   loadToolbarVisibilityConfig,
@@ -599,6 +601,30 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     }
   }, []);
   const [statusHint, setStatusHint] = useState<string | null>(null);
+  const [guideEnabled, setGuideEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const saved = window.localStorage.getItem("physboard_instruction_guide_enabled");
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleGuide = useCallback(() => {
+    setGuideEnabled((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem("physboard_instruction_guide_enabled", JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+  }, []);
+
   const [shortcutMap, setShortcutMap] = useState<ShortcutMap>(() =>
     getShortcutMap()
   );
@@ -825,6 +851,22 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       ),
     [pageElements, selectedIds]
   );
+
+  const activeGuideInfo = useMemo(() => {
+    const selInfo =
+      selectedElements.length > 0
+        ? {
+            count: selectedElements.length,
+            type: selectedElements.length === 1 ? selectedElements[0].type : undefined,
+            label:
+              selectedElements.length === 1 && selectedElements[0].type === "GeomPoint"
+                ? ((selectedElements[0].props as Record<string, unknown>)?.label as string)
+                : undefined,
+          }
+        : null;
+
+    return getToolGuide(activeTool, statusHint, selInfo);
+  }, [activeTool, statusHint, selectedElements]);
 
   const selectedAxes2D = useMemo(
     () =>
@@ -6832,6 +6874,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onChangeModularConfig={handleUpdateModularConfig}
       onOpenSettings={() => setSettingsModalOpen(true)}
       isSidebarOpen={pageSidebarOpen}
+      isGuideEnabled={guideEnabled}
+      onToggleGuide={toggleGuide}
     />
   );
 
@@ -6939,8 +6983,25 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         </>
       )}
 
-      {/* Construction Status Hint Pill */}
-      {statusHint && !examOpen && (
+      {/* Tool & Feature Instruction Guide Bar */}
+      {!examOpen && guideEnabled && (
+        <InstructionGuideBar
+          guide={activeGuideInfo}
+          enabled={guideEnabled}
+          onToggleEnabled={toggleGuide}
+          isSidebarOpen={pageSidebarOpen}
+          hasActiveStatusHint={Boolean(statusHint)}
+          onClearStatusHint={() => {
+            setStatusHint(null);
+            setPickedItems([]);
+            draftTwoPtRef.current = null;
+            setDraftPreviewLine(null);
+          }}
+        />
+      )}
+
+      {/* Fallback Construction Status Hint Pill (when guide is disabled but active construction is in progress) */}
+      {statusHint && !examOpen && !guideEnabled && (
         <div
           data-wb-construct-hint="true"
           data-export-skip="true"
@@ -8697,6 +8758,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onChangeLaserConfig={handleUpdateLaserConfig}
         gridEnabled={gridEnabled}
         onChangeGridEnabled={(val) => setGridEnabled(val)}
+        isGuideEnabled={guideEnabled}
+        onToggleGuide={toggleGuide}
         doc={doc}
         page={currentPage}
         totalPages={pageCount}

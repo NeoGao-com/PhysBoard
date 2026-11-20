@@ -184,6 +184,8 @@ export interface ToolbarProps {
   onChangeModularConfig?: (cfg: ModularLayoutConfig) => void;
   onOpenSettings?: () => void;
   isSidebarOpen?: boolean;
+  isGuideEnabled?: boolean;
+  onToggleGuide?: () => void;
 }
 
 type OpenDropdown =
@@ -265,6 +267,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onChangeModularConfig,
   onOpenSettings,
   isSidebarOpen = false,
+  isGuideEnabled = true,
+  onToggleGuide,
 }) => {
   const withShortcut = (label: string, cmdId: string): string => {
     const combo = shortcutMap?.[cmdId];
@@ -1713,6 +1717,36 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           >
             <span aria-hidden="true">{isFitLocked ? "🔒" : "🔓"}</span>
             <span>{isFitLocked ? "Đã khóa vừa" : "Vừa màn hình"}</span>
+          </button>
+        )}
+
+        {/* Toggle Instruction Guide */}
+        {onToggleGuide && (
+          <button
+            type="button"
+            data-tool="instruction-guide"
+            onClick={onToggleGuide}
+            title={
+              isGuideEnabled
+                ? "Đang bật dòng chỉ dẫn cách sử dụng chức năng (Bấm để tắt)"
+                : "Bật dòng chỉ dẫn cách sử dụng chức năng (Từng bước khi chọn công cụ)"
+            }
+            aria-pressed={isGuideEnabled}
+            style={{
+              ...btnBaseStyle,
+              padding: "0 7px",
+              background: isGuideEnabled ? "#fef3c7" : "#f1f5f9",
+              color: isGuideEnabled ? "#b45309" : "#64748b",
+              border: `1px solid ${isGuideEnabled ? "#fcd34d" : "#cbd5e1"}`,
+              fontWeight: 600,
+              fontSize: 11,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+            }}
+          >
+            <span aria-hidden="true">💡</span>
+            <span>{isGuideEnabled ? "Chỉ dẫn: Bật" : "Chỉ dẫn: Tắt"}</span>
           </button>
         )}
 
