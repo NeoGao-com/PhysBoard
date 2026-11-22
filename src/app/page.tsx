@@ -21,68 +21,34 @@ function readInitialLocalBoard(): string | null {
 
 function HomeRouter() {
   const searchParams = useSearchParams();
-  const hasUrlRoom = searchParams.has("room");
+  const rawRoom = searchParams.get("room");
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
-  const [localRoom, setLocalRoom] = useState<string | null>(() => readInitialLocalBoard());
+  const [localRoom, setLocalRoom] = useState<string>(() => {
+    return readInitialLocalBoard() || "default";
+  });
 
   if (!mounted) {
     return <div className="w-full h-full bg-[#FBFBFD]" />;
   }
 
-  if (hasUrlRoom) {
-    const rawRoom = searchParams.get("room");
-    const safeRoomId = rawRoom
-      ? sanitizeRoomId(rawRoom)
-      : parseRoomFromUrl(
-          typeof window !== "undefined" ? window.location.search : ""
-        );
-    return (
-      <Whiteboard
-        key={safeRoomId}
-        roomId={safeRoomId}
-        initialRoomId={safeRoomId}
-        onGoHome={() => {
-          setLocalRoom(null);
-          try {
-            window.localStorage.removeItem(ACTIVE_BOARD_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
-          if (typeof window !== "undefined" && window.location.search) {
-            window.history.replaceState(null, "", window.location.pathname);
-          }
-        }}
-      />
-    );
-  }
-
-  if (localRoom) {
-    return (
-      <Whiteboard
-        key={localRoom}
-        roomId={localRoom}
-        initialRoomId={localRoom}
-        onGoHome={() => {
-          setLocalRoom(null);
-          try {
-            window.localStorage.removeItem(ACTIVE_BOARD_STORAGE_KEY);
-          } catch {
-            // ignore
-          }
-        }}
-      />
-    );
-  }
+  const activeRoomId = rawRoom
+    ? sanitizeRoomId(rawRoom)
+    : localRoom || "default";
 
   return (
-    <AuthDashboard
-      onOpenRoom={(roomId) => {
-        const safe = sanitizeRoomId(roomId);
-        setLocalRoom(safe);
+    <Whiteboard
+      key={activeRoomId}
+      roomId={activeRoomId}
+      initialRoomId={activeRoomId}
+      onGoHome={() => {
+        setLocalRoom("default");
         try {
-          window.localStorage.setItem(ACTIVE_BOARD_STORAGE_KEY, safe);
+          window.localStorage.setItem(ACTIVE_BOARD_STORAGE_KEY, "default");
         } catch {
           // ignore
+        }
+        if (typeof window !== "undefined" && window.location.search) {
+          window.history.replaceState(null, "", window.location.pathname);
         }
       }}
     />
