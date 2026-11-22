@@ -458,7 +458,7 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
 
       {/* Live Trig Readout Panel */}
       <g transform={`translate(${axisExtent + 0.35} ${-R}) scale(${invScale})`}>
-        <foreignObject x={0} y={0} width={285} height={330} style={{ overflow: "visible" }}>
+        <foreignObject x={0} y={0} width={360} height={330} style={{ overflow: "visible" }}>
           <div
             data-wb-trig-values="true"
             className="wb-trig-readout"
@@ -475,7 +475,8 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
               fontSize: 13,
               fontFamily: "system-ui, sans-serif",
               pointerEvents: "auto",
-              minWidth: 248,
+              width: "max-content",
+              minWidth: 252,
             }}
           >
             {/* Header with Unit Toggle (Rad / Độ) */}
@@ -538,26 +539,35 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
               </div>
             </div>
 
-            {/* Total Angle & Unit Equivalence */}
-            <div data-wb-trig-total="true" style={{ color: "#0f172a", fontWeight: 600 }}>
-              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-                <KaTeXFormula latex={`\\alpha = ${readout.angleLatex}`} />
-                <span style={{ color: "#64748b", fontSize: 11.5, fontWeight: 500 }}>
-                  {unit === "deg" ? (
-                    <>
-                      (<KaTeXFormula latex={readout.totalRadLatex} />)
-                    </>
-                  ) : (
-                    `(${readout.angleDeg.toFixed(1).replace(/\.0$/, "")}°)`
-                  )}
-                </span>
-              </div>
+            {/* Total Angle, Decomposition & Unit Equivalence (Single Row) */}
+            <div
+              data-wb-trig-total="true"
+              style={{
+                color: "#0f172a",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                flexWrap: "nowrap",
+                gap: 6,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <KaTeXFormula latex={`\\alpha = ${readout.angleLatex}`} />
               {readout.decompositionLatex && (
-                <div style={{ color: "#64748b", fontSize: 11.5, fontWeight: 500, marginTop: 1 }}>
+                <span style={{ color: "#64748b", fontSize: 12, fontWeight: 500 }}>
                   <span>= </span>
                   <KaTeXFormula latex={readout.decompositionLatex} />
-                </div>
+                </span>
               )}
+              <span style={{ color: "#64748b", fontSize: 11.5, fontWeight: 500 }}>
+                {unit === "deg" ? (
+                  <>
+                    (<KaTeXFormula latex={readout.totalRadLatex} />)
+                  </>
+                ) : (
+                  `(${readout.angleDeg.toFixed(1).replace(/\.0$/, "")}°)`
+                )}
+              </span>
             </div>
 
             {/* Revolution / Turn Counter & Quick Buttons */}
