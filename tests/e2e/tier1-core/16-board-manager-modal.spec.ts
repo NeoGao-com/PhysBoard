@@ -38,9 +38,14 @@ test.describe('Board & Folder Manager (Samsung Notes style)', () => {
     const importPdfBtn = modal.locator('button:has-text("Chèn PDF")');
     await expect(importPdfBtn).toBeVisible();
 
-    // Close modal via close button
-    const closeBtn = modal.locator('button[title*="Quay lại bảng vẽ"]');
-    await closeBtn.click();
+    // Verify clicking "Cài đặt hệ thống" opens SettingsModal
+    const settingsLink = modal.locator('button:has-text("Cài đặt hệ thống")');
+    await expect(settingsLink).toBeVisible();
+    await settingsLink.click();
+
+    // BoardManagerModal should close and SettingsModal should be open
     await expect(modal).not.toBeVisible();
+    const settingsModal = page.locator('[data-testid="settings-modal"]');
+    await expect(settingsModal).toBeVisible();
   });
 });
