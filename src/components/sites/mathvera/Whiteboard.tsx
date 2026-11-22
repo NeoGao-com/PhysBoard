@@ -154,6 +154,7 @@ import { MathEditor, ensureMathLiveRegistered } from "./MathEditor";
 import { RealWorldDrawer } from "./RealWorldDrawer";
 import { PhysicsDrawer } from "./PhysicsDrawer";
 import { MathFormulasDrawer } from "./MathFormulasDrawer";
+import { ChemistryFormulasDrawer } from "./ChemistryFormulasDrawer";
 import { SimLauncherModal } from "./SimLauncherModal";
 import { FullscreenSimOverlay } from "./FullscreenSimOverlay";
 import type { ActiveSimSession } from "@/lib/sim-library";
@@ -672,6 +673,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [realWorldDrawerOpen, setRealWorldDrawerOpen] = useState(false);
   const [physicsDrawerOpen, setPhysicsDrawerOpen] = useState(false);
   const [mathDrawerOpen, setMathDrawerOpen] = useState(false);
+  const [chemistryDrawerOpen, setChemistryDrawerOpen] = useState(false);
   const [simLauncherOpen, setSimLauncherOpen] = useState(false);
   const [activeSim, setActiveSim] = useState<ActiveSimSession | null>(null);
   const [simMinimized, setSimMinimized] = useState(false);
@@ -7117,12 +7119,20 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onOpenMathDrawer={() => {
         handleSelectTool("select");
         setPhysicsDrawerOpen(false);
+        setChemistryDrawerOpen(false);
         setMathDrawerOpen(true);
+      }}
+      onOpenChemistryDrawer={() => {
+        handleSelectTool("select");
+        setPhysicsDrawerOpen(false);
+        setMathDrawerOpen(false);
+        setChemistryDrawerOpen(true);
       }}
       onOpenSimLauncher={() => {
         handleSelectTool("select");
         setPhysicsDrawerOpen(false);
         setMathDrawerOpen(false);
+        setChemistryDrawerOpen(false);
         setSimLauncherOpen(true);
       }}
       hasActiveSim={Boolean(activeSim)}
@@ -9294,6 +9304,32 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       <MathFormulasDrawer
         open={mathDrawerOpen}
         onClose={() => setMathDrawerOpen(false)}
+        onInsertFormulaLatex={(latex) => {
+          const center = getViewCenter();
+          const res = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "MathText",
+              transform: {
+                x: center.x,
+                y: center.y,
+                scale: 1,
+                rotation: 0,
+                z: 0,
+              },
+              style: { stroke: currentStyle.stroke ?? "#0f172a" },
+              props: { latex },
+            },
+          });
+          if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          handleSelectTool("select");
+        }}
+      />
+
+      {/* Chemistry Formulas Drawer */}
+      <ChemistryFormulasDrawer
+        open={chemistryDrawerOpen}
+        onClose={() => setChemistryDrawerOpen(false)}
         onInsertFormulaLatex={(latex) => {
           const center = getViewCenter();
           const res = dispatcher.dispatch({

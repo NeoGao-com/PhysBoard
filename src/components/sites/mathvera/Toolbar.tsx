@@ -146,6 +146,7 @@ export interface ToolbarProps {
   onOpenDecorHelp?: () => void;
   onOpenPhysicsDrawer?: () => void;
   onOpenMathDrawer?: () => void;
+  onOpenChemistryDrawer?: () => void;
   onOpenSimLauncher?: () => void;
   hasActiveSim?: boolean;
   onGoHome?: () => void;
@@ -227,6 +228,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenDecorHelp,
   onOpenPhysicsDrawer,
   onOpenMathDrawer,
+  onOpenChemistryDrawer,
   onOpenSimLauncher,
   hasActiveSim = false,
   onGoHome,
@@ -1709,6 +1711,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               ∑
             </span>
             <span>Toán</span>
+          </button>
+        )}
+
+        {/* Chemistry Formulas Drawer Button */}
+        {onOpenChemistryDrawer && (
+          <button
+            type="button"
+            data-tool="chemistry-formulas"
+            data-action="open-chemistry-drawer"
+            onClick={onOpenChemistryDrawer}
+            style={btnBaseStyle}
+            title="Bảng công thức Hoá học 10–11–12 theo từng chủ đề"
+          >
+            <span style={{ color: "#059669", fontWeight: 800, fontSize: 12.5, lineHeight: 1 }}>
+              🧪
+            </span>
+            <span>Hoá</span>
           </button>
         )}
 
