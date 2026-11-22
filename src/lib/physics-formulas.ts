@@ -226,6 +226,8 @@ export interface UnitConversionSpec {
   label: string;
   fromUnit: string;
   toUnit: string;
+  formulaLatex: string;
+  reverseFormulaLatex: string;
   convert: (v: number) => number;
   reverse: (v: number) => number;
 }
@@ -236,6 +238,8 @@ export const PHYSICS_UNIT_CONVERSIONS: ReadonlyArray<UnitConversionSpec> = [
     label: "Vận tốc",
     fromUnit: "km/h",
     toUnit: "m/s",
+    formulaLatex: "v(\\text{m/s}) = \\frac{v(\\text{km/h})}{3{,}6}",
+    reverseFormulaLatex: "v(\\text{km/h}) = v(\\text{m/s}) \\times 3{,}6",
     convert: (v) => v / 3.6,
     reverse: (v) => v * 3.6,
   },
@@ -244,6 +248,8 @@ export const PHYSICS_UNIT_CONVERSIONS: ReadonlyArray<UnitConversionSpec> = [
     label: "Nhiệt độ",
     fromUnit: "°C",
     toUnit: "K",
+    formulaLatex: "T(\\text{K}) = t(^{\\circ}\\text{C}) + 273{,}15",
+    reverseFormulaLatex: "t(^{\\circ}\\text{C}) = T(\\text{K}) - 273{,}15",
     convert: (v) => v + 273.15,
     reverse: (v) => v - 273.15,
   },
@@ -252,6 +258,8 @@ export const PHYSICS_UNIT_CONVERSIONS: ReadonlyArray<UnitConversionSpec> = [
     label: "Năng lượng",
     fromUnit: "eV",
     toUnit: "J",
+    formulaLatex: "E(\\text{J}) = E(\\text{eV}) \\times 1{,}602\\times 10^{-19}",
+    reverseFormulaLatex: "E(\\text{eV}) = \\frac{E(\\text{J})}{1{,}602\\times 10^{-19}}",
     convert: (v) => v * 1.602e-19,
     reverse: (v) => v / 1.602e-19,
   },
@@ -260,6 +268,8 @@ export const PHYSICS_UNIT_CONVERSIONS: ReadonlyArray<UnitConversionSpec> = [
     label: "Tốc độ góc",
     fromUnit: "vòng/phút",
     toUnit: "rad/s",
+    formulaLatex: "\\omega(\\text{rad/s}) = \\frac{2\\pi \\cdot n}{60}",
+    reverseFormulaLatex: "n(\\text{vòng/phút}) = \\frac{60 \\cdot \\omega}{2\\pi}",
     convert: (v) => (v * 2 * Math.PI) / 60,
     reverse: (v) => (v * 60) / (2 * Math.PI),
   },
@@ -268,6 +278,8 @@ export const PHYSICS_UNIT_CONVERSIONS: ReadonlyArray<UnitConversionSpec> = [
     label: "Năng lượng nghỉ",
     fromUnit: "u",
     toUnit: "MeV/c²",
+    formulaLatex: "1\\text{ u} = 931{,}5\\text{ MeV}/c^2",
+    reverseFormulaLatex: "m(\\text{u}) = \\frac{E(\\text{MeV}/c^2)}{931{,}5}",
     convert: (v) => v * 931.5,
     reverse: (v) => v / 931.5,
   },
@@ -276,6 +288,8 @@ export const PHYSICS_UNIT_CONVERSIONS: ReadonlyArray<UnitConversionSpec> = [
     label: "Áp suất",
     fromUnit: "atm",
     toUnit: "Pa",
+    formulaLatex: "p(\\text{Pa}) = p(\\text{atm}) \\times 1{,}01325\\times 10^5",
+    reverseFormulaLatex: "p(\\text{atm}) = \\frac{p(\\text{Pa})}{1{,}01325\\times 10^5}",
     convert: (v) => v * 1.01325e5,
     reverse: (v) => v / 1.01325e5,
   },

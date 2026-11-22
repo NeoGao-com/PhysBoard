@@ -438,6 +438,58 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
                 </option>
               ))}
             </select>
+            <div
+              data-physics-unit-formula="true"
+              style={{
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, overflowX: "auto" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                  Công thức đổi:
+                </span>
+                <div style={{ fontSize: 13, color: "#0f172a" }}>
+                  <KaTeXFormula
+                    latex={
+                      convReverse
+                        ? activeConv.reverseFormulaLatex
+                        : activeConv.formulaLatex
+                    }
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onInsertFormulaLatex(
+                    convReverse
+                      ? activeConv.reverseFormulaLatex
+                      : activeConv.formulaLatex
+                  );
+                  onClose();
+                }}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  color: "#334155",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                + Chèn CT
+              </button>
+            </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 type="number"
