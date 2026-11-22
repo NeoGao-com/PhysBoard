@@ -1471,7 +1471,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
       setActiveTool(next);
     },
-    [tryApplyConstructionFromSelection]
+    [activeTool, tryApplyConstructionFromSelection]
   );
 
   // Style State Aggregation
@@ -1830,6 +1830,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const handlePhysicsAction = useCallback(
     (action: string) => {
       if (action === "phys:drawer") {
+        handleSelectTool("select");
         setPhysicsDrawerOpen(true);
         return;
       }
@@ -2172,6 +2173,46 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     ]
   );
 
+  const commitDraftPolygon = useCallback(() => {
+    if (draftPolygonPts.length < 3) return;
+    const polyId = newElId("poly");
+    const names = getNextPointNames(draftPolygonPts.length, pageElements);
+    const marksEnabled = getConstructMarksEnabled();
+    const embedded: EmbeddedVertex[] = draftPolygonPts.map((pt, i) => ({
+      id: `${polyId}_v${i}`,
+      name: names[i] ?? `P${i + 1}`,
+      x: pt.x,
+      y: pt.y,
+    }));
+    dispatcher.dispatch({
+      type: "object.create",
+      params: {
+        id: polyId,
+        type: "GeomPolygon",
+        style: {
+          stroke: currentStyle.stroke ?? "#2563eb",
+          fill: "rgba(37,99,235,0.06)",
+          width: currentStyle.width ?? 2,
+          dash: currentStyle.dash ?? false,
+        },
+        props: {
+          vertices: embedded.map((v) => v.id),
+          points: embedded,
+          marksEnabled,
+        },
+      },
+    });
+    setDraftPolygonPts([]);
+    resetToolAfterCreation();
+    setStatusHint(null);
+  }, [
+    draftPolygonPts,
+    pageElements,
+    dispatcher,
+    currentStyle,
+    resetToolAfterCreation,
+  ]);
+
   // Global Keyboard Shortcuts (Strict Isolation inside input, textarea, math-field, contentEditable)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -2224,6 +2265,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setSelectedIds(
           pageElements.filter((el) => !el.style?.hidden).map((el) => el.id)
         );
+        return;
+      }
+      if (e.key === "Enter" && activeTool === "polygon" && draftPolygonPts.length >= 3) {
+        e.preventDefault();
+        commitDraftPolygon();
         return;
       }
       if (e.key === "Escape") {
@@ -2281,7 +2327,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     shareModalOpen,
     realWorldDrawerOpen,
     physicsDrawerOpen,
+    calculatorOpen,
     draftPolygonPts.length,
+    commitDraftPolygon,
     pickedItems.length,
     shortcutMap,
     undo,
@@ -2726,6 +2774,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
         }
       });
+      resetToolAfterCreation();
     },
     [
       dispatcher,
@@ -2735,6 +2784,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       pageElements,
       isA4Format,
       currentBoardConfig,
+      resetToolAfterCreation,
     ]
   );
 
@@ -2758,9 +2808,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           props: { src: img.src, w: img.w, h: img.h },
         },
       });
+      handleSelectTool("select");
       if (res.created?.[0]) setSelectedIds([res.created[0]]);
     },
-    [dispatcher, getViewCenter]
+    [dispatcher, getViewCenter, handleSelectTool]
   );
 
   const handleInsertPdfPages = useCallback(
@@ -2838,6 +2889,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         });
       });
 
+      handleSelectTool("select");
       setYjsCurrentPage(doc, startPage);
       setSelectedIds([]);
       if (scrollToPage) {
@@ -2847,7 +2899,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         `✓ Đã chèn ${pages.length} trang PDF vừa khít khổ giấy và tự động khóa cố định (bấm nút 🔒 trên trang để mở khóa).`
       );
     },
-    [dispatcher, doc, currentPage, pageCount, currentBoardConfig, scrollToPage]
+    [dispatcher, doc, currentPage, pageCount, currentBoardConfig, scrollToPage, handleSelectTool]
   );
 
   useEffect(() => {
@@ -2892,24 +2944,27 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       if (action.kind === "tool") {
         handleSelectTool(action.toolId);
         if (action.hint) setStatusHint(action.hint);
-      } else if (action.kind === "open-plot-dialog") {
-        setPlotDialogOpen(true);
-      } else if (action.kind === "open-conic-dialog") {
-        setConicDialogKind(action.conicKind);
-      } else if (action.kind === "open-vartable-dialog") {
-        setVarTableDialogMode(action.mode);
-      } else if (action.kind === "open-chart-dialog") {
-        setChartDialogOpen(true);
-      } else if (action.kind === "open-bayes-dialog") {
-        setBayesDialogOpen(true);
-      } else if (action.kind === "open-numberline-dialog") {
-        setNumberLineDialogOpen(true);
-      } else if (action.kind === "open-realworld-drawer") {
-        setRealWorldDrawerOpen(true);
-      } else if (action.kind === "open-decor-help") {
-        setStatusHint(
-          "Chọn một đoạn thẳng trên bảng rồi dùng thanh Trang trí đoạn ở bên dưới."
-        );
+      } else {
+        handleSelectTool("select");
+        if (action.kind === "open-plot-dialog") {
+          setPlotDialogOpen(true);
+        } else if (action.kind === "open-conic-dialog") {
+          setConicDialogKind(action.conicKind);
+        } else if (action.kind === "open-vartable-dialog") {
+          setVarTableDialogMode(action.mode);
+        } else if (action.kind === "open-chart-dialog") {
+          setChartDialogOpen(true);
+        } else if (action.kind === "open-bayes-dialog") {
+          setBayesDialogOpen(true);
+        } else if (action.kind === "open-numberline-dialog") {
+          setNumberLineDialogOpen(true);
+        } else if (action.kind === "open-realworld-drawer") {
+          setRealWorldDrawerOpen(true);
+        } else if (action.kind === "open-decor-help") {
+          setStatusHint(
+            "Chọn một đoạn thẳng trên bảng rồi dùng thanh Trang trí đoạn ở bên dưới."
+          );
+        }
       }
     },
     [handleSelectTool]
@@ -4859,6 +4914,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           } else if (nearPt.polygonId && byId.has(nearPt.polygonId)) {
             setSelectedIds([nearPt.polygonId]);
           }
+          handleSelectTool("select");
           return;
         }
 
@@ -4923,39 +4979,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         if (draftPolygonPts.length >= 3) {
           const first = draftPolygonPts[0];
           if (dist2D(clickPt, first) <= 22 / (viewport.scale || 45)) {
-            const polyId = newElId("poly");
-            const names = getNextPointNames(
-              draftPolygonPts.length,
-              pageElements
-            );
-            const marksEnabled = getConstructMarksEnabled();
-            const embedded: EmbeddedVertex[] = draftPolygonPts.map((pt, i) => ({
-              id: `${polyId}_v${i}`,
-              name: names[i] ?? `P${i + 1}`,
-              x: pt.x,
-              y: pt.y,
-            }));
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: polyId,
-                type: "GeomPolygon",
-                style: {
-                  stroke: currentStyle.stroke ?? "#2563eb",
-                  fill: "rgba(37,99,235,0.06)",
-                  width: currentStyle.width ?? 2,
-                  dash: currentStyle.dash ?? false,
-                },
-                props: {
-                  vertices: embedded.map((v) => v.id),
-                  points: embedded,
-                  marksEnabled,
-                },
-              },
-            });
-            setDraftPolygonPts([]);
-            setActiveTool("select");
-            setStatusHint(null);
+            commitDraftPolygon();
             return;
           }
         }
@@ -5534,6 +5558,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       findNearestPoint,
       snapPointAtCursor,
       commitTwoPointShape,
+      commitDraftPolygon,
       draftPolygonPts,
       currentPage,
       fillColor,
@@ -7245,17 +7270,33 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         handleSelectTool(`realworld:${item.id}`);
         setStatusHint(`Bấm lên bảng để đặt ${item.name}`);
       }}
-      onOpenRealWorldDrawer={() => setRealWorldDrawerOpen(true)}
-      onOpenPhysicsDrawer={() => setPhysicsDrawerOpen(true)}
-      onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
-      onOpenCalculator={() => setCalculatorOpen((prev) => !prev)}
+      onOpenRealWorldDrawer={() => {
+        handleSelectTool("select");
+        setRealWorldDrawerOpen(true);
+      }}
+      onOpenPhysicsDrawer={() => {
+        handleSelectTool("select");
+        setPhysicsDrawerOpen(true);
+      }}
+      onOpenHtmlSimModal={() => {
+        handleSelectTool("select");
+        setHtmlSimModalOpen(true);
+      }}
+      onOpenCalculator={() => {
+        if (!calculatorOpen) handleSelectTool("select");
+        setCalculatorOpen((prev) => !prev);
+      }}
       isCalculatorOpen={calculatorOpen}
-      onGoHome={() => setBoardManagerOpen(true)}
-      onOpenDecorHelp={() =>
+      onGoHome={() => {
+        handleSelectTool("select");
+        setBoardManagerOpen(true);
+      }}
+      onOpenDecorHelp={() => {
+        handleSelectTool("select");
         setStatusHint(
           "Chọn một đoạn thẳng trên bảng rồi dùng thanh Trang trí đoạn bên dưới."
-        )
-      }
+        );
+      }}
       onShare={() => {
         const url = buildShareUrl(activeRoomId);
         navigator.clipboard?.writeText(url).catch(() => {});
@@ -7328,7 +7369,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onToggleOpen={() => setPageSidebarOpen((v) => !v)}
         onOpenPageManager={() => setPageManagerOpen(true)}
         onInsertPdfPages={handleInsertPdfPages}
-        onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
+        onOpenHtmlSimModal={() => {
+          handleSelectTool("select");
+          setHtmlSimModalOpen(true);
+        }}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undo}
@@ -7336,7 +7380,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         selectedCount={selectedIds.length}
         onDeleteSelected={handleDeleteSelected}
         onOpenSettings={() => setSettingsModalOpen(true)}
-        onOpenBoardManager={() => setBoardManagerOpen(true)}
+        onOpenBoardManager={() => {
+          handleSelectTool("select");
+          setBoardManagerOpen(true);
+        }}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onSelectPage={(p) => {
           setYjsCurrentPage(doc, p);
@@ -8642,6 +8689,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          handleSelectTool("select");
           setStatusHint("Đã chèn nghiệm phương trình lên bảng");
         }}
       />
@@ -8676,6 +8724,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (!selectedAxes2D && res.created?.[0]) setSelectedIds([res.created[0]]);
           setAxesPointDialogOpen(false);
+          handleSelectTool("select");
         }}
         onCancel={() => setAxesPointDialogOpen(false)}
       />
@@ -8881,6 +8930,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (!selectedAxes2D && vecId) setSelectedIds([vecId]);
           setAxesVectorDialogOpen(false);
+          handleSelectTool("select");
         }}
         onCancel={() => setAxesVectorDialogOpen(false)}
       />
@@ -8907,6 +8957,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           setAxes3DPointDialogOpen(false);
+          handleSelectTool("select");
         }}
         onCancel={() => setAxes3DPointDialogOpen(false)}
       />
@@ -8961,6 +9012,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (vecId) setSelectedIds([vecId]);
           setAxes3DVectorDialogOpen(false);
+          handleSelectTool("select");
         }}
         onCancel={() => setAxes3DVectorDialogOpen(false)}
       />
@@ -8988,6 +9040,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           setAxes3DFigureDialogKind(null);
+          handleSelectTool("select");
         }}
         onCancel={() => setAxes3DFigureDialogKind(null)}
       />
@@ -9007,6 +9060,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (!selectedAxes2D && res.created?.[0]) setSelectedIds([res.created[0]]);
           setCurve2dDialogMode(null);
+          handleSelectTool("select");
         }}
         onCancel={() => setCurve2dDialogMode(null)}
       />
@@ -9026,6 +9080,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           setConicDialogKind(null);
+          handleSelectTool("select");
         }}
         onCancel={() => setConicDialogKind(null)}
       />
@@ -9051,6 +9106,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           setVarTableDialogMode(null);
+          handleSelectTool("select");
         }}
         onCancel={() => setVarTableDialogMode(null)}
       />
@@ -9085,6 +9141,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           setChartDialogOpen(false);
+          handleSelectTool("select");
         }}
         onCancel={() => setChartDialogOpen(false)}
       />
@@ -9124,6 +9181,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             });
           });
           setBayesDialogOpen(false);
+          handleSelectTool("select");
         }}
         onCancel={() => setBayesDialogOpen(false)}
       />
@@ -9148,6 +9206,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           setNumberLineDialogOpen(false);
+          handleSelectTool("select");
         }}
         onCancel={() => setNumberLineDialogOpen(false)}
       />
@@ -9276,8 +9335,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          handleSelectTool("select");
         }}
-        onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
+        onOpenHtmlSimModal={() => {
+          handleSelectTool("select");
+          setHtmlSimModalOpen(true);
+        }}
       />
 
       <HtmlSimModal
@@ -9305,6 +9368,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          handleSelectTool("select");
           setStatusHint(`✓ Đã nhúng mô phỏng HTML: ${sim.title}`);
         }}
       />
@@ -9330,6 +9394,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          handleSelectTool("select");
         }}
         onSelectPicture={({ src, ratio }) => {
           const center = getViewCenter();
@@ -9348,6 +9413,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          handleSelectTool("select");
         }}
       />
 
@@ -9373,6 +9439,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             },
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          handleSelectTool("select");
           setStatusHint(`✓ Đã chèn công thức "${latex}" vào bảng`);
         }}
       />

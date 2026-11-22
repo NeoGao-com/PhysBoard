@@ -524,13 +524,17 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         setOpenMenu(null);
       }
     };
-    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("pointerdown", handlePointerDown, true);
     window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("pointerdown", handlePointerDown, true);
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [openMenu]);
+
+  useEffect(() => {
+    setOpenMenu(null);
+  }, [activeTool]);
 
   const togglePortalMenu = (
     id: "select" | "pen" | "segment" | "fill",
@@ -793,7 +797,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <button
           type="button"
           data-tool="erase"
-          onClick={() => onSelectTool("erase")}
+          onClick={() => onSelectTool(isEraserActive ? "select" : "erase")}
           style={isEraserActive ? activeStyle : btnBaseStyle}
           title="Tẩy xoá (E)"
         >
@@ -1253,7 +1257,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           data-tool="erase"
           data-active={isEraserActive ? "true" : undefined}
           aria-pressed={isEraserActive}
-          onClick={() => onSelectTool("erase")}
+          onClick={() => onSelectTool(isEraserActive ? "select" : "erase")}
           style={isEraserActive ? activeStyle : btnBaseStyle}
           title={withShortcut("Tẩy nét vẽ", "tool:erase")}
         >
@@ -1340,7 +1344,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           data-tool="formula"
           data-active={isFormulaActive ? "true" : undefined}
           aria-pressed={isFormulaActive}
-          onClick={() => onSelectTool("formula")}
+          onClick={() => onSelectTool(isFormulaActive ? "select" : "formula")}
           style={isFormulaActive ? activeStyle : btnBaseStyle}
           title={withShortcut("Công thức", "tool:formula")}
         >
@@ -1363,7 +1367,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           data-tool="point"
           data-active={isPointActive ? "true" : undefined}
           aria-pressed={isPointActive}
-          onClick={() => onSelectTool("point")}
+          onClick={() => onSelectTool(isPointActive ? "select" : "point")}
           style={isPointActive ? activeStyle : btnBaseStyle}
           title={withShortcut("Điểm", "tool:point")}
         >
@@ -1437,7 +1441,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           data-tool="circle"
           data-active={isCircleActive ? "true" : undefined}
           aria-pressed={isCircleActive}
-          onClick={() => onSelectTool("circle")}
+          onClick={() => onSelectTool(isCircleActive ? "select" : "circle")}
           style={isCircleActive ? activeStyle : btnBaseStyle}
           title={withShortcut("Đường tròn", "tool:circle")}
         >
@@ -1451,7 +1455,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           data-tool="polygon"
           data-active={isPolygonActive ? "true" : undefined}
           aria-pressed={isPolygonActive}
-          onClick={() => onSelectTool("polygon")}
+          onClick={() => onSelectTool(isPolygonActive ? "select" : "polygon")}
           style={isPolygonActive ? activeStyle : btnBaseStyle}
           title={withShortcut("Đa giác", "tool:polygon")}
         >
@@ -2276,8 +2280,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           {vis.groupSelection && vis.toolEraser && (
             <button
               type="button"
-              onClick={() => onSelectTool("erase")}
-              style={activeTool === "erase" ? activeStyle : btnBaseStyle}
+              onClick={() => onSelectTool(isEraserActive ? "select" : "erase")}
+              style={isEraserActive ? activeStyle : btnBaseStyle}
               title="Tẩy"
             >
               <IconEraser size={14} /> <span>Tẩy</span>
@@ -2303,7 +2307,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           <button
             type="button"
-            onClick={() => onSelectTool("point")}
+            onClick={() => onSelectTool(isPointActive ? "select" : "point")}
             style={isPointActive ? activeStyle : btnBaseStyle}
             title="Điểm"
           >
@@ -2312,7 +2316,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
           <button
             type="button"
-            onClick={() => onSelectTool("c:segment")}
+            onClick={() => onSelectTool(isSegmentActive ? "select" : "c:segment")}
             style={isSegmentActive ? activeStyle : btnBaseStyle}
             title="Đoạn thẳng"
           >
@@ -2321,8 +2325,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
           <button
             type="button"
-            onClick={() => onSelectTool("circle")}
-            style={activeTool === "circle" ? activeStyle : btnBaseStyle}
+            onClick={() => onSelectTool(isCircleActive ? "select" : "circle")}
+            style={isCircleActive ? activeStyle : btnBaseStyle}
             title="Đường tròn"
           >
             <IconCircle size={14} /> <span>Tròn</span>
@@ -2330,8 +2334,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
           <button
             type="button"
-            onClick={() => onSelectTool("polygon")}
-            style={activeTool === "polygon" ? activeStyle : btnBaseStyle}
+            onClick={() => onSelectTool(isPolygonActive ? "select" : "polygon")}
+            style={isPolygonActive ? activeStyle : btnBaseStyle}
             title="Đa giác"
           >
             <IconPolygon size={14} /> <span>Đa giác</span>
