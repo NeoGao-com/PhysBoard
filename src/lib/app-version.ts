@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.0.6";
+export const APP_VERSION = "1.0.7";
 export const GITHUB_REPO = "NeoGao-com/PhysBoard";
 export const GITHUB_RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases`;
 export const GITHUB_API_LATEST_RELEASE = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;

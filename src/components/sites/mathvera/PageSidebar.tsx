@@ -24,6 +24,7 @@ export interface PageSidebarProps {
   onSaveFile?: () => void;
   onOpenFile?: () => void;
   onOpenCommandPalette?: () => void;
+  onOpenBoardManager?: () => void;
   boardConfig?: PageBoardConfig;
   pagePdfStatus?: Record<number, { hasPdf: boolean; locked: boolean; elementId?: string }>;
   onTogglePagePdfLock?: (page: number) => void;
@@ -51,6 +52,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onSaveFile,
   onOpenFile,
   onOpenCommandPalette,
+  onOpenBoardManager,
   boardConfig,
   pagePdfStatus,
   onTogglePagePdfLock,
@@ -129,6 +131,34 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           <span>SỔ TAY ({currentPage}/{totalPages})</span>
         </div>
 
+        {onOpenBoardManager && (
+          <button
+            type="button"
+            data-action="open-board-manager"
+            onClick={onOpenBoardManager}
+            title="Quản lý các bảng vẽ & thư mục"
+            aria-label="Quản lý bảng"
+            style={{
+              marginTop: "auto",
+              marginBottom: 6,
+              background: "#ffffff",
+              border: "1px solid #cbd5e1",
+              borderRadius: 4,
+              width: 20,
+              height: 24,
+              fontSize: 11,
+              color: "#0f172a",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+            }}
+          >
+            📁
+          </button>
+        )}
+
         {onOpenSettings && (
           <button
             type="button"
@@ -139,7 +169,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
             title="Cài đặt hệ thống & thanh công cụ"
             aria-label="Cài đặt"
             style={{
-              marginTop: "auto",
+              marginTop: onOpenBoardManager ? 0 : "auto",
               marginBottom: 8,
               background: "#ffffff",
               border: "1px solid #cbd5e1",
@@ -547,6 +577,31 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
               }}
             >
               <IconRedo size={13} />
+            </button>
+          )}
+
+          {onOpenBoardManager && (
+            <button
+              type="button"
+              data-action="open-board-manager"
+              onClick={onOpenBoardManager}
+              title="Quản lý các bảng vẽ & thư mục (kiểu Samsung Notes)"
+              aria-label="Quản lý bảng"
+              style={{
+                flex: 1,
+                height: 28,
+                background: "#f8fafc",
+                color: "#0f172a",
+                border: "1px solid #cbd5e1",
+                borderRadius: 6,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+              }}
+            >
+              <span>📁</span>
             </button>
           )}
 

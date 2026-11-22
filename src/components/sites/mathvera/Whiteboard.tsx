@@ -152,6 +152,7 @@ import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportModal } from "./ExportModal";
 import { ExportPdfModal } from "./ExportPdfModal";
 import { ExamEditor } from "./ExamEditor";
+import { BoardManagerModal } from "./BoardManagerModal";
 import type {
   PhysicsInstrumentKind,
   PhysicsInstrumentProps,
@@ -696,6 +697,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     }
   }, [isPortrait]);
   const [pageManagerOpen, setPageManagerOpen] = useState(false);
+  const [boardManagerOpen, setBoardManagerOpen] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [fillNamesInput, setFillNamesInput] = useState("");
@@ -2870,6 +2872,26 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       (window as unknown as { __testTriggerOverscrollAddPage?: () => void }).__testTriggerOverscrollAddPage = handleAddPage;
     }
   }, [handleInsertPdfPages, doc, currentPage, currentBoardConfig]);
+
+  // Check pending PDF import from BoardManager
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const key = `pending_pdf_import_${activeRoomId}`;
+      const raw = window.sessionStorage.getItem(key);
+      if (raw) {
+        window.sessionStorage.removeItem(key);
+        const pages = JSON.parse(raw);
+        if (Array.isArray(pages) && pages.length > 0) {
+          setTimeout(() => {
+            handleInsertPdfPages(pages);
+          }, 100);
+        }
+      }
+    } catch (err) {
+      console.error("Error processing pending PDF import:", err);
+    }
+  }, [activeRoomId, handleInsertPdfPages]);
 
   const handleM3Action = useCallback(
     (action: M3MenuAction) => {
@@ -7125,7 +7147,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
       onOpenCalculator={() => setCalculatorOpen((prev) => !prev)}
       isCalculatorOpen={calculatorOpen}
-      onGoHome={onGoHome}
+      onGoHome={() => setBoardManagerOpen(true)}
       onSaveFile={() => {
         if (!doc) return;
         const json = serializeState(doc, activeRoomId);
@@ -7260,6 +7282,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             selectedCount={selectedIds.length}
             onDeleteSelected={handleDeleteSelected}
             onOpenSettings={() => setSettingsModalOpen(true)}
+            onOpenBoardManager={() => setBoardManagerOpen(true)}
             onSaveFile={() => {
               if (!doc) return;
               const json = serializeState(doc, activeRoomId);
@@ -9461,6 +9484,24 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           )}
         </div>
       )}
+
+      {/* Board & Folder Manager Modal (Samsung Notes inspired) */}
+      <BoardManagerModal
+        open={boardManagerOpen}
+        onClose={() => setBoardManagerOpen(false)}
+        currentRoomId={activeRoomId}
+        onSelectBoard={(newBoardId) => {
+          if (newBoardId !== activeRoomId) {
+            if (typeof window !== "undefined") {
+              const url = new URL(window.location.href);
+              url.searchParams.set("room", newBoardId);
+              window.history.pushState(null, "", url.toString());
+              window.location.href = url.toString();
+            }
+          }
+        }}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+      />
     </div>
   );
 }
