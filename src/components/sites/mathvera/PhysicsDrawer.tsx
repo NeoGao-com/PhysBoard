@@ -9,18 +9,17 @@ import {
 } from "@/lib/physics-formulas";
 import { KaTeXFormula } from "./elements/MathElement";
 
-export type PhysicsDrawerTab = "diagrams" | "formulas" | "units";
+export type PhysicsDrawerTab = "formulas" | "units";
 
 export interface PhysicsDrawerProps {
   open: boolean;
   onClose: () => void;
-  onInsertAction: (action: string) => void;
+  onInsertAction?: (action: string) => void;
   onInsertFormulaLatex: (latex: string) => void;
   onOpenHtmlSimModal?: () => void;
 }
 
 const TABS: Array<{ id: PhysicsDrawerTab; label: string }> = [
-  { id: "diagrams", label: "Sơ đồ & Đo đạc" },
   { id: "formulas", label: "Bảng Công thức" },
   { id: "units", label: "Đổi đơn vị" },
 ];
@@ -32,11 +31,10 @@ export const PhysicsDrawer: React.FC<PhysicsDrawerProps> = (props) => {
 
 const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
   onClose,
-  onInsertAction,
   onInsertFormulaLatex,
   onOpenHtmlSimModal,
 }) => {
-  const [tab, setTab] = useState<PhysicsDrawerTab>("diagrams");
+  const [tab, setTab] = useState<PhysicsDrawerTab>("formulas");
   const [query, setQuery] = useState("");
   const [convId, setConvId] = useState(PHYSICS_UNIT_CONVERSIONS[0].id);
   const [convInput, setConvInput] = useState("72");
@@ -113,7 +111,7 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
             ⚛ Công cụ Vật lý &amp; Sơ đồ
           </div>
           <div style={{ fontSize: 11.5, color: "#64748b" }}>
-            Sơ đồ mạch điện/lực/quang • Thước &amp; Đo đạc • Bảng tra cứu &amp; Đổi đơn vị
+            Bảng công thức, hằng số Vật lý &amp; Đổi đơn vị
           </div>
         </div>
         <button
@@ -182,7 +180,7 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm công thức / dụng cụ (vd: mach dien, thau kinh, newton...)"
+          placeholder="Tìm công thức, hằng số (vd: newton, om, song...)"
           style={{
             width: "100%",
             padding: "7px 10px",
@@ -228,58 +226,6 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
 
       {/* Scrollable Body */}
       <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-        {tab === "diagrams" && (
-          <>
-            {[
-              { id: "phys:diag:circuit", title: "⚡ Mạch điện DC (Định luật Ôm toàn mạch)", desc: "Nguồn E/r, điện trở, biến trở, khóa K bấm đóng/ngắt, Ampe kế & Vôn kế giải tự động." },
-              { id: "phys:diag:circuit_parallel", title: "⚡ Mạch phân nhánh R₁ // R₂", desc: "Đo cường độ mạch chính & hiệu điện thế đoạn mạch song song tức thời." },
-              { id: "phys:diag:fbd", title: "↗ Sơ đồ Phân tích lực & Chiếu Ox/Oy", desc: "Mặt phẳng nghiêng α chỉnh được, các vectơ lực P, N, Fms, F và hợp lực Fhl." },
-              { id: "phys:diag:optics", title: "🔍 Quang hình học (3 Tia sáng & Dựng ảnh)", desc: "Thấu kính hội tụ/phân kỳ & gương cầu; kéo d, |f| xem ảnh thật/ảo A'B' và độ phóng đại k." },
-              { id: "phys:inst:ruler", title: "📏 Thước đo tỉ lệ (cm / mm)", desc: "Đặt lên hình để đo trực tiếp hoặc xoay góc theo mặt nghiêng." },
-              { id: "phys:inst:protractor", title: "📐 Thước đo góc 0°–180°", desc: "Đo góc tới/khúc xạ hoặc góc nghiêng α ngay trên canvas." },
-              { id: "phys:inst:stopwatch", title: "⏱ Đồng hồ bấm giây", desc: "Đo thời gian thực hoặc bấm Lap khi thực hành." },
-              { id: "phys:labtable", title: "📝 Bảng số liệu thực hành & Hồi quy Oxy", desc: "Ghi cặp (x, y) từ số đo thực tế và vẽ đường hồi quy y = ax + b lên Oxy." },
-            ]
-              .filter((it) => !nq || normalizeVietnameseQuery(`${it.title} ${it.desc}`).includes(nq))
-              .map((it) => (
-                <div
-                  key={it.id}
-                  style={{
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 10,
-                    padding: 10,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 5,
-                  }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{it.title}</div>
-                  <div style={{ fontSize: 11.5, color: "#475569" }}>{it.desc}</div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onInsertAction(it.id);
-                      onClose();
-                    }}
-                    style={{
-                      alignSelf: "flex-start",
-                      padding: "4px 10px",
-                      borderRadius: 7,
-                      border: "none",
-                      background: "#0284c7",
-                      color: "#ffffff",
-                      fontSize: 11.5,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    + Chèn lên bảng
-                  </button>
-                </div>
-              ))}
-          </>
-        )}
-
         {tab === "formulas" && (
           <>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#0f766e" }}>
