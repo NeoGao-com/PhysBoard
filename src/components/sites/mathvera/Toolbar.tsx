@@ -627,7 +627,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   const TOOLBAR_FONT =
-    'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif)';
+    'var(--font-sans, "Be Vietnam Pro", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif)';
 
   const btnBaseStyle: React.CSSProperties = {
     height: 26,
@@ -653,10 +653,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   const activeStyle: React.CSSProperties = {
     ...btnBaseStyle,
-    background: "#eef2ff",
-    color: "#4338ca",
+    background: "#eff6ff",
+    color: "#1d4ed8",
     fontWeight: 700,
-    boxShadow: "0 0 0 1.5px rgba(99, 102, 241, 0.5)",
+    boxShadow: "0 0 0 1.5px rgba(37, 99, 235, 0.4)",
   };
 
   const caretStyle: React.CSSProperties = {
@@ -697,15 +697,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     left: menuPos?.left ?? 12,
     zIndex: 5100,
     background: "rgba(255, 255, 255, 0.98)",
-    backdropFilter: "blur(12px)",
-    border: "1px solid #e0e7ff",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    border: "1px solid #e2e8f0",
     borderRadius: 14,
     boxShadow:
-      "0 12px 36px rgba(99, 102, 241, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08)",
+      "0 14px 34px -4px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.06)",
     padding: 6,
     display: "flex",
     flexDirection: "column",
-    gap: 2,
+    gap: 3,
     fontFamily: TOOLBAR_FONT,
   };
 
@@ -743,12 +744,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           alignItems: "center",
           gap: 4,
           padding: "4px 8px",
-          background: "rgba(255, 255, 255, 0.95)",
-          backdropFilter: "blur(12px)",
-          border: "1px solid rgba(203, 213, 225, 0.9)",
-          borderRadius: 20,
+          background: "rgba(255, 255, 255, 0.96)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          border: "1px solid rgba(226, 232, 240, 0.95)",
+          borderRadius: 16,
           boxShadow:
-            "0 10px 30px rgba(99, 102, 241, 0.16), 0 2px 10px rgba(15, 23, 42, 0.08)",
+            "0 12px 30px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(255, 255, 255, 0.7) inset",
           fontFamily: TOOLBAR_FONT,
           userSelect: "none",
         }}
@@ -922,12 +924,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         flexWrap: "nowrap",
         gap: isPortrait ? 2 : 4,
         padding: isPortrait ? "4px 6px" : "4px 8px",
-        background: "rgba(255, 255, 255, 0.97)",
-        backdropFilter: "blur(10px)",
-        border: "1px solid rgba(203, 213, 225, 0.85)",
-        borderRadius: embedded ? 12 : 18,
+        background: "rgba(255, 255, 255, 0.96)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        border: "1px solid rgba(226, 232, 240, 0.95)",
+        borderRadius: embedded ? 12 : 16,
         boxShadow:
-          "0 10px 32px rgba(99, 102, 241, 0.14), 0 2px 10px rgba(15, 23, 42, 0.08)",
+          "0 12px 30px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(255, 255, 255, 0.7) inset",
         fontFamily: TOOLBAR_FONT,
         overflow: "visible",
       }}
