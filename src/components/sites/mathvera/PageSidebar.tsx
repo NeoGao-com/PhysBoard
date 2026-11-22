@@ -14,6 +14,8 @@ export interface PageSidebarProps {
   onDeletePage?: (page: number) => void;
   onOpenPageManager?: () => void;
   onInsertPdfPages?: (pages: ImportedPdfPage[]) => void;
+  onOpenSimLauncher?: () => void;
+  hasActiveSim?: boolean;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -39,6 +41,8 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onDeletePage,
   onOpenPageManager,
   onInsertPdfPages,
+  onOpenSimLauncher,
+  hasActiveSim = false,
   canUndo = false,
   canRedo = false,
   onUndo,
@@ -689,6 +693,33 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           <IconPdf size={13} color="#e11d48" />
           <span>{pdfImporting ? "Đang nạp..." : "Chèn PDF"}</span>
         </button>
+
+        {onOpenSimLauncher && (
+          <button
+            type="button"
+            onClick={onOpenSimLauncher}
+            data-action="open-sim-launcher-sidebar"
+            title="Mở thư viện thí nghiệm PhET Online & File HTML Offline"
+            style={{
+              width: "100%",
+              background: hasActiveSim ? "#ecfdf5" : "#f0fdfa",
+              color: hasActiveSim ? "#047857" : "#0f766e",
+              border: `1px solid ${hasActiveSim ? "#6ee7b7" : "#99f6e4"}`,
+              borderRadius: 6,
+              padding: "6px 0",
+              fontSize: 11.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+            }}
+          >
+            <span>⚗</span>
+            <span>{hasActiveSim ? "Thí nghiệm ●" : "Thí nghiệm"}</span>
+          </button>
+        )}
 
         <button
           type="button"

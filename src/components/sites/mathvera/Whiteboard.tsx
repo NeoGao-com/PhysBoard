@@ -154,6 +154,9 @@ import { MathEditor, ensureMathLiveRegistered } from "./MathEditor";
 import { RealWorldDrawer } from "./RealWorldDrawer";
 import { PhysicsDrawer } from "./PhysicsDrawer";
 import { MathFormulasDrawer } from "./MathFormulasDrawer";
+import { SimLauncherModal } from "./SimLauncherModal";
+import { FullscreenSimOverlay } from "./FullscreenSimOverlay";
+import type { ActiveSimSession } from "@/lib/sim-library";
 import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportPdfModal } from "./ExportPdfModal";
 import { BoardManagerModal } from "./BoardManagerModal";
@@ -669,6 +672,41 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [realWorldDrawerOpen, setRealWorldDrawerOpen] = useState(false);
   const [physicsDrawerOpen, setPhysicsDrawerOpen] = useState(false);
   const [mathDrawerOpen, setMathDrawerOpen] = useState(false);
+  const [simLauncherOpen, setSimLauncherOpen] = useState(false);
+  const [activeSim, setActiveSim] = useState<ActiveSimSession | null>(null);
+  const [simMinimized, setSimMinimized] = useState(false);
+  const activeSimBlobUrlRef = useRef<string | null>(null);
+
+  const handleLaunchSimSession = useCallback((nextSession: ActiveSimSession) => {
+    if (activeSimBlobUrlRef.current && activeSimBlobUrlRef.current !== nextSession.iframeSrc) {
+      URL.revokeObjectURL(activeSimBlobUrlRef.current);
+      activeSimBlobUrlRef.current = null;
+    }
+    if (nextSession.isBlobUrl) {
+      activeSimBlobUrlRef.current = nextSession.iframeSrc;
+    }
+    setActiveSim(nextSession);
+    setSimMinimized(false);
+  }, []);
+
+  const handleCloseSimSession = useCallback(() => {
+    if (activeSimBlobUrlRef.current) {
+      URL.revokeObjectURL(activeSimBlobUrlRef.current);
+      activeSimBlobUrlRef.current = null;
+    }
+    setActiveSim(null);
+    setSimMinimized(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (activeSimBlobUrlRef.current) {
+        URL.revokeObjectURL(activeSimBlobUrlRef.current);
+        activeSimBlobUrlRef.current = null;
+      }
+    };
+  }, []);
+
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false);
   const isPortrait = useWindowOrientation();
@@ -7081,6 +7119,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setPhysicsDrawerOpen(false);
         setMathDrawerOpen(true);
       }}
+      onOpenSimLauncher={() => {
+        handleSelectTool("select");
+        setPhysicsDrawerOpen(false);
+        setMathDrawerOpen(false);
+        setSimLauncherOpen(true);
+      }}
+      hasActiveSim={Boolean(activeSim)}
       onOpenCalculator={() => {
         if (!calculatorOpen) handleSelectTool("select");
         setCalculatorOpen((prev) => !prev);
@@ -7188,6 +7233,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onToggleOpen={() => setPageSidebarOpen((v) => !v)}
         onOpenPageManager={() => setPageManagerOpen(true)}
         onInsertPdfPages={handleInsertPdfPages}
+        onOpenSimLauncher={() => {
+          handleSelectTool("select");
+          setPhysicsDrawerOpen(false);
+          setMathDrawerOpen(false);
+          setSimLauncherOpen(true);
+        }}
+        hasActiveSim={Boolean(activeSim)}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undo}
@@ -9262,6 +9314,24 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           handleSelectTool("select");
         }}
+      />
+
+      {/* Fullscreen PhET Online & Offline HTML Simulation System */}
+      <SimLauncherModal
+        open={simLauncherOpen}
+        onClose={() => setSimLauncherOpen(false)}
+        activeSim={activeSim}
+        onResumeActive={() => setSimMinimized(false)}
+        onLaunchSession={handleLaunchSimSession}
+      />
+
+      <FullscreenSimOverlay
+        session={activeSim}
+        minimized={simMinimized}
+        onMinimize={() => setSimMinimized(true)}
+        onRestore={() => setSimMinimized(false)}
+        onClose={handleCloseSimSession}
+        onOpenLauncher={() => setSimLauncherOpen(true)}
       />
 
       {/* Searchable 100-item RealWorld Drawer */}

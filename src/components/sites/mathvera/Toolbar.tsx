@@ -146,6 +146,8 @@ export interface ToolbarProps {
   onOpenDecorHelp?: () => void;
   onOpenPhysicsDrawer?: () => void;
   onOpenMathDrawer?: () => void;
+  onOpenSimLauncher?: () => void;
+  hasActiveSim?: boolean;
   onGoHome?: () => void;
   onShare?: () => void;
   getBoardElement?: () => SVGSVGElement | HTMLElement | null;
@@ -225,6 +227,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenDecorHelp,
   onOpenPhysicsDrawer,
   onOpenMathDrawer,
+  onOpenSimLauncher,
+  hasActiveSim = false,
   onGoHome,
   onShare,
   getBoardElement,
@@ -1705,6 +1709,32 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               ∑
             </span>
             <span>Toán</span>
+          </button>
+        )}
+
+        {/* Fullscreen PhET / HTML Simulation Launcher */}
+        {onOpenSimLauncher && (
+          <button
+            type="button"
+            data-tool="sim-launcher"
+            data-action="open-sim-launcher"
+            onClick={onOpenSimLauncher}
+            style={{
+              ...btnBaseStyle,
+              ...(hasActiveSim
+                ? {
+                    background: "#ecfdf5",
+                    borderColor: "#6ee7b7",
+                    color: "#047857",
+                  }
+                : {}),
+            }}
+            title="Thí nghiệm mô phỏng PhET Online & File HTML Offline (toàn màn hình)"
+          >
+            <span style={{ color: hasActiveSim ? "#059669" : "#0d9488", fontWeight: 800, fontSize: 13, lineHeight: 1 }}>
+              ⚗
+            </span>
+            <span>Thí nghiệm</span>
           </button>
         )}
 
