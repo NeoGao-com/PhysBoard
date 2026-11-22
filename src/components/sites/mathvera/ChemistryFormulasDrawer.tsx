@@ -7,6 +7,7 @@ import {
   type ChemistryTopicCategory,
 } from "@/lib/chemistry-formulas";
 import { KaTeXFormula } from "./elements/MathElement";
+import { PeriodicTablePanel } from "./PeriodicTablePanel";
 
 export interface ChemistryFormulasDrawerProps {
   open: boolean;
@@ -23,6 +24,7 @@ const ChemistryFormulasDrawerContent: React.FC<ChemistryFormulasDrawerProps> = (
   onClose,
   onInsertFormulaLatex,
 }) => {
+  const [tab, setTab] = useState<"formulas" | "periodic">("formulas");
   const [topicFilter, setTopicFilter] = useState<ChemistryTopicCategory | "all">("all");
   const [query, setQuery] = useState("");
 
@@ -42,7 +44,7 @@ const ChemistryFormulasDrawerContent: React.FC<ChemistryFormulasDrawerProps> = (
         top: 52,
         right: 12,
         bottom: 16,
-        width: 410,
+        width: tab === "periodic" ? 860 : 410,
         maxWidth: "calc(100vw - 24px)",
         background: "#ffffff",
         border: "1px solid #cbd5e1",
@@ -52,6 +54,7 @@ const ChemistryFormulasDrawerContent: React.FC<ChemistryFormulasDrawerProps> = (
         display: "flex",
         flexDirection: "column",
         fontFamily: "system-ui, -apple-system, sans-serif",
+        transition: "width 0.18s ease",
       }}
     >
       {/* Header */}
@@ -67,10 +70,10 @@ const ChemistryFormulasDrawerContent: React.FC<ChemistryFormulasDrawerProps> = (
       >
         <div>
           <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
-            🧪 Bảng Công thức Hoá học 10–11–12
+            🧪 Hoá học 10–11–12 &amp; Bảng Tuần Hoàn
           </div>
           <div style={{ fontSize: 11.5, color: "#64748b" }}>
-            Mol &amp; Dung dịch • Nhiệt hoá • pH • Điện hoá • Hữu cơ &amp; Bảo toàn
+            Công thức theo chủ đề &amp; Bảng tuần hoàn 118 nguyên tố tương tác
           </div>
         </div>
         <button
@@ -91,6 +94,66 @@ const ChemistryFormulasDrawerContent: React.FC<ChemistryFormulasDrawerProps> = (
           ✕
         </button>
       </div>
+
+      {/* Mode Tabs */}
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          padding: "8px 12px 6px",
+          borderBottom: "1px solid #e2e8f0",
+          background: "#f8fafc",
+        }}
+      >
+        <button
+          type="button"
+          data-chem-tab="formulas"
+          onClick={() => setTab("formulas")}
+          style={{
+            flex: 1,
+            padding: "6px 10px",
+            borderRadius: 8,
+            border: tab === "formulas" ? "1px solid #059669" : "1px solid #e2e8f0",
+            background: tab === "formulas" ? "#ecfdf5" : "#ffffff",
+            color: tab === "formulas" ? "#047857" : "#475569",
+            fontSize: 12.5,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          📐 Công thức Hoá
+        </button>
+        <button
+          type="button"
+          data-chem-tab="periodic"
+          onClick={() => setTab("periodic")}
+          style={{
+            flex: 1,
+            padding: "6px 10px",
+            borderRadius: 8,
+            border: tab === "periodic" ? "1px solid #059669" : "1px solid #e2e8f0",
+            background: tab === "periodic" ? "#ecfdf5" : "#ffffff",
+            color: tab === "periodic" ? "#047857" : "#475569",
+            fontSize: 12.5,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          ⚛ Bảng Tuần Hoàn (118 NT)
+        </button>
+      </div>
+
+      {tab === "periodic" ? (
+        <div style={{ flex: 1, overflowY: "auto" }}>
+          <PeriodicTablePanel
+            onInsertFormulaLatex={(latex) => {
+              onInsertFormulaLatex(latex);
+              onClose();
+            }}
+          />
+        </div>
+      ) : (
+        <>
 
       {/* Search */}
       <div style={{ padding: "8px 12px 4px" }}>
@@ -271,6 +334,8 @@ const ChemistryFormulasDrawerContent: React.FC<ChemistryFormulasDrawerProps> = (
           </div>
         )}
       </div>
+        </>
+      )}
     </aside>
   );
 };
