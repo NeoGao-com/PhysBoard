@@ -13,6 +13,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "dist/**",
     "android/**",
+    "src-tauri/**",
     "next-env.d.ts",
   ]),
 ]);

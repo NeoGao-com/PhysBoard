@@ -1895,7 +1895,31 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
       if (commandId === "phys:drawer") {
         handleSelectTool("select");
+        setMathDrawerOpen(false);
+        setChemistryDrawerOpen(false);
         setPhysicsDrawerOpen(true);
+        return;
+      }
+      if (commandId === "math:drawer") {
+        handleSelectTool("select");
+        setPhysicsDrawerOpen(false);
+        setChemistryDrawerOpen(false);
+        setMathDrawerOpen(true);
+        return;
+      }
+      if (commandId === "chem:drawer") {
+        handleSelectTool("select");
+        setPhysicsDrawerOpen(false);
+        setMathDrawerOpen(false);
+        setChemistryDrawerOpen(true);
+        return;
+      }
+      if (commandId === "sim:launcher") {
+        handleSelectTool("select");
+        setPhysicsDrawerOpen(false);
+        setMathDrawerOpen(false);
+        setChemistryDrawerOpen(false);
+        setSimLauncherOpen(true);
         return;
       }
       switch (commandId) {
@@ -1971,11 +1995,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         case "action:exportPdf":
           setExportPdfModalOpen(true);
           break;
+        case "action:unlockAll":
+          handleUnlockAllLocked();
+          break;
       }
     },
     [
       handleSelectTool,
       handleDuplicateSelected,
+      handleUnlockAllLocked,
       zoomIn,
       zoomOut,
       resetView,

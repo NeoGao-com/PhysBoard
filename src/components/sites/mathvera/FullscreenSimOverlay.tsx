@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import type { ActiveSimSession } from "@/lib/sim-library";
 
 export interface FullscreenSimOverlayProps {
@@ -21,14 +21,12 @@ export const FullscreenSimOverlay: React.FC<FullscreenSimOverlayProps> = ({
   onOpenLauncher,
 }) => {
   const [reloadNonce, setReloadNonce] = useState(0);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-
-  // Reset loaded indicator whenever a new simulation or reload starts
-  useEffect(() => {
-    setIframeLoaded(false);
-  }, [session?.id, reloadNonce]);
+  const [loadedKey, setLoadedKey] = useState<string>("");
 
   if (!session) return null;
+
+  const currentKey = `${session.id}_${reloadNonce}`;
+  const iframeLoaded = loadedKey === currentKey;
 
   return (
     <>
@@ -230,13 +228,13 @@ export const FullscreenSimOverlay: React.FC<FullscreenSimOverlayProps> = ({
           )}
 
           <iframe
-            key={`${session.id}_${reloadNonce}`}
+            key={currentKey}
             src={session.iframeSrc}
             title={session.title}
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-pointer-lock"
             allow="fullscreen; accelerometer; gyroscope"
             allowFullScreen
-            onLoad={() => setIframeLoaded(true)}
+            onLoad={() => setLoadedKey(currentKey)}
             style={{
               width: "100%",
               height: "100%",

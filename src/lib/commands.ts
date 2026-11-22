@@ -670,7 +670,25 @@ export const WHITEBOARD_COMMANDS: CommandDescriptor[] = [
     defaultShortcut: null,
     keywords: "xuat pdf export",
   },
-  // --- Vật lý & Thí nghiệm ---
+  {
+    id: "action:unlockAll",
+    label: "Mở khoá tất cả khối đang khoá trên trang",
+    category: "actions",
+    icon: "🔓",
+    defaultShortcut: null,
+    description: "Mở khoá mọi đối tượng đã khoá cố định vào trang giấy",
+    keywords: "mo khoa unlock lock khoi doi tuong",
+  },
+  // --- Toán · Vật lý · Hoá học & Thí nghiệm ---
+  {
+    id: "math:drawer",
+    label: "Mở Bảng công thức Toán (10–11–12)",
+    category: "physics",
+    icon: "∑",
+    defaultShortcut: null,
+    description: "Đại số, Lượng giác, Giải tích, Hình học 2D/3D, Tổ hợp & Xác suất",
+    keywords: "toan cong thuc dai so luong giac giai tich hinh hoc xac suat",
+  },
   {
     id: "phys:drawer",
     label: "Mở Thư viện Vật lý THPT (10–11–12)",
@@ -679,6 +697,24 @@ export const WHITEBOARD_COMMANDS: CommandDescriptor[] = [
     defaultShortcut: null,
     description: "Mở bảng công thức, hằng số Vật lý & đổi đơn vị",
     keywords: "vat ly thu vien cong thuc hang so doi don vi lop 10 11 12",
+  },
+  {
+    id: "chem:drawer",
+    label: "Mở Công thức Hoá & Bảng Tuần Hoàn (118 NT)",
+    category: "physics",
+    icon: "🧪",
+    defaultShortcut: null,
+    description: "Công thức Hoá học 10–11–12 theo chủ đề & Bảng tuần hoàn tương tác",
+    keywords: "hoa hoc bang tuan hoan nguyen to cau hinh e mol ph dien hoa",
+  },
+  {
+    id: "sim:launcher",
+    label: "Mở Thí nghiệm Mô phỏng (PhET & HTML)",
+    category: "physics",
+    icon: "⚗",
+    defaultShortcut: null,
+    description: "Chạy toàn màn hình thí nghiệm PhET Online & file .html Offline",
+    keywords: "thi nghiem mo phong phet html offline toan man hinh",
   },
 ];
 
