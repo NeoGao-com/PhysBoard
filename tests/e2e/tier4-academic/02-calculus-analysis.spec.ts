@@ -210,4 +210,61 @@ test.describe('Tier 4: Academic Scenarios - Calculus & Function Analysis (Scenar
     await rwDrawer.locator('button[data-wb-art-id="tree"]').click();
     await expect(canvas.boardContent.locator('[data-wb-type="RealObject"]').first()).toBeVisible();
   });
+
+  test('should count multi-turn revolutions, show total rotated angle, and switch between Rad and Độ (°)', async ({ page }) => {
+    await toolbar.selectDropdownItem('Hàm số', 'Đường tròn lượng giác');
+    const center = await canvas.getCanvasCenter();
+    const ox = center.x - 100;
+    const oy = center.y;
+    await canvas.clickAt({ x: ox, y: oy });
+
+    const trigCircle = canvas.boardContent.locator('[data-wb-type="TrigCircle"]').first();
+    await expect(trigCircle).toBeVisible();
+
+    const readout = trigCircle.locator('[data-wb-trig-values="true"]');
+    const totalBox = trigCircle.locator('[data-wb-trig-total="true"]');
+    const turnsBox = trigCircle.locator('[data-wb-trig-turns="true"]');
+    await expect(readout).toBeVisible();
+
+    // 1. Starts in Rad (α = π/6, 30°), 0 complete revolutions
+    await expect(turnsBox).toContainText('Số vòng: 0 vòng');
+
+    // 2. Switch unit to Độ (°)
+    const degBtn = readout.locator('button[data-trig-unit="deg"]');
+    await degBtn.click();
+    await expect(degBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(totalBox).toContainText(/30[°∘]/);
+
+    // 3. Click "+1 vòng" -> total rotated angle becomes 390° (13π/6), 1 complete revolution
+    await readout.locator('button[data-trig-action="add-turn"]').click();
+    await expect(turnsBox).toContainText('Số vòng: +1 vòng');
+    await expect(turnsBox).toContainText('+1.08 vòng');
+    await expect(totalBox).toContainText(/390[°∘]/);
+    await expect(totalBox).toContainText(/13π/);
+
+    // 4. Reset to base turn ("0 vòng"), switch back to Rad, and drag M continuously around a full CCW loop (+1 turn)
+    await readout.locator('button[data-trig-action="reset-turns"]').click();
+    await expect(turnsBox).toContainText('Số vòng: 0 vòng');
+
+    const pointM = trigCircle.locator('[data-wb-point="M"]').first();
+    const mBox = await pointM.boundingBox();
+    expect(mBox).not.toBeNull();
+    if (mBox) {
+      const r = 117;
+      await page.mouse.move(mBox.x + mBox.width / 2, mBox.y + mBox.height / 2);
+      await page.mouse.down();
+      // Sweep CCW: 90° -> 180° -> 270° -> 360° -> 405°
+      await page.mouse.move(ox, oy - r, { steps: 6 });
+      await page.mouse.move(ox - r, oy, { steps: 6 });
+      await page.mouse.move(ox, oy + r, { steps: 6 });
+      await page.mouse.move(ox + r, oy, { steps: 6 });
+      await page.mouse.move(ox + r * Math.SQRT1_2, oy - r * Math.SQRT1_2, { steps: 6 });
+      await page.mouse.up();
+    }
+
+    // After >1 full CCW loop from 30°, total turns should be +1 vòng (~405°, +1.13 vòng)
+    await expect(turnsBox).toContainText('Số vòng: +1 vòng');
+    await expect(turnsBox).toContainText('ngược KĐH');
+    await expect(totalBox).toContainText(/405[°∘]/);
+  });
 });

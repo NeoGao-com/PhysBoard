@@ -1710,10 +1710,51 @@ export function snapTrigAngle(rad: number, snapThreshold = 0.06): number {
   return norm;
 }
 
+/**
+ * Snaps an unwrapped continuous radian angle to the nearest special trigonometric
+ * angle on the SAME revolution `k`, preserving exact multi-turn rotation count.
+ */
+export function snapTrigAngleContinuous(
+  unwrappedRad: number,
+  snapThreshold = 0.06
+): number {
+  const norm = normalizeAngle(unwrappedRad);
+  const k = Math.round((unwrappedRad - norm) / (2 * Math.PI));
+  for (const s of SPECIAL_TRIG_ANGLES) {
+    if (Math.abs(norm - s.rad) < snapThreshold) {
+      return k * 2 * Math.PI + s.rad;
+    }
+    if (s.rad === Math.PI && Math.abs(Math.abs(norm) - Math.PI) < snapThreshold) {
+      const signedPi = norm < 0 ? -Math.PI : Math.PI;
+      return k * 2 * Math.PI + signedPi;
+    }
+  }
+  return unwrappedRad;
+}
+
+function formatRadMultipleOfPiLatex(totalDeg: number): string {
+  if (totalDeg === 0) return "0";
+  const simp = simplifyFraction(totalDeg, 180);
+  if (simp.d === 1) {
+    if (simp.n === 1) return "\\pi";
+    if (simp.n === -1) return "-\\pi";
+    return `${simp.n}\\pi`;
+  }
+  const sign = simp.n < 0 ? "-" : "";
+  const absN = Math.abs(simp.n);
+  const numStr = absN === 1 ? "\\pi" : `${absN}\\pi`;
+  return `${sign}\\frac{${numStr}}{${simp.d}}`;
+}
+
 export interface TrigReadout {
   angleRad: number;
   angleDeg: number;
   angleLatex: string;
+  totalDegLatex: string;
+  totalRadLatex: string;
+  decompositionLatex: string | null;
+  turns: number;
+  revolutions: number;
   cos: number;
   sin: number;
   tan: number | null;
@@ -1726,21 +1767,54 @@ export interface TrigReadout {
 
 export function computeTrigValues(angleRad: number, unit: "rad" | "deg" = "rad"): TrigReadout {
   const norm = normalizeAngle(angleRad);
+  const k = Math.round((angleRad - norm) / (2 * Math.PI));
   const cos = Math.cos(angleRad);
   const sin = Math.sin(angleRad);
   const tan = Math.abs(cos) < 1e-6 ? null : sin / cos;
   const cot = Math.abs(sin) < 1e-6 ? null : cos / sin;
-  const deg = (angleRad * 180) / Math.PI;
 
   const special = SPECIAL_TRIG_ANGLES.find(
     (s) => Math.abs(norm - s.rad) < 1e-4 || (s.rad === Math.PI && Math.abs(Math.abs(norm) - Math.PI) < 1e-4)
   );
 
   if (special) {
+    const baseDeg =
+      special.rad === Math.PI && norm < 0 ? -180 : special.deg;
+    const totalDeg = baseDeg + k * 360;
+    const turns = Math.trunc((totalDeg + (totalDeg >= 0 ? 1e-4 : -1e-4)) / 360);
+    const revolutions = totalDeg / 360;
+    const totalDegLatex = `${totalDeg}^{\\circ}`;
+    const totalRadLatex = formatRadMultipleOfPiLatex(totalDeg);
+
+    let decompositionLatex: string | null = null;
+    const remDeg = totalDeg - turns * 360;
+    if (turns !== 0 && (remDeg !== 0 || Math.abs(turns) >= 2)) {
+      const absTurns = Math.abs(turns);
+      const turnCoeff = absTurns === 1 ? "" : `${absTurns} \\cdot `;
+      const signOp = turns > 0 ? "+" : "-";
+      if (unit === "deg") {
+        decompositionLatex =
+          remDeg === 0
+            ? `${turns < 0 ? "-" : ""}${turnCoeff}360^{\\circ}`
+            : `${remDeg}^{\\circ} ${signOp} ${turnCoeff}360^{\\circ}`;
+      } else {
+        const remRadLatex = formatRadMultipleOfPiLatex(remDeg);
+        decompositionLatex =
+          remDeg === 0
+            ? `${turns < 0 ? "-" : ""}${turnCoeff}2\\pi`
+            : `${remRadLatex} ${signOp} ${turnCoeff}2\\pi`;
+      }
+    }
+
     return {
       angleRad,
-      angleDeg: special.deg,
-      angleLatex: unit === "deg" ? `${special.deg}^{\\circ}` : special.radLatex,
+      angleDeg: totalDeg,
+      angleLatex: unit === "deg" ? totalDegLatex : totalRadLatex,
+      totalDegLatex,
+      totalRadLatex,
+      decompositionLatex,
+      turns,
+      revolutions,
       cos: Math.abs(cos) < 1e-10 ? 0 : cos,
       sin: Math.abs(sin) < 1e-10 ? 0 : sin,
       tan,
@@ -1752,13 +1826,21 @@ export function computeTrigValues(angleRad: number, unit: "rad" | "deg" = "rad")
     };
   }
 
+  const deg = (angleRad * 180) / Math.PI;
+  const turns = Math.trunc((deg + (deg >= 0 ? 1e-4 : -1e-4)) / 360);
+  const revolutions = angleRad / (2 * Math.PI);
+  const totalDegLatex = `${deg.toFixed(1).replace(/\.0$/, "")}^{\\circ}`;
+  const totalRadLatex = `${angleRad.toFixed(2)}\\text{ rad}`;
+
   return {
     angleRad,
     angleDeg: deg,
-    angleLatex:
-      unit === "deg"
-        ? `${deg.toFixed(1).replace(/\.0$/, "")}^{\\circ}`
-        : `${angleRad.toFixed(2)}`,
+    angleLatex: unit === "deg" ? totalDegLatex : `${angleRad.toFixed(2)}`,
+    totalDegLatex,
+    totalRadLatex,
+    decompositionLatex: null,
+    turns,
+    revolutions,
     cos,
     sin,
     tan,

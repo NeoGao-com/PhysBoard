@@ -5,7 +5,7 @@ import { CanvasElement } from "@/types/whiteboard";
 import {
   computeTrigValues,
   normalizeAngle,
-  snapTrigAngle,
+  snapTrigAngleContinuous,
 } from "@/lib/math-eval";
 import { KaTeXFormula } from "./MathElement";
 
@@ -36,17 +36,32 @@ const SPECIAL_ANGLES_RAD = [
   -Math.PI / 6,
 ];
 
-const PRESET_ANGLES: Array<{ label: string; latex: string; rad: number }> = [
-  { label: "π/6", latex: "\\frac{\\pi}{6}", rad: Math.PI / 6 },
-  { label: "π/4", latex: "\\frac{\\pi}{4}", rad: Math.PI / 4 },
-  { label: "2π/3", latex: "\\frac{2\\pi}{3}", rad: (2 * Math.PI) / 3 },
-  { label: "-3π/4", latex: "-\\frac{3\\pi}{4}", rad: (-3 * Math.PI) / 4 },
-  { label: "120°", latex: "120^{\\circ}", rad: (2 * Math.PI) / 3 },
+const PRESET_ANGLES_RAD: Array<{ label: string; rad: number }> = [
+  { label: "0", rad: 0 },
+  { label: "π/6", rad: Math.PI / 6 },
+  { label: "π/4", rad: Math.PI / 4 },
+  { label: "π/3", rad: Math.PI / 3 },
+  { label: "π/2", rad: Math.PI / 2 },
+  { label: "2π/3", rad: (2 * Math.PI) / 3 },
+  { label: "π", rad: Math.PI },
+  { label: "2π", rad: 2 * Math.PI },
+];
+
+const PRESET_ANGLES_DEG: Array<{ label: string; rad: number }> = [
+  { label: "0°", rad: 0 },
+  { label: "30°", rad: Math.PI / 6 },
+  { label: "45°", rad: Math.PI / 4 },
+  { label: "60°", rad: Math.PI / 3 },
+  { label: "90°", rad: Math.PI / 2 },
+  { label: "120°", rad: (2 * Math.PI) / 3 },
+  { label: "180°", rad: Math.PI },
+  { label: "360°", rad: 2 * Math.PI },
 ];
 
 /**
  * Interactive Unit Trigonometric Circle (`[data-wb-type="TrigCircle"]`, `.wb-trig-circle`)
- * with draggable point `[data-wb-point="M"]` and live readout `[data-wb-trig-values="true"]`.
+ * with draggable point `[data-wb-point="M"]`, continuous multi-turn revolution tracking,
+ * unit switching (`rad` / `deg`), and live readout `[data-wb-trig-values="true"]`.
  */
 export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
   element,
@@ -71,6 +86,7 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
   const liveAngle = dragAngle ?? storedAngle;
   const circleRef = useRef<SVGCircleElement | null>(null);
   const latestAngleRef = useRef<number>(storedAngle);
+  const unwrappedAngleRef = useRef<number>(storedAngle);
 
   const R = 2.6 * (element.transform.scale || 1);
   const invScale = 1 / (scale || 45);
@@ -83,22 +99,49 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
   const mx = R * Math.cos(liveAngle);
   const my = R * Math.sin(liveAngle);
 
-  // Angle arc SVG path from 0 to liveAngle
-  const arcPath = useMemo(() => {
-    const rArc = R * 0.24;
-    const norm = normalizeAngle(liveAngle);
-    if (Math.abs(norm) < 1e-4) return "";
-    const endX = rArc * Math.cos(norm);
-    const endY = -rArc * Math.sin(norm);
-    const largeArc = Math.abs(norm) > Math.PI ? 1 : 0;
-    const sweep = norm > 0 ? 0 : 1; // SVG Y is down so positive math angle sweeps CCW (0)
-    return `M ${rArc},0 A ${rArc},${rArc} 0 ${largeArc} ${sweep} ${endX.toFixed(4)},${endY.toFixed(4)}`;
+  // Archimedean spiral arc showing exact direction and number of revolutions from 0 to liveAngle
+  const { arcPath, arcArrowPoints } = useMemo(() => {
+    const absA = Math.abs(liveAngle);
+    if (absA < 1e-4) return { arcPath: "", arcArrowPoints: "" };
+    const steps = Math.max(16, Math.ceil((absA / (Math.PI * 2)) * 48));
+    const r0 = R * 0.16;
+    const rGrowth = R * 0.045;
+    const rMax = R * 0.52;
+    const radiusAt = (a: number) =>
+      Math.min(rMax, r0 + (Math.abs(a) / (Math.PI * 2)) * rGrowth);
+    const pts: string[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const a = (liveAngle * i) / steps;
+      const r = radiusAt(a);
+      const px = r * Math.cos(a);
+      const py = -r * Math.sin(a);
+      pts.push(`${i === 0 ? "M" : "L"}${px.toFixed(4)},${py.toFixed(4)}`);
+    }
+    const rEnd = radiusAt(liveAngle);
+    const endX = rEnd * Math.cos(liveAngle);
+    const endY = -rEnd * Math.sin(liveAngle);
+    const sign = liveAngle >= 0 ? 1 : -1;
+    const tx = -sign * Math.sin(liveAngle);
+    const ty = -sign * Math.cos(liveAngle);
+    const nx = -ty;
+    const ny = tx;
+    const ah = 0.11;
+    const aw = 0.055;
+    const p1x = endX - tx * ah + nx * aw;
+    const p1y = endY - ty * ah + ny * aw;
+    const p2x = endX - tx * ah - nx * aw;
+    const p2y = endY - ty * ah - ny * aw;
+    return {
+      arcPath: pts.join(" "),
+      arcArrowPoints: `${endX.toFixed(4)},${endY.toFixed(4)} ${p1x.toFixed(4)},${p1y.toFixed(4)} ${p2x.toFixed(4)},${p2y.toFixed(4)}`,
+    };
   }, [liveAngle, R]);
 
   const handlePointMDown = (e: React.PointerEvent<SVGCircleElement>) => {
     e.stopPropagation();
     e.preventDefault();
     latestAngleRef.current = storedAngle;
+    unwrappedAngleRef.current = storedAngle;
     setDragAngle(storedAngle);
 
     const updateFromClient = (clientX: number, clientY: number) => {
@@ -106,8 +149,16 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
       if (!rect) return;
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const rawAngle = Math.atan2(-(clientY - cy), clientX - cx);
-      const snapped = snapTrigAngle(rawAngle, 0.06);
+      const rawAtan = Math.atan2(-(clientY - cy), clientX - cx);
+      const prevWrapped = Math.atan2(
+        Math.sin(unwrappedAngleRef.current),
+        Math.cos(unwrappedAngleRef.current)
+      );
+      let delta = rawAtan - prevWrapped;
+      if (delta > Math.PI) delta -= 2 * Math.PI;
+      if (delta < -Math.PI) delta += 2 * Math.PI;
+      unwrappedAngleRef.current += delta;
+      const snapped = snapTrigAngleContinuous(unwrappedAngleRef.current, 0.06);
       latestAngleRef.current = snapped;
       setDragAngle(snapped);
     };
@@ -241,15 +292,18 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
           />
         ))}
 
-      {/* Angle arc */}
+      {/* Multi-turn spiral angle arc */}
       {arcPath && (
-        <path
-          d={arcPath}
-          fill="none"
-          stroke="#f59e0b"
-          strokeWidth={1.8}
-          vectorEffect="non-scaling-stroke"
-        />
+        <g pointerEvents="none">
+          <path
+            d={arcPath}
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth={1.8}
+            vectorEffect="non-scaling-stroke"
+          />
+          {arcArrowPoints && <polygon points={arcArrowPoints} fill="#f59e0b" />}
+        </g>
       )}
 
       {/* Projections for cos (blue) and sin (red) */}
@@ -404,32 +458,214 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
 
       {/* Live Trig Readout Panel */}
       <g transform={`translate(${axisExtent + 0.35} ${-R}) scale(${invScale})`}>
-        <foreignObject x={0} y={0} width={235} height={220} style={{ overflow: "visible" }}>
+        <foreignObject x={0} y={0} width={285} height={330} style={{ overflow: "visible" }}>
           <div
             data-wb-trig-values="true"
             className="wb-trig-readout"
             onPointerDown={(e) => e.stopPropagation()}
             style={{
-              background: "rgba(255,255,255,0.96)",
+              background: "rgba(255,255,255,0.97)",
               border: "1px solid #cbd5e1",
               borderRadius: 10,
               padding: "8px 10px",
-              boxShadow: "0 4px 12px rgba(15, 23, 42, 0.08)",
+              boxShadow: "0 4px 14px rgba(15, 23, 42, 0.1)",
               display: "flex",
               flexDirection: "column",
-              gap: 4,
+              gap: 5,
               fontSize: 13,
               fontFamily: "system-ui, sans-serif",
               pointerEvents: "auto",
-              minWidth: 195,
+              minWidth: 248,
             }}
           >
-            <div style={{ color: "#0f172a", fontWeight: 600 }}>
-              <KaTeXFormula latex={`\\alpha = ${readout.angleLatex}`} />
-              <span style={{ color: "#64748b", fontSize: 11, marginLeft: 6 }}>
-                ({readout.angleDeg.toFixed(0)}°)
+            {/* Header with Unit Toggle (Rad / Độ) */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                paddingBottom: 4,
+                borderBottom: "1px solid #f1f5f9",
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
+                Góc lượng giác
               </span>
+              <div
+                style={{
+                  display: "inline-flex",
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  overflow: "hidden",
+                  background: "#f8fafc",
+                }}
+              >
+                <button
+                  type="button"
+                  data-trig-unit="rad"
+                  aria-pressed={unit === "rad"}
+                  onClick={() => onUpdateProps?.(element.id, { unit: "rad" })}
+                  style={{
+                    padding: "2px 7px",
+                    fontSize: 11,
+                    fontWeight: unit === "rad" ? 700 : 500,
+                    border: "none",
+                    background: unit === "rad" ? "#2563eb" : "transparent",
+                    color: unit === "rad" ? "#ffffff" : "#475569",
+                    cursor: "pointer",
+                  }}
+                >
+                  Rad
+                </button>
+                <button
+                  type="button"
+                  data-trig-unit="deg"
+                  aria-pressed={unit === "deg"}
+                  onClick={() => onUpdateProps?.(element.id, { unit: "deg" })}
+                  style={{
+                    padding: "2px 7px",
+                    fontSize: 11,
+                    fontWeight: unit === "deg" ? 700 : 500,
+                    border: "none",
+                    background: unit === "deg" ? "#2563eb" : "transparent",
+                    color: unit === "deg" ? "#ffffff" : "#475569",
+                    cursor: "pointer",
+                  }}
+                >
+                  Độ (°)
+                </button>
+              </div>
             </div>
+
+            {/* Total Angle & Unit Equivalence */}
+            <div data-wb-trig-total="true" style={{ color: "#0f172a", fontWeight: 600 }}>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                <KaTeXFormula latex={`\\alpha = ${readout.angleLatex}`} />
+                <span style={{ color: "#64748b", fontSize: 11.5, fontWeight: 500 }}>
+                  {unit === "deg" ? (
+                    <>
+                      (<KaTeXFormula latex={readout.totalRadLatex} />)
+                    </>
+                  ) : (
+                    `(${readout.angleDeg.toFixed(1).replace(/\.0$/, "")}°)`
+                  )}
+                </span>
+              </div>
+              {readout.decompositionLatex && (
+                <div style={{ color: "#64748b", fontSize: 11.5, fontWeight: 500, marginTop: 1 }}>
+                  <span>= </span>
+                  <KaTeXFormula latex={readout.decompositionLatex} />
+                </div>
+              )}
+            </div>
+
+            {/* Revolution / Turn Counter & Quick Buttons */}
+            <div
+              data-wb-trig-turns="true"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                padding: "5px 7px",
+                borderRadius: 7,
+                background: "#fffbeb",
+                border: "1px solid #fde68a",
+                fontSize: 11.5,
+                color: "#92400e",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                <span style={{ fontWeight: 700 }}>
+                  Số vòng: {readout.turns > 0 ? "+" : readout.turns < 0 ? "−" : ""}
+                  {Math.abs(readout.turns)} vòng
+                </span>
+                <span style={{ color: "#b45309", fontSize: 11 }}>
+                  ({readout.revolutions >= 0 ? "+" : "−"}
+                  {Math.abs(readout.revolutions).toFixed(2)} vòng
+                  {Math.abs(readout.revolutions) >= 0.01
+                    ? readout.revolutions > 0
+                      ? " · ngược KĐH"
+                      : " · cùng KĐH"
+                    : ""}
+                  )
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button
+                  type="button"
+                  data-trig-action="sub-turn"
+                  title="Quay cùng chiều KĐH thêm 1 vòng (−360° / −2π)"
+                  onClick={() => {
+                    setDragAngle(null);
+                    onUpdateProps?.(element.id, {
+                      angle: Number((storedAngle - 2 * Math.PI).toFixed(8)),
+                    });
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "2px 5px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    borderRadius: 5,
+                    border: "1px solid #fcd34d",
+                    background: "#ffffff",
+                    color: "#92400e",
+                    cursor: "pointer",
+                  }}
+                >
+                  −1 vòng
+                </button>
+                <button
+                  type="button"
+                  data-trig-action="reset-turns"
+                  title="Đặt lại về vòng gốc (−180°..180°)"
+                  onClick={() => {
+                    setDragAngle(null);
+                    onUpdateProps?.(element.id, {
+                      angle: Number(normalizeAngle(storedAngle).toFixed(8)),
+                    });
+                  }}
+                  style={{
+                    padding: "2px 7px",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    borderRadius: 5,
+                    border: "1px solid #fcd34d",
+                    background: "#ffffff",
+                    color: "#78350f",
+                    cursor: "pointer",
+                  }}
+                >
+                  0 vòng
+                </button>
+                <button
+                  type="button"
+                  data-trig-action="add-turn"
+                  title="Quay ngược chiều KĐH thêm 1 vòng (+360° / +2π)"
+                  onClick={() => {
+                    setDragAngle(null);
+                    onUpdateProps?.(element.id, {
+                      angle: Number((storedAngle + 2 * Math.PI).toFixed(8)),
+                    });
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: "2px 5px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    borderRadius: 5,
+                    border: "1px solid #fcd34d",
+                    background: "#ffffff",
+                    color: "#92400e",
+                    cursor: "pointer",
+                  }}
+                >
+                  +1 vòng
+                </button>
+              </div>
+            </div>
+
             <div style={{ color: "#1565C0" }}>
               <KaTeXFormula latex={`\\cos\\alpha = ${readout.cosLatex}`} />
             </div>
@@ -457,12 +693,12 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
                   display: "flex",
                   flexWrap: "wrap",
                   gap: 3,
-                  marginTop: 4,
-                  paddingTop: 4,
+                  marginTop: 2,
+                  paddingTop: 5,
                   borderTop: "1px solid #e2e8f0",
                 }}
               >
-                {PRESET_ANGLES.map((preset) => (
+                {(unit === "deg" ? PRESET_ANGLES_DEG : PRESET_ANGLES_RAD).map((preset) => (
                   <button
                     key={preset.label}
                     type="button"
@@ -470,7 +706,6 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
                       setDragAngle(null);
                       onUpdateProps?.(element.id, {
                         angle: preset.rad,
-                        unit: preset.label.endsWith("°") ? "deg" : "rad",
                       });
                     }}
                     style={{
