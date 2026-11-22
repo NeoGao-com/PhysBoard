@@ -333,7 +333,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 9999,
+        zIndex: 10001,
         background: "rgba(15, 23, 42, 0.55)",
         backdropFilter: "blur(5px)",
         WebkitBackdropFilter: "blur(5px)",

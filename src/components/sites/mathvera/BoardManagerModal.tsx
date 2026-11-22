@@ -547,7 +547,6 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  onClose();
                   onOpenSettings();
                 }}
                 style={{
