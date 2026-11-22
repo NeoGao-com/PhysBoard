@@ -109,11 +109,8 @@ import { snapPointToInstruments } from "@/lib/instruments";
 import { buildShareUrl, sanitizeRoomId } from "@/lib/room";
 import {
   downloadBlob,
-  downloadText,
   exportPDF,
   exportPNG,
-  loadState,
-  serializeState,
 } from "@/lib/export";
 import {
   BOARD_FORMAT_OPTIONS,
@@ -149,9 +146,7 @@ import { MathEditor, ensureMathLiveRegistered } from "./MathEditor";
 import { RealWorldDrawer } from "./RealWorldDrawer";
 import { PhysicsDrawer } from "./PhysicsDrawer";
 import { CalculatorWidget } from "./CalculatorWidget";
-import { ExportModal } from "./ExportModal";
 import { ExportPdfModal } from "./ExportPdfModal";
-import { ExamEditor } from "./ExamEditor";
 import { BoardManagerModal } from "./BoardManagerModal";
 import { retrievePendingPdfPages } from "@/lib/board-manager";
 import type {
@@ -398,7 +393,6 @@ function newElId(prefix: string): string {
 
 export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps) {
   const activeRoomId = sanitizeRoomId(roomId ?? initialRoomId ?? "default");
-  const openFileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. Real-Time Sync, Awareness, Single-Tab Lock & Yjs Pages
   const {
@@ -683,11 +677,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [physicsDrawerOpen, setPhysicsDrawerOpen] = useState(false);
   const [htmlSimModalOpen, setHtmlSimModalOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
-  const [exportModalMode, setExportModalMode] = useState<"tikz" | "json" | null>(
-    null
-  );
   const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false);
-  const [examOpen, setExamOpen] = useState(false);
   const isPortrait = useWindowOrientation();
   const [pageSidebarOpen, setPageSidebarOpen] = useState(true);
 
@@ -858,17 +848,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const pageElements = useMemo(
     () =>
       elements.filter(
-        (el) =>
-          (isA4Format || (el.meta.page ?? 1) === currentPage) &&
-          el.type !== "ExamPaper" &&
-          el.type !== "ExamItem"
+        (el) => isA4Format || (el.meta.page ?? 1) === currentPage
       ),
     [elements, currentPage, isA4Format]
-  );
-
-  const hasPaper = useMemo(
-    () => elements.some((el) => el.type === "ExamPaper"),
-    [elements]
   );
 
   const hiddenCount = useMemo(
@@ -2141,9 +2123,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         case "action:fullscreen":
           handleToggleFullscreen();
           break;
-        case "action:openExam":
-          setExamOpen(true);
-          break;
         case "action:exportPng":
           if (doc) {
             exportPNG(containerRef.current, doc, currentPage)
@@ -2153,12 +2132,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           break;
         case "action:exportPdf":
           setExportPdfModalOpen(true);
-          break;
-        case "action:exportTikz":
-          setExportModalMode("tikz");
-          break;
-        case "action:openJson":
-          setExportModalMode("json");
           break;
       }
     },
@@ -2183,7 +2156,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(document.activeElement)) return;
-      if (examOpen || commandPaletteOpen) return;
+      if (commandPaletteOpen) return;
 
       const isModifier = e.metaKey || e.ctrlKey;
       const lower = e.key.toLowerCase();
@@ -2241,8 +2214,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           setMathSession(null);
         } else if (shareModalOpen) {
           setShareModalOpen(false);
-        } else if (exportModalMode) {
-          setExportModalMode(null);
         } else if (realWorldDrawerOpen) {
           setRealWorldDrawerOpen(false);
         } else if (physicsDrawerOpen) {
@@ -2282,14 +2253,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
-    examOpen,
     commandPaletteOpen,
     activeTool,
     selectedIds,
     pageElements,
     mathSession,
     shareModalOpen,
-    exportModalMode,
     realWorldDrawerOpen,
     physicsDrawerOpen,
     draftPolygonPts.length,
@@ -7175,17 +7144,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onOpenCalculator={() => setCalculatorOpen((prev) => !prev)}
       isCalculatorOpen={calculatorOpen}
       onGoHome={() => setBoardManagerOpen(true)}
-      onSaveFile={() => {
-        if (!doc) return;
-        const json = serializeState(doc, activeRoomId);
-        downloadText(
-          json,
-          `${activeRoomId || "physboard"}.phys.json`,
-          "application/json;charset=utf-8"
-        );
-        setStatusHint("✓ Đã lưu bài vẽ ra file (.phys.json)");
-      }}
-      onOpenFile={() => openFileInputRef.current?.click()}
       onOpenDecorHelp={() =>
         setStatusHint(
           "Chọn một đoạn thẳng trên bảng rồi dùng thanh Trang trí đoạn bên dưới."
@@ -7198,7 +7156,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setShareModalOpen(true);
       }}
       getBoardElement={() => containerRef.current}
-      hasPaper={hasPaper}
       labelScale={labelScale}
       dotScale={dotScale}
       boardConfig={currentBoardConfig}
@@ -7213,11 +7170,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       onScaleGeometry={(factor) => dispatcher.scaleGeometry(factor)}
       onChangeLabelScale={setLabelScale}
       onChangeDotScale={setDotScale}
-      onOpenExam={() => setExamOpen(true)}
       onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       onExportPdf={() => setExportPdfModalOpen(true)}
-      onExportTikz={() => setExportModalMode("tikz")}
-      onOpenJsonModal={() => setExportModalMode("json")}
       shortcutMap={shortcutMap}
       penOnlyMode={penOnlyMode}
       onTogglePenOnly={handleTogglePenOnly}
@@ -7250,105 +7204,58 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       data-room-id={activeRoomId}
       className="relative w-screen h-screen overflow-hidden select-none bg-[#FBFBFD]"
     >
-      <input
-        ref={openFileInputRef}
-        type="file"
-        accept=".json,application/json"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (!file || !doc) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            const text = typeof reader.result === "string" ? reader.result : "";
-            if (!text) return;
-            const res = loadState(doc, text);
-            if (res.ok) {
-              setStatusHint(`✓ Đã mở ${res.count} đối tượng từ file!`);
-            } else {
-              setStatusHint(`⚠ ${res.error ?? "File không hợp lệ"}`);
-            }
-          };
-          reader.readAsText(file);
-          e.target.value = "";
-        }}
-      />
       {/* Single-Tab Lock Screen */}
       {isTabLocked && <TabLockOverlay onRetry={releaseTabLock} />}
 
       {/* Offline Banner */}
       <OfflineBanner isOffline={!isConnected} />
 
-      {/* Main Whiteboard View vs Exam Authoring Mode */}
-      {examOpen ? (
-        <ExamEditor
-          open={examOpen}
-          doc={doc}
-          page={currentPage}
-          whiteboardToolbarSlot={renderToolbar(true)}
-          whiteboardSlot={renderCanvas(true)}
-          onClose={() => setExamOpen(false)}
-        />
-      ) : (
-        <>
-          <PageSidebar
-            currentPage={currentPage}
-            totalPages={pageCount}
-            pagePdfStatus={pagePdfStatus}
-            onTogglePagePdfLock={handleTogglePagePdfLock}
-            isOpen={pageSidebarOpen}
-            isPortrait={isPortrait}
-            onToggleOpen={() => setPageSidebarOpen((v) => !v)}
-            onOpenPageManager={() => setPageManagerOpen(true)}
-            onInsertPdfPages={handleInsertPdfPages}
-            onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onUndo={undo}
-            onRedo={redo}
-            selectedCount={selectedIds.length}
-            onDeleteSelected={handleDeleteSelected}
-            onOpenSettings={() => setSettingsModalOpen(true)}
-            onOpenBoardManager={() => setBoardManagerOpen(true)}
-            onSaveFile={() => {
-              if (!doc) return;
-              const json = serializeState(doc, activeRoomId);
-              downloadText(
-                json,
-                `${activeRoomId || "physboard"}.phys.json`,
-                "application/json;charset=utf-8"
-              );
-              setStatusHint("✓ Đã lưu bài vẽ ra file (.phys.json)");
-            }}
-            onOpenFile={() => openFileInputRef.current?.click()}
-            onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-            onSelectPage={(p) => {
-              setYjsCurrentPage(doc, p);
-              if (isA4Format) {
-                scrollToPage(p);
-              }
-            }}
-            onAddPage={() => {
-              const added = addYjsPage(doc);
-              if (isA4Format) {
-                setTimeout(() => {
-                  scrollToPage(added.count);
-                }, 40);
-              }
-            }}
-            onDeletePage={(p) => {
-              if (doc && pageCount > 1) {
-                deleteYjsPages(doc, [p]);
-              }
-            }}
-          />
-          {renderToolbar(false)}
-          {renderCanvas(false)}
-        </>
-      )}
+      {/* Main Whiteboard View */}
+      <PageSidebar
+        currentPage={currentPage}
+        totalPages={pageCount}
+        pagePdfStatus={pagePdfStatus}
+        onTogglePagePdfLock={handleTogglePagePdfLock}
+        isOpen={pageSidebarOpen}
+        isPortrait={isPortrait}
+        onToggleOpen={() => setPageSidebarOpen((v) => !v)}
+        onOpenPageManager={() => setPageManagerOpen(true)}
+        onInsertPdfPages={handleInsertPdfPages}
+        onOpenHtmlSimModal={() => setHtmlSimModalOpen(true)}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        selectedCount={selectedIds.length}
+        onDeleteSelected={handleDeleteSelected}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenBoardManager={() => setBoardManagerOpen(true)}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+        onSelectPage={(p) => {
+          setYjsCurrentPage(doc, p);
+          if (isA4Format) {
+            scrollToPage(p);
+          }
+        }}
+        onAddPage={() => {
+          const added = addYjsPage(doc);
+          if (isA4Format) {
+            setTimeout(() => {
+              scrollToPage(added.count);
+            }, 40);
+          }
+        }}
+        onDeletePage={(p) => {
+          if (doc && pageCount > 1) {
+            deleteYjsPages(doc, [p]);
+          }
+        }}
+      />
+      {renderToolbar(false)}
+      {renderCanvas(false)}
 
       {/* Tool & Feature Instruction Guide Bar */}
-      {!examOpen && guideEnabled && (
+      {guideEnabled && (
         <InstructionGuideBar
           guide={activeGuideInfo}
           enabled={guideEnabled}
@@ -7498,7 +7405,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       )}
 
       {/* Fallback Construction Status Hint Pill (when guide is disabled but active construction is in progress) */}
-      {statusHint && !examOpen && !guideEnabled && (
+      {statusHint && !guideEnabled && (
         <div
           data-wb-construct-hint="true"
           data-export-skip="true"
@@ -7545,7 +7452,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       )}
 
       {/* Flood-Fill Name-Input Helper Strip */}
-      {activeTool === "floodFill" && !examOpen && (
+      {activeTool === "floodFill" && (
         <div
           data-export-skip="true"
           style={{
@@ -7653,7 +7560,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       )}
 
       {/* Contextual Segment Decoration Bar */}
-      {selectedSegment && !examOpen && (
+      {selectedSegment && (
         <div
           data-export-skip="true"
           style={{
@@ -7713,8 +7620,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       )}
 
       {/* Floating Selection Bar */}
-      {!examOpen && (
-        <SelectionBar
+      <SelectionBar
           sidebarOpen={pageSidebarOpen}
           isPortrait={isPortrait}
           selectedCount={selectedIds.length}
@@ -8305,10 +8211,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           onLockSelection={handleLockSelection}
           onUpdateInstrumentProps={handleUpdateElementProps}
         />
-      )}
 
       {/* 3D Orbital Controls Bar */}
-      {activeOrbitElement && !examOpen && (
+      {activeOrbitElement && (
         <OrbitBar
           visible={true}
           isPortrait={isPortrait}
@@ -9205,16 +9110,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }}
       />
 
-      {/* TikZ / JSON Export Modal */}
-      <ExportModal
-        open={exportModalMode !== null}
-        mode={exportModalMode ?? "tikz"}
-        doc={doc}
-        page={currentPage}
-        roomId={activeRoomId}
-        onClose={() => setExportModalMode(null)}
-      />
-
       {/* PDF Export Modal with Page Range & Filename Selection */}
       <ExportPdfModal
         open={exportPdfModalOpen}
@@ -9264,7 +9159,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         page={currentPage}
         totalPages={pageCount}
         getBoardElement={() => containerRef.current}
-        hasPaper={hasPaper}
         boardConfig={currentBoardConfig}
         onChangeBoardConfig={(next: PageBoardConfig) => {
           writePageBoardConfig(doc, currentPage, next);
@@ -9279,11 +9173,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onChangeLabelScale={setLabelScale}
         dotScale={dotScale}
         onChangeDotScale={setDotScale}
-        onOpenExam={() => setExamOpen(true)}
         onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onExportPdf={() => setExportPdfModalOpen(true)}
-        onExportTikz={() => setExportModalMode("tikz")}
-        onOpenJsonModal={() => setExportModalMode("json")}
       />
 
       {/* Share URL Modal */}
@@ -9393,9 +9284,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       />
 
       {/* Live Coordinate & Zoom HUD */}
-      {!examOpen && (
-        <div
-          data-wb-hud="true"
+      <div
+        data-wb-hud="true"
           data-export-skip="true"
           style={{
             position: "fixed",
@@ -9510,7 +9400,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             </span>
           )}
         </div>
-      )}
 
       {/* Board & Folder Manager Modal (Samsung Notes inspired) */}
       <BoardManagerModal

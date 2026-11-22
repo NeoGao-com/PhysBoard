@@ -655,14 +655,6 @@ export const WHITEBOARD_COMMANDS: CommandDescriptor[] = [
     keywords: "toan man hinh fullscreen",
   },
   {
-    id: "action:openExam",
-    label: "Chế độ soạn Đề thi",
-    category: "actions",
-    icon: "📝",
-    defaultShortcut: "Ctrl+E",
-    keywords: "soan de thi exam editor",
-  },
-  {
     id: "action:exportPng",
     label: "Xuất ảnh PNG",
     category: "actions",
@@ -677,22 +669,6 @@ export const WHITEBOARD_COMMANDS: CommandDescriptor[] = [
     icon: "📄",
     defaultShortcut: null,
     keywords: "xuat pdf export",
-  },
-  {
-    id: "action:exportTikz",
-    label: "Xuất mã LaTeX TikZ",
-    category: "actions",
-    icon: "📐",
-    defaultShortcut: null,
-    keywords: "xuat tikz latex code",
-  },
-  {
-    id: "action:openJson",
-    label: "Mở / Xuất JSON bảng vẽ",
-    category: "actions",
-    icon: "{ }",
-    defaultShortcut: null,
-    keywords: "json import export",
   },
   // --- Vật lý & Thí nghiệm ---
   {

@@ -37,7 +37,7 @@ test.describe('SettingsModal Responsive Redesign (Desktop Master-Detail & Mobile
     const scaleTab = sidebar.locator('button:has-text("Tỉ lệ & Cỡ chữ")');
     const toolbarTab = sidebar.locator('button:has-text("Ẩn/Hiện Công cụ")');
     const laserTab = sidebar.locator('button:has-text("Bút Laser")');
-    const exportTab = sidebar.locator('button:has-text("Xuất file & Đề thi")');
+    const exportTab = sidebar.locator('button:has-text("Xuất file PDF & PNG")');
 
     await expect(generalTab).toBeVisible();
     await expect(modularTab).toBeVisible();
@@ -64,10 +64,15 @@ test.describe('SettingsModal Responsive Redesign (Desktop Master-Detail & Mobile
     const labelDown = page.locator('[data-action="label-size-down"]');
     await expect(labelDown).toBeVisible();
 
-    // Click "Xuất file & Đề thi" and verify export actions appear
+    // Click "Xuất file PDF & PNG" and verify only PDF & PNG export actions appear (Exam/TikZ/JSON removed)
     await exportTab.click();
     const pdfExport = page.locator('[data-action="export-pdf"]');
+    const pngExport = page.locator('[data-action="export-png"]');
     await expect(pdfExport).toBeVisible();
+    await expect(pngExport).toBeVisible();
+    await expect(page.locator('[data-action="open-exam"]')).toHaveCount(0);
+    await expect(page.locator('[data-action="export-tikz"]')).toHaveCount(0);
+    await expect(page.locator('[data-action="export-json"]')).toHaveCount(0);
 
     // Click "Cập nhật ứng dụng" and verify update controls appear
     await updateTab.click();

@@ -360,7 +360,7 @@ export const ImageElement: React.FC<ImageElementProps> = ({
         y={-h / 2}
         width={w}
         height={h}
-        preserveAspectRatio={isPdf ? "none" : "xMidYMid meet"}
+        preserveAspectRatio="xMidYMid meet"
         style={{ pointerEvents: isLocked ? "none" : "auto" }}
       />
       {isSelected && (

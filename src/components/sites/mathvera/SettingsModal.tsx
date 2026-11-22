@@ -65,7 +65,6 @@ export interface SettingsModalProps {
   page?: number;
   totalPages?: number;
   getBoardElement?: () => SVGSVGElement | HTMLElement | null;
-  hasPaper?: boolean;
   boardConfig?: PageBoardConfig;
   onChangeBoardConfig?: (next: PageBoardConfig) => void;
   onApplyBoardAllPages?: (cfg: PageBoardConfig) => void;
@@ -78,11 +77,8 @@ export interface SettingsModalProps {
   onChangeDotScale?: (nextScale: number) => void;
 
   // Utilities & Export
-  onOpenExam?: () => void;
   onOpenCommandPalette?: () => void;
   onExportPdf?: () => void;
-  onExportTikz?: () => void;
-  onOpenJsonModal?: () => void;
 }
 
 type SettingsTab =
@@ -141,9 +137,9 @@ const TAB_DEFS: TabMeta[] = [
   },
   {
     id: "export",
-    label: "Xuất file & Đề thi",
+    label: "Xuất file PDF & PNG",
     icon: "💾",
-    subtitle: "Soạn đề thi A4, xuất PDF, PNG, TikZ, lưu JSON",
+    subtitle: "Xuất tài liệu PDF chuẩn in ấn và xuất hình ảnh PNG sắc nét",
   },
   {
     id: "update",
@@ -197,7 +193,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   doc,
   page = 1,
   getBoardElement,
-  hasPaper = false,
   boardConfig = DEFAULT_PAGE_BOARD_CONFIG,
   onChangeBoardConfig,
   onApplyBoardAllPages,
@@ -206,11 +201,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeLabelScale,
   dotScale = 1.5,
   onChangeDotScale,
-  onOpenExam,
   onOpenCommandPalette,
   onExportPdf,
-  onExportTikz,
-  onOpenJsonModal,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [isMobile, setIsMobile] = useState(false);
@@ -2226,52 +2218,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </>
             )}
 
-            {/* ==================== TAB 7: XUẤT FILE & ĐỀ THI ==================== */}
+            {/* ==================== TAB 7: XUẤT FILE PDF & PNG ==================== */}
             {activeTab === "export" && (
               <>
-                {/* Soạn đề thi */}
-                <div style={CARD_BOX_STYLE}>
-                  <div style={CARD_TITLE_STYLE}>
-                    <span>📄</span>
-                    <span>Chế độ soạn thảo Đề thi & Phiếu bài tập A4</span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: isMobile ? "column" : "row",
-                      alignItems: isMobile ? "stretch" : "center",
-                      justifyContent: "space-between",
-                      gap: 12,
-                    }}
-                  >
-                    <div style={{ fontSize: 12.5, color: "#64748b" }}>
-                      Khổ giấy chuẩn in ấn A4, chia cột và chèn câu hỏi toán học/vật lý trắc nghiệm
-                    </div>
-                    <button
-                      type="button"
-                      data-action="open-exam"
-                      onClick={() => {
-                        onClose();
-                        onOpenExam?.();
-                      }}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: "#2563eb",
-                        color: "#ffffff",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
-                      }}
-                    >
-                      {hasPaper ? "Mở đề thi" : "Soạn đề thi khổ A4"}
-                    </button>
-                  </div>
-                </div>
-
                 {/* Xuất file */}
                 <div style={CARD_BOX_STYLE}>
                   <div style={CARD_TITLE_STYLE}>
@@ -2333,58 +2282,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     >
                       <span style={{ fontSize: 18 }}>🖼️</span>
                       <span>{busyPng ? "Đang xuất PNG…" : "Xuất ảnh PNG trang này"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      data-action="export-tikz"
-                      onClick={() => {
-                        onClose();
-                        onExportTikz?.();
-                      }}
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: 8,
-                        border: "1px solid #cbd5e1",
-                        background: "#ffffff",
-                        color: "#1e293b",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-                      }}
-                    >
-                      <span style={{ fontSize: 18 }}>📐</span>
-                      <span>Xuất mã TikZ (LaTeX)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      data-action="export-json"
-                      onClick={() => {
-                        onClose();
-                        onOpenJsonModal?.();
-                      }}
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: 8,
-                        border: "1px solid #cbd5e1",
-                        background: "#ffffff",
-                        color: "#1e293b",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-                      }}
-                    >
-                      <span style={{ fontSize: 18 }}>💾</span>
-                      <span>Lưu / Nạp file JSON</span>
                     </button>
                   </div>
                 </div>

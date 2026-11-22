@@ -150,8 +150,7 @@
 
 input,
 textarea,
-math-field,
-.wb-rte {
+math-field {
   -webkit-user-select: text;
   user-select: text;
 }
@@ -168,42 +167,9 @@ math-field {
   --contains-highlight-background-color: rgba(37, 99, 235, 0.08);
 }
 
-/* Exam Authoring Rich-Text Sheet Styles */
-.wb-rte p {
-  margin: 0.35em 0;
-}
-.wb-rte .x-row {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin: 4px 0;
-}
-.wb-rte .x-cell {
-  min-width: 0;
-}
-.wb-rte .x-a {
-  font-weight: 700;
-  color: #16a34a;
-}
-.wb-rte .x-s {
-  margin: 6px 0;
-  padding: 6px 10px;
-  border-left: 3px solid #93c5fd;
-  background: #f8fafc;
-}
-.wb-rte .wb-exam-fig img {
-  display: inline-block;
-  max-width: 100%;
-}
-
-/* Print view helper for exam authoring */
+/* Print view helper */
 @media print {
-  [data-export-skip="true"],
-  [data-wb-doc-toolbar="true"],
-  [data-wb-exam-bar="true"],
-  [data-wb-btn="matrix"],
-  [data-wb-exam-start="true"],
-  [data-wb-shot-dock="true"] {
+  [data-export-skip="true"] {
     display: none !important;
   }
 }

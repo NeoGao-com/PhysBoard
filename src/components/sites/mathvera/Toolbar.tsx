@@ -147,11 +147,8 @@ export interface ToolbarProps {
   onOpenPhysicsDrawer?: () => void;
   onOpenHtmlSimModal?: () => void;
   onGoHome?: () => void;
-  onSaveFile?: () => void;
-  onOpenFile?: () => void;
   onShare?: () => void;
   getBoardElement?: () => SVGSVGElement | HTMLElement | null;
-  hasPaper?: boolean;
   labelScale?: number;
   dotScale?: number;
   boardConfig?: PageBoardConfig;
@@ -160,7 +157,6 @@ export interface ToolbarProps {
   onScaleGeometry?: (factor: number) => void;
   onChangeLabelScale?: (nextScale: number) => void;
   onChangeDotScale?: (nextScale: number) => void;
-  onOpenExam?: () => void;
   onOpenCalculator?: () => void;
   isCalculatorOpen?: boolean;
   onOpenCommandPalette?: () => void;
@@ -168,8 +164,6 @@ export interface ToolbarProps {
   isFitLocked?: boolean;
   onToggleFitLock?: () => void;
   onExportPdf?: () => void;
-  onExportTikz?: () => void;
-  onOpenJsonModal?: () => void;
   shortcutMap?: ShortcutMap;
   embedded?: boolean;
   penOnlyMode?: boolean;
@@ -232,11 +226,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenPhysicsDrawer,
   onOpenHtmlSimModal,
   onGoHome,
-  onSaveFile,
-  onOpenFile,
   onShare,
   getBoardElement,
-  hasPaper = false,
   labelScale = 1,
   dotScale = 1.5,
   boardConfig,
@@ -245,7 +236,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onScaleGeometry,
   onChangeLabelScale,
   onChangeDotScale,
-  onOpenExam,
   onOpenCalculator,
   isCalculatorOpen,
   onOpenCommandPalette,
@@ -253,8 +243,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   isFitLocked = false,
   onToggleFitLock,
   onExportPdf,
-  onExportTikz,
-  onOpenJsonModal,
   shortcutMap,
   embedded = false,
   penOnlyMode = false,

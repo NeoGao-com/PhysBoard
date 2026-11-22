@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { PageBoardConfig, BOARD_SURFACE_PRESETS } from "@/lib/board-themes";
 import { importPdfPages, ImportedPdfPage } from "@/lib/pdf-import";
-import { IconPdf, IconHtmlSim, IconTrash, IconUndo, IconRedo, IconSettings, IconSave, IconOpenFile, IconCommand } from "./ToolbarIcons";
+import { IconPdf, IconHtmlSim, IconTrash, IconUndo, IconRedo, IconSettings, IconCommand } from "./ToolbarIcons";
 import { Folder } from "lucide-react";
 
 export interface PageSidebarProps {
@@ -22,8 +22,6 @@ export interface PageSidebarProps {
   selectedCount?: number;
   onDeleteSelected?: () => void;
   onOpenSettings?: () => void;
-  onSaveFile?: () => void;
-  onOpenFile?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenBoardManager?: () => void;
   boardConfig?: PageBoardConfig;
@@ -50,8 +48,6 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   selectedCount = 0,
   onDeleteSelected,
   onOpenSettings,
-  onSaveFile,
-  onOpenFile,
   onOpenCommandPalette,
   onOpenBoardManager,
   boardConfig,
@@ -631,93 +627,41 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           )}
         </div>
 
-        {/* File & Command Actions: Save, Open, Commands */}
-        {(onSaveFile || onOpenFile || onOpenCommandPalette) && (
+        {/* Command Palette Button */}
+        {onOpenCommandPalette && (
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: 4,
+              justifyContent: "center",
               padding: "4px 0",
               borderBottom: "1px solid #f1f5f9",
               marginBottom: 4,
             }}
           >
-            {onSaveFile && (
-              <button
-                type="button"
-                onClick={onSaveFile}
-                title="Lưu bài vẽ ra file (.phys.json)"
-                style={{
-                  flex: 1,
-                  height: 28,
-                  background: "#f8fafc",
-                  color: "#334155",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 3,
-                  fontSize: 11,
-                  fontWeight: 600,
-                }}
-              >
-                <IconSave size={13} />
-                <span>Lưu</span>
-              </button>
-            )}
-
-            {onOpenFile && (
-              <button
-                type="button"
-                onClick={onOpenFile}
-                title="Mở file bài vẽ (.json)"
-                style={{
-                  flex: 1,
-                  height: 28,
-                  background: "#f8fafc",
-                  color: "#334155",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 3,
-                  fontSize: 11,
-                  fontWeight: 600,
-                }}
-              >
-                <IconOpenFile size={13} />
-                <span>Mở</span>
-              </button>
-            )}
-
-            {onOpenCommandPalette && (
-              <button
-                type="button"
-                onClick={onOpenCommandPalette}
-                title="Cửa sổ lệnh & Phím tắt"
-                style={{
-                  width: 28,
-                  height: 28,
-                  background: "#f8fafc",
-                  color: "#334155",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <IconCommand size={13} />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              title="Cửa sổ lệnh & Phím tắt"
+              style={{
+                width: "100%",
+                height: 28,
+                background: "#f8fafc",
+                color: "#334155",
+                border: "1px solid #e2e8f0",
+                borderRadius: 6,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                fontSize: 11.5,
+                fontWeight: 600,
+              }}
+            >
+              <IconCommand size={13} />
+              <span>Phím tắt & Lệnh</span>
+            </button>
           </div>
         )}
 

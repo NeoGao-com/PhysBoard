@@ -107,8 +107,6 @@ export type WhiteboardElementType =
   | "Network"
   | "RealObject"
   | "LineDecor"
-  | "ExamPaper"
-  | "ExamItem"
   | "PhysicsDiagram"
   | "PhysicsInstrument"
   | "PhysicsLabTable"

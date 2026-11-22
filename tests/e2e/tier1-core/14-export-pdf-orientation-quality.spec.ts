@@ -151,7 +151,7 @@ test.describe("Tier 1: 14 PDF Export Orientation & Quality Verification", () => 
 
     // 4. Open Export PDF modal, choose "Tất cả các trang"
     await toolbar.openMoreMenu();
-    const exportTab = page.locator('button:has-text("Xuất file & Đề thi")');
+    const exportTab = page.locator('button:has-text("Xuất file")').first();
     if (await exportTab.isVisible()) await exportTab.click();
     await page.locator('[data-action="export-pdf"]').first().click();
 

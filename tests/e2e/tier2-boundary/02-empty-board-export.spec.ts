@@ -59,21 +59,4 @@ test.describe('Tier 2: 02 Empty Board Export Safeguards', () => {
     expect(result.isValidFormat).toBe(true);
     expect(result.sizeBytes).toBeGreaterThan(100);
   });
-
-  test('TC-02-B03: TikZ export on empty canvas outputs valid empty tikzpicture environment', async ({ page }) => {
-    const canvas = new CanvasDriver(page);
-    const toolbar = new ToolbarDriver(page);
-    const exportDriver = new ExportDriver(page);
-
-    expect(await canvas.getObjectCount()).toBe(0);
-
-    // Trigger TikZ export dialog
-    await toolbar.triggerExport('TikZ');
-
-    // Retrieve generated TikZ code
-    const tikzCode = await exportDriver.getTikZExportCode();
-
-    expect(tikzCode).toContain('\\begin{tikzpicture}');
-    expect(tikzCode).toContain('\\end{tikzpicture}');
-  });
 });

@@ -254,9 +254,9 @@ export class ToolbarDriver {
   /**
    * Trigger Export from More menu
    */
-  async triggerExport(format: 'PNG' | 'PDF' | 'TikZ') {
+  async triggerExport(format: 'PNG' | 'PDF') {
     await this.openMoreMenu();
-    const exportTab = this.page.locator('button:has-text("Xuất file & Đề thi")');
+    const exportTab = this.page.locator('button:has-text("Xuất file")').first();
     if (await exportTab.isVisible()) await exportTab.click();
     const exportBtn = this.page.locator(
       `[data-action="export-${format.toLowerCase()}"]`
@@ -270,17 +270,5 @@ export class ToolbarDriver {
       await confirmPdfBtn.waitFor({ state: 'visible', timeout: 5000 });
       await confirmPdfBtn.click();
     }
-  }
-
-  /**
-   * Open Exam Authoring Mode ("Mở đề thi" / "Soạn đề")
-   */
-  async openExamMode() {
-    await this.openMoreMenu();
-    const exportTab = this.page.locator('button:has-text("Xuất file & Đề thi")');
-    if (await exportTab.isVisible()) await exportTab.click();
-    const examBtn = this.page.locator('button[data-action="open-exam"], button:has-text("Mở đề thi"), button:has-text("Soạn đề")').first();
-    await examBtn.click();
-    await this.page.locator('[data-wb-exam-editor="true"], .wb-exam-editor').waitFor({ state: 'visible' });
   }
 }

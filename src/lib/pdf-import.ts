@@ -139,7 +139,6 @@ export async function importPdfPages(
   options: PdfImportOptions = {}
 ): Promise<ImportedPdfResult> {
   const maxPages = Math.min(MAX_PDF_PAGES, Math.max(1, options.maxPages ?? MAX_PDF_PAGES));
-  const renderScale = options.renderScale ?? 1.5;
   const maxWorldWidth = options.maxWorldWidth ?? 11;
 
   const pdfjs = await loadPdfJs();
@@ -156,6 +155,11 @@ export async function importPdfPages(
 
     for (let pageNum = 1; pageNum <= count; pageNum++) {
       const page = await pdfDoc.getPage(pageNum);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const maxBaseSide = Math.max(1, baseViewport.width, baseViewport.height);
+      // Target ~3200px on longest side (~300 DPI for A4), clamped cleanly so text & equations stay razor-sharp
+      const autoScale = Math.min(4.5, Math.max(3.2, 3200 / maxBaseSide));
+      const renderScale = options.renderScale ?? autoScale;
       const viewport = page.getViewport({ scale: renderScale });
 
       const canvas = document.createElement("canvas");
@@ -164,6 +168,8 @@ export async function importPdfPages(
 
       const ctx = canvas.getContext("2d");
       if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
