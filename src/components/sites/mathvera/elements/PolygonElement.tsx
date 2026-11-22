@@ -263,6 +263,7 @@ export const PolygonElement: React.FC<PolygonElementProps> = ({
 
   if (element.type === "GeomPolygon") {
     const props = element.props as Partial<GeomPolygonProps>;
+    const isBareShape = Boolean((props as Record<string, unknown>).bareShape);
     const embeddedPts = Array.isArray(props.points) ? (props.points as EmbeddedVertex[]) : null;
 
     let coords: Point2D[] = [];
@@ -280,15 +281,17 @@ export const PolygonElement: React.FC<PolygonElementProps> = ({
     if (coords.length < 3) return null;
 
     const strokeColor = activeColor ?? style.stroke ?? "#2563eb";
-    const fillColor = style.fill ?? "rgba(37,99,235,0.06)";
+    const fillColor = style.fill ?? (isBareShape ? "none" : "rgba(37,99,235,0.06)");
     const isTriangle = coords.length === 3;
     const polyPtsStr = coords.map((p) => `${p.x},${-p.y}`).join(" ");
-    const marksEnabled = getConstructMarksEnabled();
-    const autoMarks = embeddedPts ? detectPolygonAutoMarks(coords, marksEnabled) : null;
-    const rightAngleIndices = Array.isArray(props.rightAngles)
+    const marksEnabled = !isBareShape && getConstructMarksEnabled();
+    const autoMarks = !isBareShape && embeddedPts ? detectPolygonAutoMarks(coords, marksEnabled) : null;
+    const rightAngleIndices = isBareShape
+      ? []
+      : Array.isArray(props.rightAngles)
       ? props.rightAngles
       : autoMarks?.rightAngles ?? [];
-    const edgeTicks = props.edgeTicks ?? autoMarks?.edgeTicks ?? {};
+    const edgeTicks = isBareShape ? {} : props.edgeTicks ?? autoMarks?.edgeTicks ?? {};
     const dotRadius = (scale > 0 ? 1.8 / scale : 0.04) * dotScale;
     const lastPt = coords[coords.length - 1];
 
@@ -347,6 +350,7 @@ export const PolygonElement: React.FC<PolygonElementProps> = ({
 
         {/* Embedded preset vertices & labels */}
         {embeddedPts &&
+          !isBareShape &&
           coords.map((pt, idx) => {
             const vName = embeddedPts[idx]?.name ?? "";
             const prev = coords[(idx - 1 + coords.length) % coords.length];

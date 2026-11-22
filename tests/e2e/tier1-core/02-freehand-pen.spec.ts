@@ -451,4 +451,54 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     const latestCurve = canvas.getLatestObject();
     await expect(latestCurve).toHaveAttribute('data-element-type', 'Ink');
   });
+
+  test('TC-02-13: ShortStraw mid-edge rectangle beautification + quick Circle/Ellipse toggle & Revert pill', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+    await toolbar.selectTool('ink');
+
+    const initialCount = await canvas.getObjectCount();
+
+    // 1. Draw a rough rectangle starting from the middle of the top edge
+    await canvas.drawStroke([
+      { x: 350, y: 200 },
+      { x: 450, y: 202 },
+      { x: 452, y: 310 },
+      { x: 250, y: 312 },
+      { x: 248, y: 200 },
+      { x: 355, y: 200 },
+    ]);
+    await canvas.waitForObjectCount(initialCount + 1);
+    const rectEl = canvas.getLatestObject();
+    await expect(rectEl).toHaveAttribute('data-element-type', 'GeomPolygon');
+    // Bare shape must not draw auto A/B/C/D vertex labels
+    await expect(rectEl.locator('[data-wb-vertex="true"]')).toHaveCount(0);
+
+    // 2. Draw an oval and test the floating post-snap pill (toggle Circle <-> Ellipse & Revert)
+    const ovalPts: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= 24; i++) {
+      const angle = (i / 24) * 2 * Math.PI;
+      ovalPts.push({
+        x: 640 + 80 * Math.cos(angle),
+        y: 350 + 45 * Math.sin(angle),
+      });
+    }
+    await canvas.drawStroke(ovalPts);
+    await canvas.waitForObjectCount(initialCount + 2);
+
+    const pill = page.locator('[data-wb-ink-snap-pill="true"]');
+    await expect(pill).toBeVisible();
+
+    // Toggle to Circle
+    const toggleBtn = pill.locator('[data-action="toggle-circle-ellipse"]');
+    await expect(toggleBtn).toBeVisible();
+    await toggleBtn.click();
+    await expect(canvas.getLatestObject()).toHaveAttribute('data-wb-type', 'circle');
+
+    // Revert back to raw Ink stroke
+    const revertBtn = pill.locator('[data-action="revert-ink-snap"]');
+    await revertBtn.click();
+    await expect(pill).not.toBeVisible();
+    await expect(canvas.getLatestObject()).toHaveAttribute('data-element-type', 'Ink');
+  });
 });

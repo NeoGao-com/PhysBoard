@@ -145,6 +145,7 @@ export interface GeomPolygonProps {
   points?: EmbeddedVertex[];
   rightAngles?: number[];
   edgeTicks?: Record<number, 1 | 2 | 3>;
+  bareShape?: boolean;
 }
 
 export interface GeomAngleProps {

@@ -68,7 +68,11 @@ import {
   DEFAULT_DOT_SCALE,
   DEFAULT_LABEL_SCALE,
 } from "@/lib/geometry";
-import { recognizeStrokeShape } from "@/lib/ink-recognizer";
+import {
+  type RecognizedShape,
+  recognizeStrokeShape,
+  recognizedShapeToPreviewPoints,
+} from "@/lib/ink-recognizer";
 import {
   type CameraMatrix3,
   type Solid3DKind,
@@ -715,6 +719,22 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const liveStrokeRafRef = useRef<number | null>(null);
   const liveStrokeStyleRef = useRef<Style | undefined>(undefined);
   const liveStrokeNibRef = useRef<InkProps["nib"] | undefined>(undefined);
+  const liveStrokeSnappedRef = useRef<RecognizedShape | null>(null);
+  const dwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastInkSnapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [lastInkSnap, setLastInkSnap] = useState<{
+    elementId: string;
+    shapeType: RecognizedShape["type"];
+    rawPoints: number[];
+    rawPressures: number[];
+    nib?: InkProps["nib"];
+    style: Style;
+    page: number;
+    center?: Point2D;
+    rx?: number;
+    ry?: number;
+    rotation?: number;
+  } | null>(null);
   const containerRectRef = useRef<DOMRect | null>(null);
   const [liveStroke, setLiveStroke] = useState<{
     points: number[];
@@ -5487,6 +5507,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         liveStrokePressuresRef.current = [e.pressure || 0.5];
         liveStrokeStyleRef.current = effectiveStyle;
         liveStrokeNibRef.current = nib;
+        liveStrokeSnappedRef.current = null;
+        if (dwellTimerRef.current) {
+          clearTimeout(dwellTimerRef.current);
+          dwellTimerRef.current = null;
+        }
+        setLastInkSnap(null);
         setLiveStroke({
           points: [x, y],
           pressures: [e.pressure || 0.5],
@@ -5923,6 +5949,36 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           : drawPt.y;
         liveStrokePointsRef.current.push(x, y);
         liveStrokePressuresRef.current.push(e.pressure || 0.5);
+        liveStrokeSnappedRef.current = null;
+
+        // Draw-and-Hold dwell preview (340ms stationary pause snaps preview smoothly like GoodNotes/Samsung Notes)
+        if (dwellTimerRef.current) {
+          clearTimeout(dwellTimerRef.current);
+          dwellTimerRef.current = null;
+        }
+        if (
+          inkToShape &&
+          (nib === undefined || nib === "pencil") &&
+          liveStrokePointsRef.current.length >= 8
+        ) {
+          dwellTimerRef.current = setTimeout(() => {
+            dwellTimerRef.current = null;
+            const currentPts = liveStrokePointsRef.current;
+            if (currentPts.length < 8 || !liveStrokeStyleRef.current) return;
+            const shape = recognizeStrokeShape(currentPts);
+            if (shape) {
+              liveStrokeSnappedRef.current = shape;
+              const previewPts = recognizedShapeToPreviewPoints(shape);
+              if (previewPts.length >= 4) {
+                setLiveStroke({
+                  points: previewPts,
+                  nib: liveStrokeNibRef.current,
+                  style: liveStrokeStyleRef.current,
+                });
+              }
+            }
+          }, 340);
+        }
 
         // Throttle React DOM re-renders using requestAnimationFrame to guarantee smooth 60/120fps on mobile
         if (!liveStrokeRafRef.current) {
@@ -5948,6 +6004,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       activeTool,
       pageElements,
       laserConfig,
+      inkToShape,
     ]
   );
 
@@ -6052,8 +6109,30 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             (liveStroke.nib === undefined ||
               liveStroke.nib === "pencil")
           ) {
-            // Ink-to-shape intelligence: check if matches straight segment, arrow, circle, triangle, or rectangle
-            const recognized = recognizeStrokeShape(pts);
+            // Ink-to-shape intelligence: use cached dwell snap or classify stroke via ShortStraw + PaleoSketch
+            const recognized = liveStrokeSnappedRef.current ?? recognizeStrokeShape(pts);
+            const targetPage = isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage;
+            const showSnapPill = (
+              elementId: string,
+              shapeType: RecognizedShape["type"],
+              extra?: { center?: Point2D; rx?: number; ry?: number; rotation?: number }
+            ) => {
+              if (lastInkSnapTimerRef.current) clearTimeout(lastInkSnapTimerRef.current);
+              setLastInkSnap({
+                elementId,
+                shapeType,
+                rawPoints: [...pts],
+                rawPressures: [...pressures],
+                nib: liveStroke.nib,
+                style: { ...liveStroke.style },
+                page: targetPage,
+                ...extra,
+              });
+              lastInkSnapTimerRef.current = setTimeout(() => {
+                setLastInkSnap(null);
+                lastInkSnapTimerRef.current = null;
+              }, 5500);
+            };
             if (recognized) {
               if (recognized.type === "circle") {
                 const circId = newElId("circ");
@@ -6062,6 +6141,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   params: {
                     id: circId,
                     type: "GeomCircle",
+                    page: targetPage,
                     style: {
                       stroke: liveStroke.style.stroke ?? "#0891b2",
                       width: liveStroke.style.width ?? 2,
@@ -6074,6 +6154,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     },
                   },
                 });
+                showSnapPill(circId, "circle", {
+                  center: recognized.center,
+                  rx: recognized.radius,
+                  ry: recognized.radius,
+                  rotation: 0,
+                });
               } else if (recognized.type === "ellipse") {
                 const ellId = newElId("circ");
                 dispatcher.dispatch({
@@ -6081,6 +6167,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   params: {
                     id: ellId,
                     type: "GeomCircle",
+                    page: targetPage,
                     style: {
                       stroke: liveStroke.style.stroke ?? "#0891b2",
                       width: liveStroke.style.width ?? 2,
@@ -6096,6 +6183,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     },
                   },
                 });
+                showSnapPill(ellId, "ellipse", {
+                  center: recognized.center,
+                  rx: recognized.rx,
+                  ry: recognized.ry,
+                  rotation: recognized.rotation,
+                });
               } else if (recognized.type === "segment") {
                 const segId = newElId("seg");
                 dispatcher.dispatch({
@@ -6103,6 +6196,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   params: {
                     id: segId,
                     type: "GeomSegment",
+                    page: targetPage,
                     style: {
                       stroke: liveStroke.style.stroke ?? "#334155",
                       width: liveStroke.style.width ?? 2,
@@ -6116,6 +6210,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     },
                   },
                 });
+                showSnapPill(segId, "segment");
               } else if (recognized.type === "arrow") {
                 const vecId = newElId("vec");
                 dispatcher.dispatch({
@@ -6123,6 +6218,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   params: {
                     id: vecId,
                     type: "GeomVector",
+                    page: targetPage,
                     style: {
                       stroke: liveStroke.style.stroke ?? "#334155",
                       width: liveStroke.style.width ?? 2,
@@ -6136,14 +6232,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     },
                   },
                 });
+                showSnapPill(vecId, "arrow");
               } else if (recognized.type === "triangle" || recognized.type === "rectangle") {
                 const polyId = newElId("poly");
                 const verts = recognized.vertices;
-                const names = getNextPointNames(verts.length, pageElements);
-                const marksEnabled = getConstructMarksEnabled();
                 const embedded: EmbeddedVertex[] = verts.map((pt, i) => ({
                   id: `${polyId}_v${i}`,
-                  name: names[i] ?? `P${i + 1}`,
+                  name: "",
                   x: pt.x,
                   y: pt.y,
                 }));
@@ -6152,19 +6247,21 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   params: {
                     id: polyId,
                     type: "GeomPolygon",
+                    page: targetPage,
                     style: {
-                      stroke: liveStroke.style.stroke ?? "#2563eb",
-                      fill: "rgba(37,99,235,0.06)",
+                      stroke: liveStroke.style.stroke ?? "#334155",
+                      fill: "none",
                       width: liveStroke.style.width ?? 2,
                       dash: liveStroke.style.dash ?? false,
                     },
                     props: {
                       vertices: embedded.map((v) => v.id),
                       points: embedded,
-                      marksEnabled,
+                      bareShape: true,
                     },
                   },
                 });
+                showSnapPill(polyId, recognized.type);
               }
             } else {
               // Normal ink stroke
@@ -6175,7 +6272,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   pressures,
                   nib: liveStroke.nib,
                   style: liveStroke.style,
-                  page: isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage,
+                  page: targetPage,
                 },
               });
             }
@@ -6192,6 +6289,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             });
           }
         }
+        if (dwellTimerRef.current) {
+          clearTimeout(dwellTimerRef.current);
+          dwellTimerRef.current = null;
+        }
+        liveStrokeSnappedRef.current = null;
         if (liveStrokeRafRef.current) {
           cancelAnimationFrame(liveStrokeRafRef.current);
           liveStrokeRafRef.current = null;
@@ -6266,6 +6368,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
 
       if (liveStroke) {
+        if (dwellTimerRef.current) {
+          clearTimeout(dwellTimerRef.current);
+          dwellTimerRef.current = null;
+        }
+        liveStrokeSnappedRef.current = null;
         if (liveStrokeRafRef.current) {
           cancelAnimationFrame(liveStrokeRafRef.current);
           liveStrokeRafRef.current = null;
@@ -7444,6 +7551,162 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               padding: "1px 7px",
               fontSize: 11,
               cursor: "pointer",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Post-Snap Ink-to-Shape Quick Switch & Revert Floating Pill */}
+      {lastInkSnap && (
+        <div
+          data-wb-ink-snap-pill="true"
+          data-export-skip="true"
+          style={{
+            position: "fixed",
+            bottom: 18,
+            left: isPortrait ? "50%" : pageSidebarOpen ? "calc(50% + 70px)" : "50%",
+            transform: "translateX(-50%)",
+            zIndex: 72,
+            background: "rgba(15, 23, 42, 0.94)",
+            backdropFilter: "blur(12px)",
+            color: "#ffffff",
+            padding: "6px 12px",
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 500,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.28)",
+            border: "1px solid rgba(255, 255, 255, 0.14)",
+          }}
+        >
+          <span style={{ color: "#93c5fd", fontWeight: 600 }}>
+            ✨ {lastInkSnap.shapeType === "circle"
+              ? "Hình tròn"
+              : lastInkSnap.shapeType === "ellipse"
+              ? "Hình elip"
+              : lastInkSnap.shapeType === "rectangle"
+              ? "Hình chữ nhật"
+              : lastInkSnap.shapeType === "triangle"
+              ? "Tam giác"
+              : lastInkSnap.shapeType === "arrow"
+              ? "Mũi tên"
+              : "Đoạn thẳng"}
+          </span>
+
+          {(lastInkSnap.shapeType === "circle" || lastInkSnap.shapeType === "ellipse") &&
+            lastInkSnap.rx &&
+            lastInkSnap.ry && (
+              <button
+                type="button"
+                data-action="toggle-circle-ellipse"
+                onClick={() => {
+                  const snap = lastInkSnap;
+                  const nextType = snap.shapeType === "circle" ? "ellipse" : "circle";
+                  if (nextType === "circle") {
+                    const avgR = Number((((snap.rx ?? 1) + (snap.ry ?? 1)) / 2).toFixed(3));
+                    dispatcher.dispatch({
+                      type: "object.update",
+                      params: {
+                        id: snap.elementId,
+                        props: {
+                          radius: { kind: "value", v: avgR },
+                          rx: undefined,
+                          ry: undefined,
+                          rotation: undefined,
+                        },
+                      },
+                    });
+                  } else {
+                    const rxVal = Number((snap.rx ?? 1.4).toFixed(3));
+                    const ryVal = Number(
+                      (Math.abs((snap.rx ?? 1.4) - (snap.ry ?? 1.0)) < 0.05
+                        ? rxVal * 0.65
+                        : (snap.ry ?? 1.0)
+                      ).toFixed(3)
+                    );
+                    dispatcher.dispatch({
+                      type: "object.update",
+                      params: {
+                        id: snap.elementId,
+                        props: {
+                          radius: { kind: "value", v: Number(((rxVal + ryVal) / 2).toFixed(3)) },
+                          rx: rxVal,
+                          ry: ryVal,
+                          rotation: snap.rotation ?? 0,
+                        },
+                      },
+                    });
+                  }
+                  setLastInkSnap({ ...snap, shapeType: nextType });
+                }}
+                style={{
+                  border: "1px solid rgba(56, 189, 248, 0.45)",
+                  background: "rgba(56, 189, 248, 0.16)",
+                  color: "#e0f2fe",
+                  borderRadius: 999,
+                  padding: "3px 10px",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {lastInkSnap.shapeType === "circle" ? "⬭ Đổi sang Elip" : "⭕ Đổi sang Hình tròn"}
+              </button>
+            )}
+
+          <button
+            type="button"
+            data-action="revert-ink-snap"
+            onClick={() => {
+              const snap = lastInkSnap;
+              if (lastInkSnapTimerRef.current) {
+                clearTimeout(lastInkSnapTimerRef.current);
+                lastInkSnapTimerRef.current = null;
+              }
+              setLastInkSnap(null);
+              dispatcher.batch(() => {
+                dispatcher.deleteObjects([snap.elementId]);
+                dispatcher.dispatch({
+                  type: "ink.stroke",
+                  params: {
+                    points: snap.rawPoints,
+                    pressures: snap.rawPressures,
+                    nib: snap.nib,
+                    style: snap.style,
+                    page: snap.page,
+                  },
+                });
+              });
+            }}
+            style={{
+              border: "none",
+              background: "rgba(255, 255, 255, 0.14)",
+              color: "#ffffff",
+              borderRadius: 999,
+              padding: "3px 10px",
+              fontSize: 11.5,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            ↩ Giữ nét vẽ tay
+          </button>
+
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={() => setLastInkSnap(null)}
+            style={{
+              border: "none",
+              background: "transparent",
+              color: "#94a3b8",
+              fontSize: 12,
+              cursor: "pointer",
+              padding: "0 4px",
             }}
           >
             ✕

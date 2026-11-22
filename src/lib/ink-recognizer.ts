@@ -1,7 +1,7 @@
 /**
- * Geometric shape recognizer for ink strokes (Ink-to-Shape).
- * Recognizes straight segments, arrows, circles, ellipses, triangles, and rectangles
- * while preserving intentionally curved strokes and smooth rounded shapes.
+ * Hybrid Sketch Recognition Engine combining ShortStraw corner finding
+ * (Wolin, Eoff & Hammond) and PaleoSketch primitive fitting & beautification
+ * (Paulson & Hammond) with Samsung Notes / GoodNotes style auto-regularization.
  */
 
 import { Point2D, dist2D } from "./geometry";
@@ -38,9 +38,6 @@ export type RecognizedShape =
       vertices: [Point2D, Point2D, Point2D, Point2D];
     };
 
-/**
- * Total arc length of points along stroke.
- */
 function totalPathLength(pts: Point2D[]): number {
   let len = 0;
   for (let i = 1; i < pts.length; i++) {
@@ -49,9 +46,6 @@ function totalPathLength(pts: Point2D[]): number {
   return len;
 }
 
-/**
- * Resample polyline to N equidistant points.
- */
 function resamplePoints(pts: Point2D[], n = 64): Point2D[] {
   if (pts.length <= 1) return pts;
   const total = totalPathLength(pts);
@@ -67,7 +61,7 @@ function resamplePoints(pts: Point2D[], n = 64): Point2D[] {
 
   for (let i = 1; i < n - 1; i++) {
     const targetDist = i * interval;
-    while (segIndex < pts.length - 1 && currentDist + segLen < targetDist) {
+    while (segIndex < pts.length - 2 && currentDist + segLen < targetDist) {
       currentDist += segLen;
       segIndex++;
       p1 = pts[segIndex];
@@ -86,15 +80,96 @@ function resamplePoints(pts: Point2D[], n = 64): Point2D[] {
 }
 
 /**
- * Measure perpendicular deviation of points relative to line segment A -> B.
- * signedBias approaches 1.0 when all points curve smoothly to one side.
+ * Removes tiny pen-down / pen-up hook artifacts (<4% arc length with >75 deg direction reversal).
  */
+function trimStrokeHooks(pts: Point2D[]): Point2D[] {
+  if (pts.length < 10) return pts;
+  const total = totalPathLength(pts);
+  if (total <= 1e-4) return pts;
+
+  let startIdx = 0;
+  const maxTrimLen = total * 0.045;
+  let accStart = 0;
+  for (let i = 1; i < Math.min(pts.length - 6, 4); i++) {
+    accStart += dist2D(pts[i - 1], pts[i]);
+    if (accStart > maxTrimLen) break;
+    const v1 = { x: pts[i].x - pts[i - 1].x, y: pts[i].y - pts[i - 1].y };
+    const v2 = { x: pts[i + 2].x - pts[i].x, y: pts[i + 2].y - pts[i].y };
+    const l1 = Math.hypot(v1.x, v1.y);
+    const l2 = Math.hypot(v2.x, v2.y);
+    if (l1 > 1e-5 && l2 > 1e-5) {
+      const cosA = (v1.x * v2.x + v1.y * v2.y) / (l1 * l2);
+      if (cosA < 0.25) {
+        startIdx = i;
+      }
+    }
+  }
+
+  let endIdx = pts.length - 1;
+  let accEnd = 0;
+  for (let i = pts.length - 2; i > Math.max(startIdx + 5, pts.length - 5); i--) {
+    accEnd += dist2D(pts[i], pts[i + 1]);
+    if (accEnd > maxTrimLen) break;
+    const v1 = { x: pts[i].x - pts[i - 2].x, y: pts[i].y - pts[i - 2].y };
+    const v2 = { x: pts[i + 1].x - pts[i].x, y: pts[i + 1].y - pts[i].y };
+    const l1 = Math.hypot(v1.x, v1.y);
+    const l2 = Math.hypot(v2.x, v2.y);
+    if (l1 > 1e-5 && l2 > 1e-5) {
+      const cosA = (v1.x * v2.x + v1.y * v2.y) / (l1 * l2);
+      if (cosA < 0.25) {
+        endIdx = i;
+      }
+    }
+  }
+
+  return pts.slice(startIdx, endIdx + 1);
+}
+
+/**
+ * For closed/over-traced loops, trims the trailing overshoot after passing 360° or closest revisit to start.
+ */
+function normalizeClosedLoop(pts: Point2D[], diag: number): Point2D[] {
+  if (pts.length < 12) return pts;
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+
+  let accumAngle = 0;
+  const twoPiCutoff = 2 * Math.PI * 1.05;
+  for (let i = 1; i < pts.length; i++) {
+    const a1 = Math.atan2(pts[i - 1].y - cy, pts[i - 1].x - cx);
+    const a2 = Math.atan2(pts[i].y - cy, pts[i].x - cx);
+    let diff = a2 - a1;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    accumAngle += diff;
+    if (i > Math.floor(pts.length * 0.72) && Math.abs(accumAngle) >= twoPiCutoff) {
+      return pts.slice(0, i + 1);
+    }
+  }
+
+  // If tail ends past 80% of points and revisited near pts[0] earlier, trim extra overshoot
+  const startSearch = Math.floor(pts.length * 0.75);
+  let minD = Infinity;
+  let minIdx = pts.length - 1;
+  for (let i = startSearch; i < pts.length; i++) {
+    const d = dist2D(pts[0], pts[i]);
+    if (d < minD) {
+      minD = d;
+      minIdx = i;
+    }
+  }
+  if (minIdx < pts.length - 3 && minD < diag * 0.14) {
+    return pts.slice(0, minIdx + 1);
+  }
+  return pts;
+}
+
 function maxPerpDistanceToSegment(
   pts: Point2D[],
   a: Point2D,
   b: Point2D
-): { maxDist: number; meanDist: number; signedBias: number } {
-  if (pts.length === 0) return { maxDist: 0, meanDist: 0, signedBias: 0 };
+): { maxDist: number; meanDist: number } {
+  if (pts.length === 0) return { maxDist: 0, meanDist: 0 };
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const len = Math.hypot(dx, dy);
@@ -106,31 +181,309 @@ function maxPerpDistanceToSegment(
       if (d > maxD) maxD = d;
       sumD += d;
     }
-    return { maxDist: maxD, meanDist: sumD / pts.length, signedBias: 0 };
+    return { maxDist: maxD, meanDist: sumD / pts.length };
   }
 
   let maxDist = 0;
   let sumAbs = 0;
-  let sumSigned = 0;
   for (const p of pts) {
-    const cross = (p.x - a.x) * dy - (p.y - a.y) * dx;
-    const signed = cross / len;
-    const d = Math.abs(signed);
+    const cross = Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx);
+    const d = cross / len;
     if (d > maxDist) maxDist = d;
     sumAbs += d;
-    sumSigned += signed;
   }
 
-  return {
-    maxDist,
-    meanDist: sumAbs / pts.length,
-    signedBias: sumAbs > 1e-6 ? Math.abs(sumSigned) / sumAbs : 0,
-  };
+  return { maxDist, meanDist: sumAbs / pts.length };
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+function isSegmentStraight(pts: Point2D[]): boolean {
+  if (pts.length <= 2) return true;
+  const a = pts[0];
+  const b = pts[pts.length - 1];
+  const chord = dist2D(a, b);
+  if (chord < 1e-5) return false;
+  const arc = totalPathLength(pts);
+  if (chord / arc < 0.93) return false;
+  const { maxDist } = maxPerpDistanceToSegment(pts, a, b);
+  return maxDist / chord <= 0.072;
 }
 
 /**
- * Fit circle using Kåsa algebraic method (fast, stable, handles noisy/overlapping hand strokes).
+ * ShortStraw corner finder adapted for closed loops (handles strokes starting anywhere on the perimeter).
  */
+function findShortStrawClosedCorners(rawClosed: Point2D[], diag: number): Point2D[] {
+  const nUniform = Math.min(84, Math.max(32, Math.round(totalPathLength(rawClosed) / Math.max(0.05, diag / 40))));
+  let ring = resamplePoints(rawClosed, nUniform);
+  // Drop duplicate end point if very close to start
+  if (ring.length > 8 && dist2D(ring[0], ring[ring.length - 1]) < diag * 0.06) {
+    ring = ring.slice(0, -1);
+  }
+  const n = ring.length;
+  if (n < 12) return [];
+
+  const W = 3;
+  const straws = new Array<number>(n);
+  let minStraw = Infinity;
+  let minIdx = 0;
+  for (let i = 0; i < n; i++) {
+    const pPrev = ring[(i - W + n) % n];
+    const pNext = ring[(i + W) % n];
+    const s = dist2D(pPrev, pNext);
+    straws[i] = s;
+    if (s < minStraw) {
+      minStraw = s;
+      minIdx = i;
+    }
+  }
+
+  // Rotate ring so index 0 is the sharpest corner candidate
+  if (minIdx > 0) {
+    ring = ring.slice(minIdx).concat(ring.slice(0, minIdx));
+    const rotatedStraws = straws.slice(minIdx).concat(straws.slice(0, minIdx));
+    for (let i = 0; i < n; i++) straws[i] = rotatedStraws[i];
+  }
+
+  const threshold = median(straws) * 0.95;
+  const cornerIndices: number[] = [0];
+
+  let i = 1;
+  while (i < n) {
+    if (straws[i] < threshold) {
+      let localMin = straws[i];
+      let localMinIdx = i;
+      while (i < n && straws[i] < threshold) {
+        if (straws[i] < localMin) {
+          localMin = straws[i];
+          localMinIdx = i;
+        }
+        i++;
+      }
+      if (localMinIdx > 2 && n - localMinIdx > 2) {
+        cornerIndices.push(localMinIdx);
+      }
+    } else {
+      i++;
+    }
+  }
+
+  // Post-process corners (ShortStraw halfway split if non-straight edge + remove collinear corners)
+  let changed = true;
+  let pass = 0;
+  while (changed && pass < 4) {
+    changed = false;
+    pass++;
+    for (let c = 0; c < cornerIndices.length; c++) {
+      const idx1 = cornerIndices[c];
+      const idx2 = cornerIndices[(c + 1) % cornerIndices.length];
+      const slice =
+        idx2 > idx1
+          ? ring.slice(idx1, idx2 + 1)
+          : ring.slice(idx1).concat(ring.slice(0, idx2 + 1));
+
+      if (slice.length > 6 && !isSegmentStraight(slice)) {
+        // Find point with smallest straw or largest perp distance inside [idx1..idx2]
+        let bestOffset = -1;
+        let maxDev = 0;
+        const a = slice[0];
+        const b = slice[slice.length - 1];
+        const chord = dist2D(a, b);
+        for (let k = 2; k < slice.length - 2; k++) {
+          const { maxDist } = maxPerpDistanceToSegment([slice[k]], a, b);
+          if (maxDist > maxDev) {
+            maxDev = maxDist;
+            bestOffset = k;
+          }
+        }
+        if (bestOffset > 2 && maxDev > Math.max(diag * 0.05, chord * 0.08)) {
+          const newIdx = (idx1 + bestOffset) % n;
+          if (!cornerIndices.includes(newIdx) && cornerIndices.length < 10) {
+            cornerIndices.splice(c + 1, 0, newIdx);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Filter out collinear / shallow-bend corners (> 150 deg)
+  let filtered = cornerIndices.slice();
+  let removed = true;
+  while (removed && filtered.length > 3) {
+    removed = false;
+    for (let c = 0; c < filtered.length; c++) {
+      const prev = ring[filtered[(c - 1 + filtered.length) % filtered.length]];
+      const curr = ring[filtered[c]];
+      const next = ring[filtered[(c + 1) % filtered.length]];
+      const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
+      const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+      const l1 = Math.hypot(v1.x, v1.y);
+      const l2 = Math.hypot(v2.x, v2.y);
+      if (l1 < diag * 0.07 || l2 < diag * 0.07) {
+        filtered.splice(c, 1);
+        removed = true;
+        break;
+      }
+      const dot = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (l1 * l2)));
+      const deg = (Math.acos(dot) * 180) / Math.PI;
+      if (deg > 148) {
+        filtered.splice(c, 1);
+        removed = true;
+        break;
+      }
+    }
+  }
+
+  // Verify every final edge in ring is actually straight
+  if (filtered.length >= 3 && filtered.length <= 5) {
+    // Handle case where user drew square starting from 4th corner returning cleanly or slight extra vertex
+    if (filtered.length === 5) {
+      let minEdgeLen = Infinity;
+      let minC = -1;
+      for (let c = 0; c < filtered.length; c++) {
+        const d = dist2D(ring[filtered[c]], ring[filtered[(c + 1) % filtered.length]]);
+        if (d < minEdgeLen) {
+          minEdgeLen = d;
+          minC = c;
+        }
+      }
+      if (minEdgeLen < diag * 0.16 && minC !== -1) {
+        filtered.splice(minC, 1);
+      }
+    }
+  }
+
+  return filtered.map((idx) => ring[idx]);
+}
+
+function verifyPolygonEdgesStraight(pts: Point2D[], corners: Point2D[]): boolean {
+  if (corners.length < 3) return false;
+  for (let i = 0; i < corners.length; i++) {
+    const prev = corners[(i - 1 + corners.length) % corners.length];
+    const curr = corners[i];
+    const next = corners[(i + 1) % corners.length];
+    const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
+    const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+    const len1 = Math.hypot(v1.x, v1.y);
+    const len2 = Math.hypot(v2.x, v2.y);
+    if (len1 < 0.12 || len2 < 0.12) return false;
+    const dot = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (len1 * len2)));
+    const angleDeg = (Math.acos(dot) * 180) / Math.PI;
+    if (angleDeg < 22 || angleDeg > 146) {
+      return false;
+    }
+  }
+
+  // Check distance of every sample point in pts to the nearest polygon edge
+  let maxDistToPoly = 0;
+  let diag = 0;
+  for (const c of corners) {
+    diag = Math.max(diag, dist2D(c, corners[0]));
+  }
+  for (const p of pts) {
+    let minD = Infinity;
+    for (let i = 0; i < corners.length; i++) {
+      const a = corners[i];
+      const b = corners[(i + 1) % corners.length];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const l2 = dx * dx + dy * dy;
+      const t = l2 > 1e-8 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+      const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+      if (d < minD) minD = d;
+    }
+    if (minD > maxDistToPoly) maxDistToPoly = minD;
+  }
+
+  return maxDistToPoly <= Math.max(0.18, diag * 0.085);
+}
+
+/**
+ * Beautifies a 4-vertex quadrilateral into an orthogonal rectangle (or square if aspect ~1:1),
+ * aligned to the horizontal/vertical axes if drawn within ±14° of level.
+ */
+function regularizeRectangle(verts: [Point2D, Point2D, Point2D, Point2D]): [Point2D, Point2D, Point2D, Point2D] {
+  const angles: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const prev = verts[(i + 3) % 4];
+    const curr = verts[i];
+    const next = verts[(i + 1) % 4];
+    const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
+    const v2 = { x: next.x - curr.x, y: next.y - curr.y };
+    const dot = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y))));
+    angles.push((Math.acos(dot) * 180) / Math.PI);
+  }
+
+  const isRoughRect = angles.every((deg) => Math.abs(deg - 90) <= 24);
+  if (!isRoughRect) {
+    return verts;
+  }
+
+  // Determine dominant orientation from edge 0->1 and 2->3
+  const e1Angle = Math.atan2(verts[1].y - verts[0].y, verts[1].x - verts[0].x);
+  // Fold modulo PI/2 into [-PI/4, PI/4]
+  let baseAngle = e1Angle % (Math.PI / 2);
+  if (baseAngle > Math.PI / 4) baseAngle -= Math.PI / 2;
+  if (baseAngle < -Math.PI / 4) baseAngle += Math.PI / 2;
+
+  // Snap to level if within ±14°
+  if (Math.abs(baseAngle) <= (14 * Math.PI) / 180) {
+    baseAngle = 0;
+  }
+
+  const cos = Math.cos(baseAngle);
+  const sin = Math.sin(baseAngle);
+  let minU = Infinity;
+  let maxU = -Infinity;
+  let minV = Infinity;
+  let maxV = -Infinity;
+
+  for (const p of verts) {
+    const u = p.x * cos + p.y * sin;
+    const v = -p.x * sin + p.y * cos;
+    if (u < minU) minU = u;
+    if (u > maxU) maxU = u;
+    if (v < minV) minV = v;
+    if (v > maxV) maxV = v;
+  }
+
+  let w = maxU - minU;
+  let h = maxV - minV;
+  const cu = (minU + maxU) / 2;
+  const cv = (minV + maxV) / 2;
+
+  // Regularize to square if nearly equal sides
+  const ratio = Math.min(w, h) / Math.max(1e-4, Math.max(w, h));
+  if (ratio >= 0.87) {
+    const s = (w + h) / 2;
+    w = s;
+    h = s;
+  }
+
+  const hw = w / 2;
+  const hh = h / 2;
+  const localCorners = [
+    { u: cu - hw, v: cv + hh },
+    { u: cu + hw, v: cv + hh },
+    { u: cu + hw, v: cv - hh },
+    { u: cu - hw, v: cv - hh },
+  ];
+
+  return localCorners.map((lc) => ({
+    x: lc.u * cos - lc.v * sin,
+    y: lc.u * sin + lc.v * cos,
+  })) as [Point2D, Point2D, Point2D, Point2D];
+}
+
 function fitCircleKasa(pts: Point2D[]): { cx: number; cy: number; r: number } | null {
   const n = pts.length;
   if (n < 4) return null;
@@ -192,10 +545,6 @@ function fitCircleKasa(pts: Point2D[]): { cx: number; cy: number; r: number } | 
   return { cx, cy, r: Math.sqrt(r2) };
 }
 
-/**
- * Fit an oriented ellipse using PCA (covariance orientation + principal bounding center/axes)
- * and evaluate normalized radial residuals rho_i = sqrt((u_i / rx)^2 + (v_i / ry)^2).
- */
 function fitEllipsePCA(pts: Point2D[]): {
   center: Point2D;
   rx: number;
@@ -257,13 +606,11 @@ function fitEllipsePCA(pts: Point2D[]): {
   const a0 = Math.max(1e-4, (maxU - minU) / 2);
   const b0 = Math.max(1e-4, (maxV - minV) / 2);
 
-  // Convert midpoint back to world coordinates for accurate ellipse centering
   const center: Point2D = {
     x: mx + uMid * cos - vMid * sin,
     y: my + uMid * sin + vMid * cos,
   };
 
-  // Compute initial normalized radii relative to centered axes
   const rawRhos: number[] = [];
   let meanRho = 0;
   for (const lp of localPts) {
@@ -276,7 +623,6 @@ function fitEllipsePCA(pts: Point2D[]): {
   meanRho /= n;
   if (meanRho <= 1e-4) return null;
 
-  // Scale semi-axes so mean normalized radius equals 1.0
   let rx = a0 * meanRho;
   let ry = b0 * meanRho;
 
@@ -293,13 +639,22 @@ function fitEllipsePCA(pts: Point2D[]): {
   const stdDev = Math.sqrt(variance / n);
   const maxMinRatio = maxRho / Math.max(1e-4, minRho);
 
-  // Normalize so rx >= ry and adjust rotation accordingly if swapped
   let finalRotation = rotation;
   if (ry > rx) {
     const tmp = rx;
     rx = ry;
     ry = tmp;
     finalRotation += Math.PI / 2;
+  }
+
+  // Normalize angle to [-PI/2, PI/2] and auto-level if within ±12° of horizontal/vertical
+  while (finalRotation > Math.PI / 2) finalRotation -= Math.PI;
+  while (finalRotation < -Math.PI / 2) finalRotation += Math.PI;
+  const deg = (finalRotation * 180) / Math.PI;
+  if (Math.abs(deg) <= 12) {
+    finalRotation = 0;
+  } else if (Math.abs(Math.abs(deg) - 90) <= 12) {
+    finalRotation = Math.PI / 2;
   }
 
   return {
@@ -312,10 +667,6 @@ function fitEllipsePCA(pts: Point2D[]): {
   };
 }
 
-/**
- * Measure cumulative rotational angle around center (in radians).
- * A full loop circle traces approximately 2*PI (~6.28 rad) or more if overlapping.
- */
 function cumulativeAngleSpan(pts: Point2D[], cx: number, cy: number): number {
   let totalDelta = 0;
   for (let i = 1; i < pts.length; i++) {
@@ -330,7 +681,7 @@ function cumulativeAngleSpan(pts: Point2D[], cx: number, cy: number): number {
 }
 
 /**
- * Ramer-Douglas-Peucker polyline simplification.
+ * Ramer-Douglas-Peucker polyline simplification (preserved for utility compatibility).
  */
 export function simplifyRDP(points: Point2D[], epsilon: number): Point2D[] {
   if (points.length <= 2) return points;
@@ -368,107 +719,25 @@ export function simplifyRDP(points: Point2D[], epsilon: number): Point2D[] {
 }
 
 /**
- * Verify that each edge between consecutive polygon vertices actually follows straight lines
- * in the original ink stroke (prevents ellipses / ovals / rounded shapes from snapping to polygons).
- */
-function verifyPolygonEdgesStraight(pts: Point2D[], corners: Point2D[]): boolean {
-  if (corners.length < 3 || pts.length < corners.length) return false;
-
-  // Map each corner in order to its nearest index along pts (with wrap-around handling)
-  const cornerIndices: number[] = [];
-  let searchStart = 0;
-  for (let cIdx = 0; cIdx < corners.length; cIdx++) {
-    const target = corners[cIdx];
-    let bestIdx = searchStart;
-    let bestDist = Infinity;
-    for (let i = searchStart; i < pts.length; i++) {
-      const d = dist2D(pts[i], target);
-      if (d < bestDist) {
-        bestDist = d;
-        bestIdx = i;
-      }
-    }
-    // If remaining points couldn't beat a wrap-around, also check early pts for first/last corner
-    if (cIdx === 0) {
-      for (let i = 0; i < pts.length; i++) {
-        const d = dist2D(pts[i], target);
-        if (d < bestDist) {
-          bestDist = d;
-          bestIdx = i;
-        }
-      }
-    }
-    cornerIndices.push(bestIdx);
-    searchStart = bestIdx;
-  }
-
-  // Verify every corner angle is sharp enough (not a smooth 160°+ curve bend)
-  for (let i = 0; i < corners.length; i++) {
-    const prev = corners[(i - 1 + corners.length) % corners.length];
-    const curr = corners[i];
-    const next = corners[(i + 1) % corners.length];
-    const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
-    const v2 = { x: next.x - curr.x, y: next.y - curr.y };
-    const len1 = Math.hypot(v1.x, v1.y);
-    const len2 = Math.hypot(v2.x, v2.y);
-    if (len1 < 0.1 || len2 < 0.1) return false;
-    const dot = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y) / (len1 * len2)));
-    const angleDeg = (Math.acos(dot) * 180) / Math.PI;
-    if (angleDeg < 22 || angleDeg > 148) {
-      return false;
-    }
-  }
-
-  // Verify straightness of every edge slice along the stroke
-  for (let i = 0; i < corners.length; i++) {
-    const a = corners[i];
-    const b = corners[(i + 1) % corners.length];
-    const chord = dist2D(a, b);
-    if (chord < 0.12) return false;
-
-    const idxA = cornerIndices[i];
-    const idxB = cornerIndices[(i + 1) % corners.length];
-    const edgeSlice: Point2D[] =
-      idxB >= idxA
-        ? pts.slice(idxA, idxB + 1)
-        : pts.slice(idxA).concat(pts.slice(0, idxB + 1));
-
-    if (edgeSlice.length >= 3) {
-      const edgeArc = totalPathLength(edgeSlice);
-      if (edgeArc > chord && chord / edgeArc < 0.91) {
-        return false;
-      }
-      const { maxDist } = maxPerpDistanceToSegment(edgeSlice, a, b);
-      if (maxDist / chord > 0.075) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
-/**
- * Detect if stroke matches a straight segment, arrow, circle, ellipse, triangle, or rectangle.
- * Tuned for intentional geometric sketching without flattening curved edges or rounded blocks.
- * @param flatPoints Flat array [x0, y0, x1, y1, ...]
+ * Recognizes geometric primitives (segment, arrow, circle, ellipse, triangle, rectangle/square)
+ * from raw pen stroke coordinates using ShortStraw corner detection + PaleoSketch fitting.
  */
 export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | null {
-  if (!flatPoints || flatPoints.length < 8) return null; // at least 4 points
+  if (!flatPoints || flatPoints.length < 8) return null;
 
-  const pts: Point2D[] = [];
+  const rawPts: Point2D[] = [];
   for (let i = 0; i < flatPoints.length; i += 2) {
-    pts.push({ x: flatPoints[i], y: flatPoints[i + 1] });
+    rawPts.push({ x: flatPoints[i], y: flatPoints[i + 1] });
   }
 
+  const pts = trimStrokeHooks(rawPts);
   const arcLen = totalPathLength(pts);
-  if (arcLen < 0.3) return null; // ignore jitter/tiny click
+  if (pts.length < 4 || arcLen < 0.3) return null;
 
   const pStart = pts[0];
   const pEnd = pts[pts.length - 1];
   const endToStartDist = dist2D(pStart, pEnd);
 
-  // Bounding box
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
@@ -484,126 +753,99 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
   const diag = Math.hypot(bboxW, bboxH);
   const bboxAspect = Math.max(bboxW, bboxH) / Math.min(bboxW, bboxH);
 
-  // Tighter closure threshold so open curves/U-shapes don't prematurely trigger closed-shape snapping
-  const isClosedRoughly = endToStartDist < Math.max(0.45, arcLen * 0.24);
+  // Determine closed loop via either endpoint proximity or >= 290° winding span around center
+  const centerGuessX = (minX + maxX) / 2;
+  const centerGuessY = (minY + maxY) / 2;
+  const rawAngleSpan = cumulativeAngleSpan(pts, centerGuessX, centerGuessY);
+  const isClosed =
+    endToStartDist < Math.max(0.45, arcLen * 0.25) ||
+    (rawAngleSpan >= 5.05 && endToStartDist < diag * 0.45);
 
-  const resampled = resamplePoints(pts, 64);
+  if (isClosed && pts.length >= 6 && diag > 0.3) {
+    const loopPts = normalizeClosedLoop(pts, diag);
+    const corners = findShortStrawClosedCorners(loopPts, diag);
+    const hasStraightPolygon =
+      (corners.length === 3 || corners.length === 4) &&
+      verifyPolygonEdgesStraight(loopPts, corners);
 
-  // Pre-check if the closed stroke has sharp straight polygon corners
-  let isClearStraightPolygon = false;
-  if (isClosedRoughly && pts.length >= 6 && diag > 0.3) {
-    const rdpCheck = simplifyRDP(pts, diag * 0.09);
-    let cand = rdpCheck.slice();
-    if (cand.length > 2 && dist2D(cand[0], cand[cand.length - 1]) < diag * 0.28) {
-      cand = cand.slice(0, -1);
-    }
-    if ((cand.length === 3 || cand.length === 4) && verifyPolygonEdgesStraight(pts, cand)) {
-      isClearStraightPolygon = true;
-    }
-  }
+    const resampled64 = resamplePoints(loopPts, 64);
+    const kasaFit = fitCircleKasa(resampled64);
+    const ellipseFit = fitEllipsePCA(resampled64);
 
-  // =========================================================================
-  // 1. Check Circle & Ellipse (supports rotated ovals and circles)
-  // =========================================================================
-  if (!isClearStraightPolygon && pts.length >= 10 && diag > 0.3) {
-    const fit = fitCircleKasa(resampled);
-    const kasaCx = fit ? fit.cx : (minX + maxX) / 2;
-    const kasaCy = fit ? fit.cy : (minY + maxY) / 2;
-    const angleSpan = cumulativeAngleSpan(resampled, kasaCx, kasaCy);
+    // Check smooth Circle / Ellipse when corners are NOT a sharp verified straight polygon
+    if (!hasStraightPolygon) {
+      const kasaCx = kasaFit ? kasaFit.cx : centerGuessX;
+      const kasaCy = kasaFit ? kasaFit.cy : centerGuessY;
+      const angleSpan = cumulativeAngleSpan(resampled64, kasaCx, kasaCy);
 
-    // Must trace a substantial closed/near-closed loop (>= 275° or closed with >= 250°)
-    const isAngleLoop = angleSpan >= 4.8 || (isClosedRoughly && angleSpan >= 4.4);
+      if (angleSpan >= 4.4) {
+        if (kasaFit && kasaFit.r > 0.14) {
+          const center: Point2D = { x: kasaFit.cx, y: kasaFit.cy };
+          const radii = resampled64.map((p) => dist2D(p, center));
+          const meanR = kasaFit.r;
+          const variance =
+            radii.reduce((s, r) => s + Math.pow(r - meanR, 2), 0) / radii.length;
+          const stdDevRatio = Math.sqrt(variance) / meanR;
+          const maxMinRatio = Math.max(...radii) / Math.max(1e-4, Math.min(...radii));
 
-    if (isAngleLoop) {
-      if (fit && fit.r > 0.15) {
-        const center: Point2D = { x: fit.cx, y: fit.cy };
-        const radii = resampled.map((p) => dist2D(p, center));
-        const meanR = fit.r;
-        const variance =
-          radii.reduce((s, r) => s + Math.pow(r - meanR, 2), 0) / radii.length;
-        const stdDev = Math.sqrt(variance);
-        const minR = Math.min(...radii);
-        const maxR = Math.max(...radii);
-        const stdDevRatio = stdDev / meanR;
-        const maxMinRatio = maxR / Math.max(1e-4, minR);
+          if (stdDevRatio <= 0.16 && maxMinRatio <= 1.48 && bboxAspect <= 1.24) {
+            return {
+              type: "circle",
+              center,
+              radius: meanR,
+            };
+          }
+        }
 
-        if (stdDevRatio <= 0.16 && maxMinRatio <= 1.45 && bboxAspect <= 1.24) {
+        if (
+          ellipseFit &&
+          ellipseFit.ry > 0.11 &&
+          ellipseFit.stdDev <= 0.19 &&
+          ellipseFit.maxMinRatio <= 1.72 &&
+          ellipseFit.rx / ellipseFit.ry <= 5.0
+        ) {
+          if (ellipseFit.rx / ellipseFit.ry <= 1.19) {
+            return {
+              type: "circle",
+              center: ellipseFit.center,
+              radius: (ellipseFit.rx + ellipseFit.ry) / 2,
+            };
+          }
           return {
-            type: "circle",
-            center,
-            radius: meanR,
+            type: "ellipse",
+            center: ellipseFit.center,
+            rx: ellipseFit.rx,
+            ry: ellipseFit.ry,
+            rotation: ellipseFit.rotation,
           };
         }
       }
+    }
 
-      // Check Ellipse via PCA fit (supports any rotation & elongation up to 4.5:1)
-      const ellipseFit = fitEllipsePCA(resampled);
-      if (
-        ellipseFit &&
-        ellipseFit.ry > 0.12 &&
-        ellipseFit.stdDev <= 0.17 &&
-        ellipseFit.maxMinRatio <= 1.62 &&
-        ellipseFit.rx / ellipseFit.ry <= 4.5
-      ) {
-        if (ellipseFit.rx / ellipseFit.ry <= 1.18) {
-          return {
-            type: "circle",
-            center: ellipseFit.center,
-            radius: (ellipseFit.rx + ellipseFit.ry) / 2,
-          };
-        }
+    // Check Polygon (Triangle or Rectangle / Square with beautification)
+    if (hasStraightPolygon) {
+      if (corners.length === 4) {
+        const regVerts = regularizeRectangle(
+          corners as [Point2D, Point2D, Point2D, Point2D]
+        );
         return {
-          type: "ellipse",
-          center: ellipseFit.center,
-          rx: ellipseFit.rx,
-          ry: ellipseFit.ry,
-          rotation: ellipseFit.rotation,
+          type: "rectangle",
+          vertices: regVerts,
+        };
+      }
+      if (corners.length === 3) {
+        return {
+          type: "triangle",
+          vertices: corners as [Point2D, Point2D, Point2D],
         };
       }
     }
+
+    return null;
   }
 
-  // =========================================================================
-  // 2. Check Polygon (Triangle or Rectangle / Square with verified straight edges)
-  // =========================================================================
-  if (isClosedRoughly && pts.length >= 6 && diag > 0.35) {
-    for (const epsFactor of [0.075, 0.095, 0.115, 0.135]) {
-      const eps = diag * epsFactor;
-      const simplified = simplifyRDP(pts, eps);
-      let cornerCandidates = simplified.slice();
-      if (
-        cornerCandidates.length > 2 &&
-        dist2D(cornerCandidates[0], cornerCandidates[cornerCandidates.length - 1]) <
-          diag * 0.28
-      ) {
-        cornerCandidates = cornerCandidates.slice(0, -1);
-      }
-
-      if (
-        (cornerCandidates.length === 4 || cornerCandidates.length === 3) &&
-        verifyPolygonEdgesStraight(pts, cornerCandidates)
-      ) {
-        if (cornerCandidates.length === 4) {
-          const [A, B, C, D] = cornerCandidates;
-          return {
-            type: "rectangle",
-            vertices: [A, B, C, D],
-          };
-        } else {
-          const [A, B, C] = cornerCandidates;
-          return {
-            type: "triangle",
-            vertices: [A, B, C],
-          };
-        }
-      }
-    }
-  }
-
-  // =========================================================================
-  // 3. Check Arrow: Straight main shaft + clear deliberate arrowhead
-  // =========================================================================
-  if (!isClosedRoughly && pts.length >= 12 && arcLen > 0.6) {
+  // Open strokes: Arrow & Straight Segment (strict thresholds so curves/arcs stay smooth!)
+  if (pts.length >= 12 && arcLen > 0.6) {
     const barbCutoff = Math.max(4, Math.floor(pts.length * 0.25));
     const mainPts = pts.slice(0, pts.length - barbCutoff);
     const headPts = pts.slice(pts.length - barbCutoff);
@@ -647,20 +889,27 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
     }
   }
 
-  // =========================================================================
-  // 4. Check Straight Segment (Strict straightness so curved edges stay smooth!)
-  // =========================================================================
-  if (!isClosedRoughly && arcLen > 0.35) {
+  // Straight Segment with gentle H/V auto-leveling
+  if (arcLen > 0.35) {
     const chordLen = dist2D(pStart, pEnd);
-    if (chordLen > 0.3 && chordLen / arcLen >= 0.972) {
+    if (chordLen > 0.3 && chordLen / arcLen >= 0.968) {
       const { maxDist } = maxPerpDistanceToSegment(pts, pStart, pEnd);
-      if (maxDist / chordLen <= 0.038) {
-        const simplified = simplifyRDP(pts, chordLen * 0.038);
+      if (maxDist / chordLen <= 0.04) {
+        const simplified = simplifyRDP(pts, chordLen * 0.04);
         if (simplified.length === 2) {
+          let endPt = { ...pEnd };
+          const dx = endPt.x - pStart.x;
+          const dy = endPt.y - pStart.y;
+          const angleDeg = Math.abs((Math.atan2(dy, dx) * 180) / Math.PI);
+          if (angleDeg <= 4.5 || angleDeg >= 175.5) {
+            endPt = { x: endPt.x, y: pStart.y };
+          } else if (Math.abs(angleDeg - 90) <= 4.5) {
+            endPt = { x: pStart.x, y: endPt.y };
+          }
           return {
             type: "segment",
             start: pStart,
-            end: pEnd,
+            end: endPt,
           };
         }
       }
@@ -668,4 +917,44 @@ export function recognizeStrokeShape(flatPoints: number[]): RecognizedShape | nu
   }
 
   return null;
+}
+
+/**
+ * Generates smooth world-space polyline points for live preview during Draw-and-Hold.
+ */
+export function recognizedShapeToPreviewPoints(shape: RecognizedShape): number[] {
+  const out: number[] = [];
+  if (shape.type === "segment" || shape.type === "arrow") {
+    out.push(shape.start.x, shape.start.y, shape.end.x, shape.end.y);
+  } else if (shape.type === "circle") {
+    const steps = 40;
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * 2 * Math.PI;
+      out.push(
+        shape.center.x + shape.radius * Math.cos(a),
+        shape.center.y + shape.radius * Math.sin(a)
+      );
+    }
+  } else if (shape.type === "ellipse") {
+    const steps = 44;
+    const cos = Math.cos(shape.rotation);
+    const sin = Math.sin(shape.rotation);
+    for (let i = 0; i <= steps; i++) {
+      const a = (i / steps) * 2 * Math.PI;
+      const lx = shape.rx * Math.cos(a);
+      const ly = shape.ry * Math.sin(a);
+      out.push(
+        shape.center.x + lx * cos - ly * sin,
+        shape.center.y + lx * sin + ly * cos
+      );
+    }
+  } else if (shape.type === "triangle" || shape.type === "rectangle") {
+    for (const v of shape.vertices) {
+      out.push(v.x, v.y);
+    }
+    if (shape.vertices.length > 0) {
+      out.push(shape.vertices[0].x, shape.vertices[0].y);
+    }
+  }
+  return out;
 }
