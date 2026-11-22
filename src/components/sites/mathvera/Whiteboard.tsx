@@ -4,6 +4,7 @@ import React, {
   useState,
   useRef,
   useEffect,
+  useLayoutEffect,
   useCallback,
   useMemo,
 } from "react";
@@ -21,7 +22,11 @@ import {
 } from "@/types/whiteboard";
 import { useWindowOrientation } from "@/hooks/useWindowOrientation";
 import { screenToWorld } from "@/lib/coordinates";
-import { OneEuroFilter } from "@/lib/ink";
+import {
+  OneEuroFilter,
+  generateCatmullRomSpline,
+  generateFilledInkPath,
+} from "@/lib/ink";
 import { checkEraserCollision } from "@/lib/eraser";
 import {
   getSavedDrawStyle,
@@ -714,9 +719,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   // 5. Gesture & Multi-Click Drafting Refs
   const liveStrokePointsRef = useRef<number[]>([]);
   const liveStrokePressuresRef = useRef<number[]>([]);
-  const filterXRef = useRef(new OneEuroFilter(1.2, 0.06, 1.0));
-  const filterYRef = useRef(new OneEuroFilter(1.2, 0.06, 1.0));
+  const liveStrokeTipRef = useRef<{
+    x: number;
+    y: number;
+    pressure: number;
+  } | null>(null);
+  const filterXRef = useRef(new OneEuroFilter(2.0, 0.35, 1.0));
+  const filterYRef = useRef(new OneEuroFilter(2.0, 0.35, 1.0));
   const liveStrokeRafRef = useRef<number | null>(null);
+  const liveStrokePathRef = useRef<SVGPathElement | null>(null);
   const liveStrokeStyleRef = useRef<Style | undefined>(undefined);
   const liveStrokeNibRef = useRef<InkProps["nib"] | undefined>(undefined);
   const liveStrokeSnappedRef = useRef<RecognizedShape | null>(null);
@@ -871,6 +882,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         (el) => isA4Format || (el.meta.page ?? 1) === currentPage
       ),
     [elements, currentPage, isA4Format]
+  );
+
+  const hasActiveInstruments = useMemo(
+    () =>
+      pageElements.some(
+        (el) => !el.style?.hidden && el.type === "PhysicsInstrument"
+      ),
+    [pageElements]
   );
 
   const hiddenCount = useMemo(
@@ -4786,6 +4805,45 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     ]
   );
 
+  const buildLiveStrokePathData = useCallback(() => {
+    if (liveStrokeSnappedRef.current) {
+      const previewPts = recognizedShapeToPreviewPoints(
+        liveStrokeSnappedRef.current
+      );
+      if (previewPts.length >= 4) {
+        return generateCatmullRomSpline(previewPts);
+      }
+    }
+    const basePts = liveStrokePointsRef.current;
+    const tip = liveStrokeTipRef.current;
+    const pts = tip ? [...basePts, tip.x, tip.y] : basePts;
+    if (pts.length < 2) return "";
+    const nib = liveStrokeNibRef.current;
+    if (nib === "fountain" || nib === "brush") {
+      const baseW = liveStrokeStyleRef.current?.width ?? 2.2;
+      const effW = nib === "brush" ? baseW * 1.9 : baseW;
+      const pressures = tip
+        ? [...liveStrokePressuresRef.current, tip.pressure]
+        : liveStrokePressuresRef.current;
+      return generateFilledInkPath(
+        pts,
+        pressures,
+        viewport.scale || 45,
+        effW,
+        nib
+      );
+    }
+    return generateCatmullRomSpline(pts);
+  }, [viewport.scale]);
+
+  useLayoutEffect(() => {
+    if (!liveStroke || !liveStrokePathRef.current) return;
+    const d = buildLiveStrokePathData();
+    if (d) {
+      liveStrokePathRef.current.setAttribute("d", d);
+    }
+  }, [liveStroke, buildLiveStrokePathData]);
+
   // --- Root Canvas Pointer Down ---
   const handleCanvasPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
@@ -5503,15 +5561,23 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           }
         }
         dispatcher.gesture(true);
-        // Magnetic snap to Ruler or Set Square edges if nearby
-        const instrumentSnap = snapPointToInstruments(worldPos, pageElements, 0.45);
-        const drawPt = instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
+        // Magnetic snap to Ruler or Set Square edges if nearby (only scan if an instrument exists)
+        const drawPt = hasActiveInstruments
+          ? (() => {
+              const instrumentSnap = snapPointToInstruments(
+                worldPos,
+                pageElements,
+                0.45
+              );
+              return instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
+            })()
+          : worldPos;
 
         const nib = resolvePenNib(activeTool) ?? undefined;
         const smooth = nib === "fountain" || nib === "brush";
         filterXRef.current.reset();
         filterYRef.current.reset();
-        const ts = performance.now();
+        const ts = e.nativeEvent.timeStamp || performance.now();
         const x = smooth
           ? filterXRef.current.filter(drawPt.x, ts)
           : drawPt.x;
@@ -5529,6 +5595,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             : currentStyle;
         liveStrokePointsRef.current = [x, y];
         liveStrokePressuresRef.current = [e.pressure || 0.5];
+        liveStrokeTipRef.current = null;
         liveStrokeStyleRef.current = effectiveStyle;
         liveStrokeNibRef.current = nib;
         liveStrokeSnappedRef.current = null;
@@ -5552,6 +5619,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       activeTool,
       navPointerDown,
       pageElements,
+      hasActiveInstruments,
       dispatcher,
       hydratedPts,
       currentStyle,
@@ -5953,27 +6021,57 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         return;
       }
 
-      // 6. Ink / Multi-nib Pens
+      // 6. Ink / Multi-nib Pens (Coalesced High-Refresh Input + Direct DOM rAF Path Update)
       if (
         isPenTool(activeTool) &&
         e.buttons === 1 &&
         liveStrokePointsRef.current.length > 0
       ) {
-        // Magnetic snap to Ruler or Set Square edges if nearby
-        const instrumentSnap = snapPointToInstruments(worldPos, pageElements, 0.45);
-        const drawPt = instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
-
         const nib = liveStrokeNibRef.current ?? resolvePenNib(activeTool) ?? undefined;
         const smooth = nib === "fountain" || nib === "brush";
-        const ts = performance.now();
-        const x = smooth
-          ? filterXRef.current.filter(drawPt.x, ts)
-          : drawPt.x;
-        const y = smooth
-          ? filterYRef.current.filter(drawPt.y, ts)
-          : drawPt.y;
-        liveStrokePointsRef.current.push(x, y);
-        liveStrokePressuresRef.current.push(e.pressure || 0.5);
+        const coalesced =
+          typeof e.nativeEvent.getCoalescedEvents === "function"
+            ? e.nativeEvent.getCoalescedEvents()
+            : null;
+        const events = coalesced && coalesced.length > 0 ? coalesced : [e.nativeEvent];
+        const minWorldDist = 1.4 / (viewport.scale || 45);
+        const ptsArr = liveStrokePointsRef.current;
+        const pressArr = liveStrokePressuresRef.current;
+
+        for (const ev of events) {
+          const evWorld = screenToWorld(
+            ev.clientX,
+            ev.clientY,
+            viewport.tx,
+            viewport.ty,
+            viewport.scale,
+            rect
+          );
+          const drawPt = hasActiveInstruments
+            ? (() => {
+                const snap = snapPointToInstruments(evWorld, pageElements, 0.45);
+                return snap.didSnap ? snap.snapped : evWorld;
+              })()
+            : evWorld;
+          const ts = ev.timeStamp || performance.now();
+          const x = smooth
+            ? filterXRef.current.filter(drawPt.x, ts)
+            : drawPt.x;
+          const y = smooth
+            ? filterYRef.current.filter(drawPt.y, ts)
+            : drawPt.y;
+          const lastX = ptsArr[ptsArr.length - 2];
+          const lastY = ptsArr[ptsArr.length - 1];
+          const d = Math.hypot(x - lastX, y - lastY);
+          const p = ev.pressure || 0.5;
+          if (d >= minWorldDist) {
+            ptsArr.push(x, y);
+            pressArr.push(p);
+            liveStrokeTipRef.current = null;
+          } else {
+            liveStrokeTipRef.current = { x, y, pressure: p };
+          }
+        }
         liveStrokeSnappedRef.current = null;
 
         // Draw-and-Hold dwell preview (340ms stationary pause snaps preview smoothly like GoodNotes/Samsung Notes)
@@ -5988,6 +6086,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         ) {
           dwellTimerRef.current = setTimeout(() => {
             dwellTimerRef.current = null;
+            if (liveStrokeRafRef.current) {
+              cancelAnimationFrame(liveStrokeRafRef.current);
+              liveStrokeRafRef.current = null;
+            }
             const currentPts = liveStrokePointsRef.current;
             if (currentPts.length < 8 || !liveStrokeStyleRef.current) return;
             const shape = recognizeStrokeShape(currentPts);
@@ -5995,27 +6097,28 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               liveStrokeSnappedRef.current = shape;
               const previewPts = recognizedShapeToPreviewPoints(shape);
               if (previewPts.length >= 4) {
-                setLiveStroke({
-                  points: previewPts,
-                  nib: liveStrokeNibRef.current,
-                  style: liveStrokeStyleRef.current,
-                });
+                const d = generateCatmullRomSpline(previewPts);
+                if (d) {
+                  liveStrokePathRef.current?.setAttribute("d", d);
+                }
               }
             }
           }, 340);
         }
 
-        // Throttle React DOM re-renders using requestAnimationFrame to guarantee smooth 60/120fps on mobile
+        // Update live SVG <path d="..."> directly on requestAnimationFrame with zero React re-renders
         if (!liveStrokeRafRef.current) {
           liveStrokeRafRef.current = requestAnimationFrame(() => {
             liveStrokeRafRef.current = null;
-            if (liveStrokePointsRef.current.length > 0 && liveStrokeStyleRef.current) {
-              setLiveStroke({
-                points: [...liveStrokePointsRef.current],
-                pressures: [...liveStrokePressuresRef.current],
-                nib: liveStrokeNibRef.current,
-                style: liveStrokeStyleRef.current,
-              });
+            if (
+              liveStrokePathRef.current &&
+              liveStrokePointsRef.current.length > 0 &&
+              liveStrokeStyleRef.current
+            ) {
+              const d = buildLiveStrokePathData();
+              if (d) {
+                liveStrokePathRef.current.setAttribute("d", d);
+              }
             }
           });
         }
@@ -6028,7 +6131,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       dispatcher,
       activeTool,
       pageElements,
+      hasActiveInstruments,
+      buildLiveStrokePathData,
       laserConfig,
+      liveLaserScreenPos,
       inkToShape,
     ]
   );
@@ -6112,11 +6218,27 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setIsLaserPressed(false);
       }
 
-      if (liveStroke) {
+      const activeLive =
+        liveStroke ??
+        (liveStrokeStyleRef.current
+          ? {
+              points: liveStrokePointsRef.current,
+              pressures: liveStrokePressuresRef.current,
+              nib: liveStrokeNibRef.current,
+              style: liveStrokeStyleRef.current,
+            }
+          : null);
+
+      if (activeLive) {
         const pts = liveStrokePointsRef.current;
         const pressures = liveStrokePressuresRef.current;
+        if (pts.length === 2 && liveStrokeTipRef.current) {
+          pts.push(liveStrokeTipRef.current.x, liveStrokeTipRef.current.y);
+          pressures.push(liveStrokeTipRef.current.pressure);
+          liveStrokeTipRef.current = null;
+        }
         if (pts.length >= 4) {
-          if (liveStroke.nib === "laser") {
+          if (activeLive.nib === "laser") {
             // Dedicated laser pointer: fade out completely after 1.5s, not persisting in Yjs
             const strokeId = newElId("laser");
             setLaserStrokes((prev) => [
@@ -6131,8 +6253,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             ]);
           } else if (
             inkToShape &&
-            (liveStroke.nib === undefined ||
-              liveStroke.nib === "pencil")
+            (activeLive.nib === undefined ||
+              activeLive.nib === "pencil")
           ) {
             // Ink-to-shape intelligence: use cached dwell snap or classify stroke via ShortStraw + PaleoSketch
             const recognized = liveStrokeSnappedRef.current ?? recognizeStrokeShape(pts);
@@ -6148,8 +6270,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 shapeType,
                 rawPoints: [...pts],
                 rawPressures: [...pressures],
-                nib: liveStroke.nib,
-                style: { ...liveStroke.style },
+                nib: activeLive.nib,
+                style: { ...activeLive.style },
                 page: targetPage,
                 ...extra,
               });
@@ -6168,9 +6290,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     type: "GeomCircle",
                     page: targetPage,
                     style: {
-                      stroke: liveStroke.style.stroke ?? "#0891b2",
-                      width: liveStroke.style.width ?? 2,
-                      dash: liveStroke.style.dash ?? false,
+                      stroke: activeLive.style.stroke ?? "#0891b2",
+                      width: activeLive.style.width ?? 2,
+                      dash: activeLive.style.dash ?? false,
                     },
                     props: {
                       center: `${circId}_c`,
@@ -6194,9 +6316,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     type: "GeomCircle",
                     page: targetPage,
                     style: {
-                      stroke: liveStroke.style.stroke ?? "#0891b2",
-                      width: liveStroke.style.width ?? 2,
-                      dash: liveStroke.style.dash ?? false,
+                      stroke: activeLive.style.stroke ?? "#0891b2",
+                      width: activeLive.style.width ?? 2,
+                      dash: activeLive.style.dash ?? false,
                     },
                     props: {
                       center: `${ellId}_c`,
@@ -6223,9 +6345,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     type: "GeomSegment",
                     page: targetPage,
                     style: {
-                      stroke: liveStroke.style.stroke ?? "#334155",
-                      width: liveStroke.style.width ?? 2,
-                      dash: liveStroke.style.dash ?? false,
+                      stroke: activeLive.style.stroke ?? "#334155",
+                      width: activeLive.style.width ?? 2,
+                      dash: activeLive.style.dash ?? false,
                     },
                     props: {
                       from: `${segId}_a`,
@@ -6245,9 +6367,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     type: "GeomVector",
                     page: targetPage,
                     style: {
-                      stroke: liveStroke.style.stroke ?? "#334155",
-                      width: liveStroke.style.width ?? 2,
-                      dash: liveStroke.style.dash ?? false,
+                      stroke: activeLive.style.stroke ?? "#334155",
+                      width: activeLive.style.width ?? 2,
+                      dash: activeLive.style.dash ?? false,
                     },
                     props: {
                       from: `${vecId}_a`,
@@ -6274,10 +6396,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     type: "GeomPolygon",
                     page: targetPage,
                     style: {
-                      stroke: liveStroke.style.stroke ?? "#334155",
+                      stroke: activeLive.style.stroke ?? "#334155",
                       fill: "none",
-                      width: liveStroke.style.width ?? 2,
-                      dash: liveStroke.style.dash ?? false,
+                      width: activeLive.style.width ?? 2,
+                      dash: activeLive.style.dash ?? false,
                     },
                     props: {
                       vertices: embedded.map((v) => v.id),
@@ -6295,8 +6417,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 params: {
                   points: pts,
                   pressures,
-                  nib: liveStroke.nib,
-                  style: liveStroke.style,
+                  nib: activeLive.nib,
+                  style: activeLive.style,
                   page: targetPage,
                 },
               });
@@ -6307,8 +6429,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               params: {
                 points: pts,
                 pressures,
-                nib: liveStroke.nib,
-                style: liveStroke.style,
+                nib: activeLive.nib,
+                style: activeLive.style,
                 page: isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage,
               },
             });
@@ -6326,6 +6448,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         dispatcher.gesture(false);
         liveStrokePointsRef.current = [];
         liveStrokePressuresRef.current = [];
+        liveStrokeTipRef.current = null;
         liveStrokeStyleRef.current = undefined;
         liveStrokeNibRef.current = undefined;
         containerRectRef.current = null;
@@ -6353,6 +6476,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       dispatcher,
       viewport,
       pageElements,
+      hasActiveInstruments,
+      isA4Format,
+      currentPage,
       containerRef,
       findNearestPoint,
       commitTwoPointShape,
@@ -6405,6 +6531,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         dispatcher.gesture(false);
         liveStrokePointsRef.current = [];
         liveStrokePressuresRef.current = [];
+        liveStrokeTipRef.current = null;
         liveStrokeStyleRef.current = undefined;
         liveStrokeNibRef.current = undefined;
         containerRectRef.current = null;
@@ -6515,7 +6642,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   );
 
   // --- Shared Renderers (used in both Fullscreen Whiteboard & 50/50 Split Exam Mode) ---
-  const renderBoardElement = (rawEl: CanvasElement) => {
+  const renderBoardElement = useCallback(
+    (rawEl: CanvasElement) => {
     if (rawEl.style?.hidden) return null;
     const el = adaptElementForBoard(rawEl, currentBoardTheme.isDark);
     const isSel = selectedIds.includes(el.id);
@@ -7019,7 +7147,46 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       default:
         return null;
     }
-  };
+    },
+    [
+      currentBoardTheme.isDark,
+      selectedIds,
+      viewport.scale,
+      viewport.tx,
+      viewport.ty,
+      handleElementPointerDown,
+      hydratedPts,
+      labelScale,
+      dotScale,
+      penOnlyMode,
+      navPointerDown,
+      containerRef,
+      dispatcher,
+      openPointRename,
+      byId,
+      solved3D.p3,
+      solved3D.lifts,
+      orbitCamById,
+      activeSolidSubPart,
+      handleEditMathElement,
+      handleUpdateTableCells,
+      pageElements,
+      handleUpdatePlotExpr,
+      handleUpdatePlotParam,
+      handleChangeSliderValue,
+      handleUpdateElementProps,
+      handleCompassDrawArc,
+      handlePlotLabRegression,
+    ]
+  );
+
+  const renderedBoardElements = useMemo(
+    () =>
+      [...pageElements]
+        .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
+        .map(renderBoardElement),
+    [pageElements, renderBoardElement]
+  );
 
   const renderCanvas = (contained = false) => (
     <SvgCanvas
@@ -7199,13 +7366,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         </>
       }
     >
-      {[...pageElements]
-        .sort((a, b) => (a.transform.z ?? 0) - (b.transform.z ?? 0))
-        .map(renderBoardElement)}
+      {renderedBoardElements}
 
       {liveStroke && (
         <InkElement
           id="live-in-progress-stroke"
+          pathRef={liveStrokePathRef}
           transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 9999 }}
           style={{
             ...liveStroke.style,

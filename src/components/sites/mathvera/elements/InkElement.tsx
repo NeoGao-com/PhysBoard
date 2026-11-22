@@ -12,11 +12,12 @@ export interface InkElementProps {
   scale?: number;
   isSelected?: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
+  pathRef?: React.Ref<SVGPathElement>;
 }
 
-const DEFAULT_WIDTH = 2.4;
+const DEFAULT_WIDTH = 2.2;
 
-export const InkElement: React.FC<InkElementProps> = ({
+export const InkElement: React.FC<InkElementProps> = React.memo(({
   id,
   transform,
   style,
@@ -24,6 +25,7 @@ export const InkElement: React.FC<InkElementProps> = ({
   scale = 45,
   isSelected = false,
   onPointerDown,
+  pathRef,
 }) => {
   const points = useMemo(() => props.points ?? [], [props.points]);
   const strokeColor = style.stroke ?? "#111827";
@@ -94,6 +96,7 @@ export const InkElement: React.FC<InkElementProps> = ({
       {/* 2. Rendered stroke path */}
       {isVariableInk ? (
         <path
+          ref={pathRef}
           d={pathData}
           fill={strokeColor}
           stroke="none"
@@ -101,6 +104,7 @@ export const InkElement: React.FC<InkElementProps> = ({
         />
       ) : (
         <path
+          ref={pathRef}
           d={pathData}
           fill="none"
           stroke={strokeColor}
@@ -125,4 +129,4 @@ export const InkElement: React.FC<InkElementProps> = ({
       )}
     </g>
   );
-};
+});

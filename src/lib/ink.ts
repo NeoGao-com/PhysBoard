@@ -13,8 +13,8 @@ export class OneEuroFilter {
   private t: number = 0;
 
   constructor(
-    public minCutoff: number = 1.2,
-    public beta: number = 0.06,
+    public minCutoff: number = 2.0,
+    public beta: number = 0.35,
     public dCutoff: number = 1.0
   ) {}
 
@@ -51,52 +51,95 @@ export class OneEuroFilter {
 }
 
 /**
- * Catmull-Rom cubic Bezier path generation (verbatim Hft).
- * Converts flat [x0, y0, x1, y1, ...] points into an SVG path string.
+ * Variation-diminishing C1-continuous Midpoint Quadratic Bezier spline (with corner-preserving streamline).
+ * Converts flat [x0, y0, x1, y1, ...] points into an SVG path string with zero overshoot or end-hooks.
  * Flips Math World Y to SVG Y via `-y`.
  */
 export function generateCatmullRomSpline(flatPoints: number[]): string {
-  const pts: Array<{ x: number; y: number }> = [];
+  const rawPts: Array<{ x: number; y: number }> = [];
   for (let i = 0; i + 1 < flatPoints.length; i += 2) {
     const x = flatPoints[i];
     const y = -flatPoints[i + 1]; // Invert Math Y to SVG Y
-    const prev = pts[pts.length - 1];
+    const prev = rawPts[rawPts.length - 1];
     if (!prev || Math.hypot(x - prev.x, y - prev.y) >= 1e-6) {
-      pts.push({ x, y });
+      rawPts.push({ x, y });
     }
   }
 
-  if (pts.length === 0) return "";
-  if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y} l 0.0001 0`;
-  if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
-
-  const commands = [`M ${pts[0].x.toFixed(3)} ${pts[0].y.toFixed(3)}`];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[i + 2] ?? p2;
-
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-    commands.push(
-      `C ${cp1x.toFixed(3)} ${cp1y.toFixed(3)} ${cp2x.toFixed(3)} ${cp2y.toFixed(3)} ${p2.x.toFixed(3)} ${p2.y.toFixed(3)}`
-    );
+  if (rawPts.length === 0) return "";
+  const fmt = (v: number) => v.toFixed(4);
+  if (rawPts.length === 1) return `M ${fmt(rawPts[0].x)} ${fmt(rawPts[0].y)} l 0.0001 0`;
+  if (rawPts.length === 2) {
+    return `M ${fmt(rawPts[0].x)} ${fmt(rawPts[0].y)} L ${fmt(rawPts[1].x)} ${fmt(rawPts[1].y)}`;
   }
+
+  // Filter out micro-jitter points closer than 0.008 world units while always preserving endpoints
+  const pts: Array<{ x: number; y: number }> = [rawPts[0]];
+  for (let i = 1; i < rawPts.length - 1; i++) {
+    const last = pts[pts.length - 1];
+    if (Math.hypot(rawPts[i].x - last.x, rawPts[i].y - last.y) >= 0.008) {
+      pts.push(rawPts[i]);
+    }
+  }
+  const lastRaw = rawPts[rawPts.length - 1];
+  const lastKept = pts[pts.length - 1];
+  if (Math.hypot(lastRaw.x - lastKept.x, lastRaw.y - lastKept.y) >= 1e-6) {
+    pts.push(lastRaw);
+  }
+
+  if (pts.length === 2) {
+    return `M ${fmt(pts[0].x)} ${fmt(pts[0].y)} L ${fmt(pts[1].x)} ${fmt(pts[1].y)}`;
+  }
+
+  // Light 1-pass corner-preserving streamline filter to eliminate staircase jitter
+  const smoothed: Array<{ x: number; y: number }> = [pts[0]];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const prev = pts[i - 1];
+    const curr = pts[i];
+    const next = pts[i + 1];
+    const v1x = curr.x - prev.x;
+    const v1y = curr.y - prev.y;
+    const v2x = next.x - curr.x;
+    const v2y = next.y - curr.y;
+    const d1 = Math.hypot(v1x, v1y);
+    const d2 = Math.hypot(v2x, v2y);
+    if (d1 > 1e-6 && d2 > 1e-6) {
+      const cos = (v1x * v2x + v1y * v2y) / (d1 * d2);
+      if (cos > -0.35) {
+        smoothed.push({
+          x: 0.18 * prev.x + 0.64 * curr.x + 0.18 * next.x,
+          y: 0.18 * prev.y + 0.64 * curr.y + 0.18 * next.y,
+        });
+        continue;
+      }
+    }
+    smoothed.push(curr);
+  }
+  smoothed.push(pts[pts.length - 1]);
+
+  // C1 Midpoint Quadratic Bezier spline: M p0 L mid(p0,p1) Q p1 mid(p1,p2) ... L pLast
+  const n = smoothed.length;
+  const commands = [
+    `M ${fmt(smoothed[0].x)} ${fmt(smoothed[0].y)}`,
+    `L ${fmt((smoothed[0].x + smoothed[1].x) * 0.5)} ${fmt((smoothed[0].y + smoothed[1].y) * 0.5)}`,
+  ];
+  for (let i = 1; i < n - 1; i++) {
+    const mx = (smoothed[i].x + smoothed[i + 1].x) * 0.5;
+    const my = (smoothed[i].y + smoothed[i + 1].y) * 0.5;
+    commands.push(`Q ${fmt(smoothed[i].x)} ${fmt(smoothed[i].y)} ${fmt(mx)} ${fmt(my)}`);
+  }
+  commands.push(`L ${fmt(smoothed[n - 1].x)} ${fmt(smoothed[n - 1].y)}`);
 
   return commands.join(" ");
 }
 
 /**
- * Calligraphy Fountain Pen dynamic thickness calculation (verbatim DLe).
+ * Calligraphy Fountain Pen dynamic thickness calculation.
  * Evaluates direction relative to 15° slant angle, speed, and pressure.
  */
 const FOUNTAIN_NIB_ANGLE_DEG = 15;
-const MIN_WIDTH_FACTOR = 0.35;
-const MAX_WIDTH_FACTOR = 1.7;
+const MIN_WIDTH_FACTOR = 0.5;
+const MAX_WIDTH_FACTOR = 1.42;
 
 function smoothstep(min: number, max: number, x: number): number {
   const t = Math.min(1, Math.max(0, (x - min) / (max - min)));
@@ -246,17 +289,56 @@ export function generateFilledInkPath(
   baseWidth: number = 2.4,
   nib?: "fountain" | "pencil" | "highlighter" | "brush" | "dashed" | "laser"
 ): string {
-  const rawPts: Array<[number, number, number]> = [];
+  const deduped: Array<[number, number, number]> = [];
   for (let i = 0; i + 1 < flatPoints.length; i += 2) {
     const x = flatPoints[i] * scale;
     const y = -flatPoints[i + 1] * scale;
-    const prev = rawPts[rawPts.length - 1];
+    const prev = deduped[deduped.length - 1];
     if (!prev || Math.hypot(x - prev[0], y - prev[1]) >= 1e-6) {
-      rawPts.push([x, y, pressures?.[i / 2] ?? 0.5]);
+      deduped.push([x, y, pressures?.[i / 2] ?? 0.5]);
     }
   }
 
-  if (rawPts.length === 0) return "";
+  if (deduped.length === 0) return "";
+
+  // Filter raw pixel points to >= 1.5px spacing (preserving start & end points) so normals stay jitter-free
+  const rawPts: Array<[number, number, number]> = [deduped[0]];
+  for (let i = 1; i < deduped.length - 1; i++) {
+    const last = rawPts[rawPts.length - 1];
+    if (Math.hypot(deduped[i][0] - last[0], deduped[i][1] - last[1]) >= 1.5) {
+      rawPts.push(deduped[i]);
+    }
+  }
+  if (deduped.length > 1) {
+    const lastRaw = deduped[deduped.length - 1];
+    const lastKept = rawPts[rawPts.length - 1];
+    if (Math.hypot(lastRaw[0] - lastKept[0], lastRaw[1] - lastKept[1]) >= 0.25) {
+      rawPts.push(lastRaw);
+    } else if (rawPts.length > 1) {
+      rawPts[rawPts.length - 1] = lastRaw;
+    }
+  }
+
+  if (rawPts.length === 1) {
+    const [cx, cy] = rawPts[0];
+    const r = Math.max(0.6, baseWidth / 2);
+    const dotPts: Array<[number, number]> = [];
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4;
+      dotPts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+    }
+    const toWorld = (coord: number) => (coord / scale).toFixed(4);
+    const parts = [`M ${toWorld(dotPts[0][0])} ${toWorld(dotPts[0][1])} Q`];
+    for (let i = 0; i < dotPts.length; i++) {
+      const [x1, y1] = dotPts[i];
+      const [x2, y2] = dotPts[(i + 1) % dotPts.length];
+      parts.push(
+        `${toWorld(x1)} ${toWorld(y1)} ${toWorld((x1 + x2) / 2)} ${toWorld((y1 + y2) / 2)}`
+      );
+    }
+    parts.push("Z");
+    return parts.join(" ");
+  }
 
   // Catmull-Rom curve subdivision
   const subdivided: Array<[number, number, number]> = [rawPts[0]];
@@ -291,37 +373,72 @@ export function generateFilledInkPath(
   let outline: Array<[number, number]>;
   if (nib === "fountain" || nib === "brush") {
     const widths = computeFountainPenThickness(subdivided, baseWidth);
-    if (subdivided.length === 1) {
-      const [x, y] = subdivided[0];
-      const r = Math.max(0.5, baseWidth / 2);
-      outline = [
-        [x - r, y],
-        [x, y - r],
-        [x + r, y],
-        [x, y + r],
-      ];
-    } else {
-      const leftPts: Array<[number, number]> = [];
-      const rightPts: Array<[number, number]> = [];
-      const lastIdx = subdivided.length - 1;
-      for (let i = 0; i < subdivided.length; i++) {
-        const p0 = subdivided[Math.max(0, i - 1)];
-        const p1 = subdivided[i];
-        const p2 = subdivided[Math.min(lastIdx, i + 1)];
-        const dx = p2[0] - p0[0];
-        const dy = p2[1] - p0[1];
-        const len = Math.hypot(dx, dy) || 1;
-        const nx = -dy / len;
-        const ny = dx / len;
-        // Gentle endpoint nib taper while honoring exact directional width
-        const taper =
-          i === 0 || i === lastIdx ? 0.65 : i === 1 || i === lastIdx - 1 ? 0.85 : 1;
-        const halfWidth = Math.max(0.35, (widths[i] * taper) / 2);
-        leftPts.push([p1[0] + nx * halfWidth, p1[1] + ny * halfWidth]);
-        rightPts.push([p1[0] - nx * halfWidth, p1[1] - ny * halfWidth]);
+    const leftPts: Array<[number, number]> = [];
+    const rightPts: Array<[number, number]> = [];
+    const lastIdx = subdivided.length - 1;
+    let t0x = 1;
+    let t0y = 0;
+    let n0x = 0;
+    let n0y = 1;
+    let r0 = 0.5;
+    let tEndX = 1;
+    let tEndY = 0;
+    let nEndX = 0;
+    let nEndY = 1;
+    let rEnd = 0.5;
+
+    for (let i = 0; i < subdivided.length; i++) {
+      const p0 = subdivided[Math.max(0, i - 1)];
+      const p1 = subdivided[i];
+      const p2 = subdivided[Math.min(lastIdx, i + 1)];
+      const dx = p2[0] - p0[0];
+      const dy = p2[1] - p0[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const tx = dx / len;
+      const ty = dy / len;
+      const nx = -ty;
+      const ny = tx;
+      // Gentle endpoint nib taper while preserving round caps
+      const taper =
+        i === 0 || i === lastIdx ? 0.72 : i === 1 || i === lastIdx - 1 ? 0.88 : 1;
+      const halfWidth = Math.max(0.35, (widths[i] * taper) / 2);
+      if (i === 0) {
+        t0x = tx;
+        t0y = ty;
+        n0x = nx;
+        n0y = ny;
+        r0 = halfWidth;
       }
-      outline = leftPts.concat(rightPts.reverse());
+      if (i === lastIdx) {
+        tEndX = tx;
+        tEndY = ty;
+        nEndX = nx;
+        nEndY = ny;
+        rEnd = halfWidth;
+      }
+      leftPts.push([p1[0] + nx * halfWidth, p1[1] + ny * halfWidth]);
+      rightPts.push([p1[0] - nx * halfWidth, p1[1] - ny * halfWidth]);
     }
+
+    // 5-point semicircular round caps at both stroke endpoints
+    const endPt = subdivided[lastIdx];
+    const startPt = subdivided[0];
+    const endCap: Array<[number, number]> = [];
+    const startCap: Array<[number, number]> = [];
+    for (let k = 1; k <= 5; k++) {
+      const angle = (k / 6) * Math.PI;
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      endCap.push([
+        endPt[0] + rEnd * (c * nEndX + s * tEndX),
+        endPt[1] + rEnd * (c * nEndY + s * tEndY),
+      ]);
+      startCap.push([
+        startPt[0] - r0 * (c * n0x + s * t0x),
+        startPt[1] - r0 * (c * n0y + s * t0y),
+      ]);
+    }
+    outline = leftPts.concat(endCap, rightPts.reverse(), startCap);
   } else {
     outline = generateOutlinePolygon(subdivided, {
       size: baseWidth,
