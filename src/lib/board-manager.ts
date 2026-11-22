@@ -69,3 +69,98 @@ export function saveFolders(folders: BoardFolder[]): void {
     window.localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(folders));
   } catch {}
 }
+
+const PDF_STORE_DB = "physboard_pdf_import_db";
+const PDF_STORE_TABLE = "pending_imports";
+
+function openPdfImportDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB is not available"));
+      return;
+    }
+    const request = indexedDB.open(PDF_STORE_DB, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(PDF_STORE_TABLE)) {
+        db.createObjectStore(PDF_STORE_TABLE, { keyPath: "boardId" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function storePendingPdfPages(boardId: string, pages: unknown[]): Promise<void> {
+  try {
+    const db = await openPdfImportDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(PDF_STORE_TABLE, "readwrite");
+      const store = tx.objectStore(PDF_STORE_TABLE);
+      store.put({ boardId, pages, timestamp: Date.now() });
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+    });
+  } catch (err) {
+    console.error("storePendingPdfPages IndexedDB fallback:", err);
+    // Fallback to sessionStorage if small enough
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(`pending_pdf_import_${boardId}`, JSON.stringify(pages));
+      } catch (sessErr) {
+        console.error("sessionStorage also failed:", sessErr);
+      }
+    }
+  }
+}
+
+export async function retrievePendingPdfPages(boardId: string): Promise<unknown[] | null> {
+  try {
+    const db = await openPdfImportDb();
+    const result = await new Promise<{ boardId: string; pages: unknown[] } | undefined>((resolve, reject) => {
+      const tx = db.transaction(PDF_STORE_TABLE, "readwrite");
+      const store = tx.objectStore(PDF_STORE_TABLE);
+      const req = store.get(boardId);
+      req.onsuccess = () => {
+        if (req.result) {
+          store.delete(boardId);
+        }
+        resolve(req.result);
+      };
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => db.close();
+    });
+
+    if (result && Array.isArray(result.pages) && result.pages.length > 0) {
+      return result.pages;
+    }
+  } catch (err) {
+    console.error("retrievePendingPdfPages error:", err);
+  }
+
+  // Fallback to sessionStorage
+  if (typeof window !== "undefined") {
+    try {
+      const key = `pending_pdf_import_${boardId}`;
+      const raw = window.sessionStorage.getItem(key);
+      if (raw) {
+        window.sessionStorage.removeItem(key);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return null;
+}
+

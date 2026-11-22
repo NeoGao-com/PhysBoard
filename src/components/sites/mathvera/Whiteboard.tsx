@@ -153,6 +153,7 @@ import { ExportModal } from "./ExportModal";
 import { ExportPdfModal } from "./ExportPdfModal";
 import { ExamEditor } from "./ExamEditor";
 import { BoardManagerModal } from "./BoardManagerModal";
+import { retrievePendingPdfPages } from "@/lib/board-manager";
 import type {
   PhysicsInstrumentKind,
   PhysicsInstrumentProps,
@@ -2876,21 +2877,25 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   // Check pending PDF import from BoardManager
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const key = `pending_pdf_import_${activeRoomId}`;
-      const raw = window.sessionStorage.getItem(key);
-      if (raw) {
-        window.sessionStorage.removeItem(key);
-        const pages = JSON.parse(raw);
-        if (Array.isArray(pages) && pages.length > 0) {
+    let isCancelled = false;
+
+    retrievePendingPdfPages(activeRoomId)
+      .then((pages) => {
+        if (!isCancelled && pages && Array.isArray(pages) && pages.length > 0) {
           setTimeout(() => {
-            handleInsertPdfPages(pages);
-          }, 100);
+            if (!isCancelled) {
+              handleInsertPdfPages(pages as ImportedPdfPage[]);
+            }
+          }, 150);
         }
-      }
-    } catch (err) {
-      console.error("Error processing pending PDF import:", err);
-    }
+      })
+      .catch((err) => {
+        console.error("Error processing pending PDF import:", err);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [activeRoomId, handleInsertPdfPages]);
 
   const handleM3Action = useCallback(
@@ -9490,6 +9495,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         open={boardManagerOpen}
         onClose={() => setBoardManagerOpen(false)}
         currentRoomId={activeRoomId}
+        onInsertPdfIntoCurrentBoard={(pages) => {
+          handleInsertPdfPages(pages);
+        }}
         onSelectBoard={(newBoardId) => {
           if (newBoardId !== activeRoomId) {
             if (typeof window !== "undefined") {

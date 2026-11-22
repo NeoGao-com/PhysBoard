@@ -9,6 +9,7 @@ import {
   loadFolders,
   saveFolders,
   DEFAULT_BOARD_ID,
+  storePendingPdfPages,
 } from "@/lib/board-manager";
 import { generateRoomId, sanitizeRoomId } from "@/lib/room";
 import { importPdfPages } from "@/lib/pdf-import";
@@ -18,6 +19,7 @@ export interface BoardManagerModalProps {
   onClose: () => void;
   currentRoomId: string;
   onSelectBoard: (boardId: string) => void;
+  onInsertPdfIntoCurrentBoard?: (pages: import("@/lib/pdf-import").ImportedPdfPage[]) => void;
   onOpenSettings?: () => void;
 }
 
@@ -28,6 +30,7 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
   onClose,
   currentRoomId,
   onSelectBoard,
+  onInsertPdfIntoCurrentBoard,
   onOpenSettings,
 }) => {
   const [boards, setBoards] = useState<BoardItem[]>([]);
@@ -173,9 +176,23 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
 
   const handleImportPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     try {
       const res = await importPdfPages(file);
+      if (!res.pages || res.pages.length === 0) {
+        alert("File PDF không có trang nào hoặc không thể hiển thị.");
+        return;
+      }
+
+      // If onInsertPdfIntoCurrentBoard is provided, insert directly into current board
+      if (onInsertPdfIntoCurrentBoard) {
+        onInsertPdfIntoCurrentBoard(res.pages);
+        onClose();
+        return;
+      }
+
+      // Fallback: create a new board with PDF pages
       const newId = generateRoomId("pdf");
       const baseName = file.name.replace(/\.[^/.]+$/, "");
       const newBoard: BoardItem = {
@@ -189,10 +206,8 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
       setBoards(next);
       saveBoards(next);
 
-      // Store initial PDF pages in sessionStorage for Whiteboard to import upon load
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(`pending_pdf_import_${newId}`, JSON.stringify(res.pages));
-      }
+      // Store initial PDF pages in IndexedDB & sessionStorage for Whiteboard to import upon load
+      await storePendingPdfPages(newId, res.pages);
 
       onSelectBoard(newId);
       onClose();
