@@ -1,135 +1,135 @@
 <div align="center">
-  <img src="assets/logo.png" alt="PhysBoard Logo" width="128" height="128" />
-  <h1>PhysBoard</h1>
-  <p><strong>Bảng trắng tương tác dạy Toán &amp; Vật lý THPT — Hoạt động 100% Offline trên Windows &amp; Android</strong></p>
+  <img src="assets/logo.png" alt="PhysBoard Logo" width="120" height="120" />
+  <h1>PhysBoard v1.2.0</h1>
+  <p>
+    <strong>Bảng trắng tương tác dạy Toán · Vật lý · Hoá học THPT (GDPT 2018)</strong><br />
+    <em>Hoạt động mượt mà trên Windows (.exe), Android (.apk) &amp; Trình duyệt — Dữ liệu lưu 100% Offline</em>
+  </p>
+
   <p>
     <a href="https://github.com/NeoGao-com/PhysBoard/releases/latest">
-      <img src="https://img.shields.io/badge/Download-PhysBoard%20Windows%20(.exe)-2563eb?style=for-the-badge&logo=windows" alt="Download Windows EXE" />
+      <img src="https://img.shields.io/badge/Download-Windows%20(.exe)-2563eb?style=for-the-badge&logo=windows" alt="Download Windows EXE" />
     </a>
     &nbsp;
     <a href="https://github.com/NeoGao-com/PhysBoard/releases/latest">
-      <img src="https://img.shields.io/badge/Download-PhysBoard%20Android%20(.apk)-16a34a?style=for-the-badge&logo=android" alt="Download Android APK" />
+      <img src="https://img.shields.io/badge/Download-Android%20(.apk)-16a34a?style=for-the-badge&logo=android" alt="Download Android APK" />
     </a>
   </p>
+
   <p>
-    <em>Next.js 16 (Static Export) · React 19 · Tailwind CSS v4 · Tauri v2 (Rust) · Capacitor Android</em>
+    <code>Next.js 16</code> · <code>React 19</code> · <code>Tailwind CSS v4</code> · <code>KaTeX &amp; MathLive</code> · <code>Tauri v2 (Rust)</code> · <code>Capacitor Android</code>
   </p>
 </div>
 
 ---
 
-## Giới thiệu
+## Tại sao chọn PhysBoard?
 
-**PhysBoard** là ứng dụng bảng trắng vector tương tác chuyên dụng cho giảng dạy **Toán học** và **Vật lý cấp THPT (Lớp 10, 11, 12 — GDPT 2018)**. Ứng dụng chạy hoàn toàn **100% Offline** không phụ thuộc trình duyệt web hay máy chủ mạng: dữ liệu bảng vẽ được lưu tự động trên thiết bị qua IndexedDB và hỗ trợ lưu/mở trực tiếp tệp `.phys.json`, xuất PNG, PDF và mã LaTeX TikZ.
+Giáo viên dạy **Toán – Lý – Hoá** thường phải mở cùng lúc nhiều phần mềm rời rạc: một app để viết vẽ bảng, một trình duyệt để mở thí nghiệm PhET, một máy tính cầm tay riêng và một file tra cứu công thức / bảng tuần hoàn.
+
+**PhysBoard** gom toàn bộ quy trình giảng dạy vào **một không gian bảng trắng vector duy nhất**, tối ưu cho cả **chuột/bảng vẽ Wacom trên Windows** lẫn **bút cảm ứng (S Pen / Stylus) trên tablet Android**.
 
 ---
 
-## Tính năng nổi bật
+## Tính năng nổi bật & Ví dụ sử dụng thực tế
 
-### 1. Bảng vẽ Vector & Bút cảm ứng (Stylus-ready)
-- **Hệ tọa độ Descartes vô hạn (`Oxy`):** Kéo pan, phóng to/thu nhỏ mượt mà (`Zoom 8–600`), lưới chấm (`#wb-dot-grid`), tối ưu cảm ứng & bút vẽ (`touch-action: none`, `overscroll-behavior: none`).
-- **Công cụ vẽ & Quản lý điểm:** Bút thường, Bút máy thư pháp (`ink:fountain`), Tẩy tiếp xúc, bảng màu & độ dày nét linh hoạt, tô màu vùng/đỉnh đa giác; thanh chọn điểm trực quan (`Đổi tên`, `Ẩn/Hiện tên`, kiểu/cỡ chấm, cỡ tên mọi điểm, kéo di chuyển & nhấp đúp đổi tên nhãn).
-- **Nhiều trang & Lưu trữ Offline:** Tạo nhiều trang bảng trong một phiên làm việc, tự động lưu cục bộ bằng IndexedDB (`y-indexeddb`), Lưu file `.phys.json` (`💾`) và Mở file (`📂`) 1 chạm.
-- **Cửa sổ lệnh (`Ctrl+K`):** Tìm kiếm nhanh mọi công cụ, thí nghiệm và tùy chỉnh phím tắt cá nhân.
+### 1. Cửa sổ Thí nghiệm Mô phỏng PhET & HTML Toàn màn hình (`⚗ Thí nghiệm`)
+Thay vì nhúng khung nhỏ chật hẹp lên canvas, PhysBoard chạy thí nghiệm như một **cửa sổ toàn màn hình độc lập ngay trong app**:
+- **Kho PhET Online (28+ bài chọn lọc & dán link bất kỳ):** Tự động chuẩn hoá sang gói đa ngôn ngữ `_all.html?locale=vi` (hiển thị tiếng Việt, tự động fallback tiếng Anh nếu bài đó chưa có bản dịch).
+- **Kho File `.html` Offline (IndexedDB + Blob URL):** Tải sẵn file HTML5 đơn lẻ từ [PhET](https://phet.colorado.edu/) về máy, kéo-thả vào app để lưu lâu dài — dạy **100% không cần Internet**, tối ưu RAM cho Android WebView.
+- **Chuyển đổi tức thì Bảng trắng ↔ Thí nghiệm:** Bấm **─ Về bảng trắng** để ghi công thức/chú thích mà thí nghiệm vẫn giữ nguyên trạng thái chạy ngầm; bấm nút nổi góc dưới phải để quay lại đúng thí nghiệm đang chạy dở.
 
-### 2. Bộ Công cụ Giảng dạy Vật lý THPT (`⚛ Vật lý ▾`)
-- **15 Thí nghiệm Mô phỏng Tương tác (Lớp 10–11–12):**
-  - **Lớp 10:** Chuyển động thẳng BĐĐ & Rơi tự do, Ném ngang/Ném xiên, Mặt phẳng nghiêng & Ma sát, Va chạm & Bảo toàn động lượng, Chuyển động tròn đều & Lực hướng tâm.
-  - **Lớp 11:** Con lắc lò xo & Cơ năng, Con lắc đơn, Vòng tròn lượng giác & Tổng hợp dao động, Sóng dừng trên dây, Giao thoa sóng hai nguồn, Giao thoa ánh sáng Y-âng.
-  - **Lớp 12:** Khí lý tưởng $p-V-T$, Cảm ứng điện từ Faraday/Len-xơ, Mạch RLC xoay chiều & Dao động ký, Quang điện ngoài & Phóng xạ hạt nhân.
-- **Sơ đồ Vật lý Thông minh & Dụng cụ Đo:**
-  - Mạch điện DC tương tác (nguồn $(E, r)$, biến trở, khóa `K` đóng/ngắt trực tiếp, Ampe kế/Vôn kế cập nhật tức thời).
-  - Sơ đồ phân tích lực trên mặt phẳng ngang/nghiêng & Quang hình học 3 tia (Thấu kính hội tụ/phân kỳ, gương cầu lồi/lõm).
-  - Thước thẳng (`cm/mm`), Thước đo góc `0°–180°`, Đồng hồ bấm giây có nút Lap.
-- **Bảng thực hành & Bài giảng mẫu:** Ghi số liệu trực tiếp từ mô phỏng sang bảng thực hành, tính hồi quy tuyến tính $y = ax + b$ ($R^2$) và vẽ đồ thị lên `Axes2D`; 8 bài giảng mẫu 1 chạm; ~20 nhóm công thức SGK, 11 hằng số CODATA & đổi đơn vị nhanh.
+> **Ví dụ tiết dạy Vật lý 11 — Dao động con lắc đơn:**
+> 1. Bấm **⚗ Thí nghiệm** → chọn **Thí nghiệm Con lắc đơn** (`pendulum-lab`) ở chế độ toàn màn hình để học sinh quan sát chu kỳ $T$ khi thay đổi chiều dài dây $l$.
+> 2. Bấm **─ Về bảng trắng** → mở ngăn kéo **Vật lý** → chèn 1 chạm công thức $T = 2\pi\sqrt{\frac{l}{g}}$ lên bảng và giải bài tập minh hoạ.
+> 3. Bấm nút nổi **⚗ Thí nghiệm Con lắc đơn** ở góc dưới phải để mở lại ngay thí nghiệm đang chạy.
 
-### 3. Toán học 2D, 3D, Đồ thị & Soạn đề
-- **Hình học phẳng 2D:** Điểm, đoạn/đường/tia/vectơ, đường tròn, đa giác, tam giác/tứ giác đặc biệt, dựng hình (đường cao, trung tuyến, phân giác, trọng tâm, trực tâm, đường tròn nội/ngoại tiếp), tự động vẽ ký hiệu vuông góc/bằng nhau.
-- **Hình học không gian 3D:** Hộp chữ nhật, lập phương, lăng trụ, chóp, chóp cụt, trụ, nón, cầu, hệ trục `Oxyz`, điều khiển xoay quỹ đạo 3D, giao tuyến, thiết diện và tách mặt phẳng (hình thật).
-- **Giải tích, Thống kê & Soạn đề (`Soạn đề`):** Vẽ đồ thị hàm số/bất phương trình có thanh trượt tham số, bảng biến thiên, cây xác suất, biểu đồ Venn/thống kê, trình soạn thảo đề A4 chuẩn.
+---
+
+### 2. Bộ 3 Ngăn kéo Công thức & Tra cứu chuyên sâu (Chèn LaTeX 1 chạm)
+
+Mỗi môn học có ngăn kéo riêng biệt, tìm kiếm tiếng Việt không dấu và nút **+ Chèn bảng** biến công thức thành đối tượng `MathText` sắc nét (KaTeX) ngay trên bảng:
+
+| Môn học | Nội dung chính | Điểm nhấn |
+| :--- | :--- | :--- |
+| **∑ Toán** | Đại số & PT, Lượng giác, Giải tích, Hình học 2D & `Oxy`, Không gian & `Oxyz`, Tổ hợp & Xác suất | Tách rõ từng chủ đề THPT 10–11–12 |
+| **⚛ Vật lý** | Công thức theo chủ đề (Lớp 10–11–12), Bảng hằng số CODATA, **Bộ đổi đơn vị kèm công thức quy đổi** | Gồm hệ số đổi trực quan (vd: `1 km/h = 1/3,6 m/s`) |
+| **🧪 Hoá** | 6 nhóm công thức (Mol & Dung dịch, Nhiệt hoá, pH, Điện hoá, Hữu cơ, Giải nhanh) + **Bảng Tuần Hoàn 118 NT** | Click vào nguyên tố bất kỳ để xem cấu hình `e`, $M$, độ âm điện, số OXH & chèn lên bảng |
+
+> **Ví dụ tiết dạy Hoá học 10 — Cấu tạo nguyên tử:**
+> - Mở **🧪 Hoá** → chuyển sang tab **⚛ Bảng Tuần Hoàn (118 NT)** → gõ `Fe` hoặc `26`.
+> - Chọn ô **Sắt (Fe)** → bấm **+ Chèn cấu hình e** để đưa ngay `Fe (Z=26): [Ar] 3d⁶ 4s²` lên bảng trắng mà không cần gõ tay.
+
+---
+
+### 3. Bảng vẽ Vector, Hình học 2D/3D & Đồ thị Toán học
+- **Bút vẽ thông minh (`Stylus-ready`):** Bút bi, Bút máy thư pháp (`ink:fountain`), Bút chì, Dạ quang, Bút nét đứt, **Bút chỉ Laser** (dấu chấm / vệt sáng tự mờ) và **Ink-to-Shape** (vẽ tay giữ nguyên 0.34s tự nắn thành đường thẳng, tròn, tam giác).
+- **Hình học phẳng 2D:** Điểm, đoạn/đường/tia/vectơ, đường tròn, đa giác, dựng hình tự động (trọng tâm, trực tâm, đường cao, phân giác, tiếp tuyến, trung trực), ký hiệu bằng nhau/vuông góc.
+- **Hình học không gian 3D & `Oxyz`:** Hộp chữ nhật, lập phương, lăng trụ, chóp, chóp cụt, trụ, nón, cầu; xoay góc nhìn quỹ đạo 3D trực tiếp, tìm giao tuyến & thiết diện.
+- **Đồ thị & Giải tích:** Hệ trục `Oxy`, đồ thị hàm số/bất phương trình có **thanh trượt tham số ($a, b, m$)**, bảng biến thiên, cây xác suất Bayes, biểu đồ thống kê & biểu đồ Venn.
+
+---
+
+### 4. Máy tính cầm tay, Soạn đề A4, PDF & Tuỳ biến Giao diện
+- **Máy tính khoa học (`fx-580VN X` style):** Giải phương trình, tính tích phân/đạo hàm số, phân số, lượng giác, ma trận/thống kê ngay trên cửa sổ nổi.
+- **Chế độ trang linh hoạt:** Bảng vô hạn, trang A4 soạn đề in ấn, nhiều loại nền giấy (lưới chấm, ô ly, kẻ ngang, nền đen/xanh bảng phấn).
+- **Chèn & Xuất tài liệu:** Chèn nhiều trang **PDF** làm nền giảng dạy (có nút khoá cố định PDF), xuất bảng ra **PNG**, **PDF** hoặc lưu/mở file dự án `.phys.json`.
+- **Khoá/Mở khoá & Tuỳ biến thanh công cụ:**
+  - Chọn khối bất kỳ → bấm **🔒 Khóa vào trang** để tránh xê dịch nhầm khi viết đè lên; bấm **🔓 Mở khoá N khối** ở góc dưới trái khi cần chỉnh sửa lại.
+  - Vào **Cài đặt → Ẩn/Hiện Công cụ** để bật/tắt từng nút (**Toán**, **Vật lý**, **Hoá**, **Thí nghiệm**, **Máy tính**...) theo nhu cầu từng tiết dạy.
+- **Bảng lệnh nhanh (`Ctrl+K`):** Tìm kiếm mọi công cụ và gán phím tắt cá nhân.
 
 ---
 
 ## Cấu trúc dự án
 
 ```text
-├── assets/                 # Logo gốc 1024x1024 & lớp adaptive icon
-├── build/                  # Icon đóng gói Windows (icon.ico, icon.png)
-├── src-tauri/              # Nhân Rust & Tauri v2 cho bản desktop Windows (.exe)
-├── android/                # Dự án Capacitor Android (đã đồng bộ mipmap & web assets)
-├── public/                 # Tài nguyên tĩnh (logo.png)
-├── scripts/                # Script sinh bộ icon đa nền tảng (generate-icons.mjs)
-├── server/                 # WebSocket LAN sync tùy chọn (chỉ bật khi NEXT_PUBLIC_ENABLE_SYNC=1)
+├── assets/                 # Logo gốc & adaptive icon
+├── src-tauri/              # Nhân Rust & Tauri v2 cho bản Windows (.exe)
+├── android/                # Dự án Capacitor Android (.apk)
 ├── src/
-│   ├── app/                # Next.js App Router (layout.tsx, page.tsx, globals.css)
-│   ├── components/         # UI primitives & toàn bộ thành phần bảng vẽ PhysBoard
-│   ├── hooks/              # Hooks điều hướng canvas, undo/redo, lưu trữ offline
-│   ├── lib/                # Bộ giải Toán 2D/3D, Đồ thị, Export, Mô phỏng Vật lý 10-12
-│   └── types/              # Định nghĩa TypeScript cho Whiteboard & Physics
+│   ├── app/                # Next.js App Router (Static Export)
+│   ├── components/
+│   │   └── sites/mathvera/ # Whiteboard, Drawers (Toán/Lý/Hoá), PeriodicTable, SimLauncher, FullscreenSimOverlay, Calculator
+│   ├── hooks/              # Hooks điều hướng canvas, undo/redo, Yjs offline
+│   ├── lib/                # Công thức Toán/Lý/Hoá, Bảng tuần hoàn 118 NT, Sim library (IndexedDB), Giải Hình 2D/3D, Export
+│   └── types/              # Định nghĩa TypeScript
 ├── tests/e2e/              # Bộ kiểm thử Playwright E2E
 ├── capacitor.config.json   # Cấu hình Capacitor (com.physboard.app)
-├── next.config.ts          # Next.js Static Export (out/, assetPrefix tương đối khi build)
-└── package.json            # Scripts dev, check, tauri build (.exe) & cap sync
+└── package.json            # Scripts dev, check, build:exe, build:android
 ```
 
 ---
 
-## Cài đặt & Phát triển
+## Cài đặt & Phát triển (Dành cho Developer)
 
 Yêu cầu: **Node.js >= 20** (khuyến nghị Node 24).
 
 ```bash
-# 1. Cài đặt dependencies
+# 1. Cài đặt thư viện
 npm install
 
-# 2. Chạy môi trường web phát triển (http://localhost:3000)
+# 2. Chạy môi trường phát triển (http://localhost:3000)
 npm run dev
 
 # 3. Kiểm tra Lint + TypeScript + Build Static Export (out/)
 npm run check
 ```
 
-### Kiểm thử E2E (Playwright)
-
-```bash
-# Chạy toàn bộ bộ test học thuật (Toán & Vật lý)
-npx playwright test tests/e2e/tier4-academic/ --reporter=list
-```
+### Đóng gói đa nền tảng
+- **Windows (`.exe`) với Tauri v2 (Rust):**
+  ```bash
+  npm run tauri:dev   # Chạy thử cửa sổ Desktop
+  npm run build:exe   # Đóng gói bộ cài NSIS & Portable EXE
+  ```
+- **Android (`.apk`) với Capacitor:**
+  ```bash
+  npm run build:android   # Build web (out/) + đồng bộ sang android/
+  npx cap open android    # Mở bằng Android Studio để Build APK
+  ```
 
 ---
 
-## Đóng gói Offline: Windows `.exe` & Android `.apk`
-
-### Windows Desktop (`.exe`) với Tauri v2 (Rust)
-
-> Yêu cầu máy đã cài **Rust toolchain** (`rustup`) và **Microsoft C++ Build Tools**.
-
-```bash
-# Chạy thử cửa sổ Desktop Tauri (Rust) trực tiếp
-npm run tauri:dev
-
-# Đóng gói bộ cài Windows NSIS (.exe) & file thực thi Rust
-npm run build:exe
-```
-
-### Android (`.apk`) với Capacitor
-
-> Yêu cầu máy đã cài **Android Studio / Android SDK** (`ANDROID_HOME`) và JDK để biên dịch `.apk`.
-
-```bash
-# Build web (out/) và đồng bộ sang thư mục android/
-npm run build:android
-
-# Mở dự án bằng Android Studio để Build APK / Signed Bundle
-npx cap open android
-
-# Hoặc build Debug APK trực tiếp bằng Gradle (PowerShell)
-cd android
-.\gradlew assembleDebug
-```
-
-### Tạo lại bộ Icon đa nền tảng
-
-```bash
-npm run icons:generate
-```
+<div align="center">
+  <sub>Phát hành theo giấy phép MIT · Phát triển tại <a href="https://github.com/NeoGao-com/PhysBoard">NeoGao-com/PhysBoard</a></sub>
+</div>
