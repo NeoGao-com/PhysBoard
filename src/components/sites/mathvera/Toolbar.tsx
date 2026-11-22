@@ -628,6 +628,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     toolStatsMenu: true,
     groupPhysics: true,
     toolPhysics: true,
+    toolMathFormulas: true,
+    toolChemistryFormulas: true,
+    toolSimLauncher: true,
     toolRealWorld: true,
     toolCalculator: true,
   };
@@ -1698,7 +1701,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* Math Formulas Drawer Button */}
-        {onOpenMathDrawer && (
+        {vis.toolMathFormulas && onOpenMathDrawer && (
           <button
             type="button"
             data-tool="math-formulas"
@@ -1715,7 +1718,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* Chemistry Formulas Drawer Button */}
-        {onOpenChemistryDrawer && (
+        {vis.toolChemistryFormulas && onOpenChemistryDrawer && (
           <button
             type="button"
             data-tool="chemistry-formulas"
@@ -1732,7 +1735,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
 
         {/* Fullscreen PhET / HTML Simulation Launcher */}
-        {onOpenSimLauncher && (
+        {vis.toolSimLauncher && onOpenSimLauncher && (
           <button
             type="button"
             data-tool="sim-launcher"
@@ -2502,18 +2505,51 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             />
           </div>
 
-          {onOpenPhysicsDrawer && (
+          {vis.toolPhysics && onOpenPhysicsDrawer && (
             <button
               type="button"
               onClick={onOpenPhysicsDrawer}
               style={btnBaseStyle}
-              title="Vật lý"
+              title="Bảng công thức, hằng số Vật lý & Đổi đơn vị"
             >
               <IconPhysics size={14} color="#7c3aed" /> <span>Vật lý</span>
             </button>
           )}
 
-          {onOpenCalculator && (
+          {vis.toolMathFormulas && onOpenMathDrawer && (
+            <button
+              type="button"
+              onClick={onOpenMathDrawer}
+              style={btnBaseStyle}
+              title="Bảng công thức Toán"
+            >
+              <span style={{ color: "#2563eb", fontWeight: 800, fontSize: 13 }}>∑</span> <span>Toán</span>
+            </button>
+          )}
+
+          {vis.toolChemistryFormulas && onOpenChemistryDrawer && (
+            <button
+              type="button"
+              onClick={onOpenChemistryDrawer}
+              style={btnBaseStyle}
+              title="Bảng công thức Hoá học"
+            >
+              <span style={{ color: "#059669", fontWeight: 800, fontSize: 12.5 }}>🧪</span> <span>Hoá</span>
+            </button>
+          )}
+
+          {vis.toolSimLauncher && onOpenSimLauncher && (
+            <button
+              type="button"
+              onClick={onOpenSimLauncher}
+              style={btnBaseStyle}
+              title="Thí nghiệm mô phỏng PhET & HTML"
+            >
+              <span style={{ color: "#0d9488", fontWeight: 800, fontSize: 13 }}>⚗</span> <span>Thí nghiệm</span>
+            </button>
+          )}
+
+          {vis.toolCalculator && onOpenCalculator && (
             <button
               type="button"
               onClick={onOpenCalculator}

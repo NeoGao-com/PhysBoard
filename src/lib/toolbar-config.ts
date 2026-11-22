@@ -31,6 +31,9 @@ export interface ToolbarVisibilityConfig {
   // Nhóm 5: Vật lý & Máy tính
   groupPhysics: boolean;
   toolPhysics: boolean;
+  toolMathFormulas: boolean;
+  toolChemistryFormulas: boolean;
+  toolSimLauncher: boolean;
   toolRealWorld: boolean;
   toolCalculator: boolean;
 }
@@ -63,6 +66,9 @@ export const DEFAULT_TOOLBAR_VISIBILITY: ToolbarVisibilityConfig = {
 
   groupPhysics: true,
   toolPhysics: true,
+  toolMathFormulas: true,
+  toolChemistryFormulas: true,
+  toolSimLauncher: true,
   toolRealWorld: true,
   toolCalculator: true,
 };

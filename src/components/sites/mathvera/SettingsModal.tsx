@@ -2047,7 +2047,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           onChange={(e) => updateToolbarItem("toolPhysics", e.target.checked)}
                           style={{ accentColor: "#2563eb" }}
                         />
-                        <span>Mô phỏng Thí nghiệm Vật lý & Mạch điện & Quang học</span>
+                        <span>Bảng công thức, hằng số Vật lý &amp; Đổi đơn vị</span>
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#334155", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={toolbarConfig.toolMathFormulas}
+                          onChange={(e) => updateToolbarItem("toolMathFormulas", e.target.checked)}
+                          style={{ accentColor: "#2563eb" }}
+                        />
+                        <span>Bảng công thức Toán 10–11–12 theo chủ đề</span>
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#334155", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={toolbarConfig.toolChemistryFormulas}
+                          onChange={(e) => updateToolbarItem("toolChemistryFormulas", e.target.checked)}
+                          style={{ accentColor: "#2563eb" }}
+                        />
+                        <span>Bảng công thức Hoá học 10–11–12 theo chủ đề</span>
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#334155", cursor: "pointer" }}>
+                        <input
+                          type="checkbox"
+                          checked={toolbarConfig.toolSimLauncher}
+                          onChange={(e) => updateToolbarItem("toolSimLauncher", e.target.checked)}
+                          style={{ accentColor: "#2563eb" }}
+                        />
+                        <span>Thí nghiệm mô phỏng PhET Online &amp; HTML Offline</span>
                       </label>
                       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#334155", cursor: "pointer" }}>
                         <input
