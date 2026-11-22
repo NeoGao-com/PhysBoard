@@ -413,4 +413,42 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     const latestPoly = canvas.getLatestObject();
     await expect(latestPoly).toHaveAttribute('data-element-type', 'GeomPolygon');
   });
+
+  test('TC-02-12: Recognizes ellipses smoothly and preserves open curved edges without flattening', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+    await toolbar.selectTool('ink');
+
+    const initialCount = await canvas.getObjectCount();
+
+    // 1. Draw an elongated ellipse (rx = 95, ry = 40) -> snaps to ellipse instead of polygon
+    const ellCenter = { x: 620, y: 260 };
+    const ellPoints: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= 24; i++) {
+      const angle = (i / 24) * 2 * Math.PI;
+      ellPoints.push({
+        x: ellCenter.x + 95 * Math.cos(angle),
+        y: ellCenter.y + 40 * Math.sin(angle),
+      });
+    }
+    await canvas.drawStroke(ellPoints);
+    await canvas.waitForObjectCount(initialCount + 1);
+    const latestEllipse = canvas.getLatestObject();
+    await expect(latestEllipse).toHaveAttribute('data-element-type', 'GeomCircle');
+    await expect(latestEllipse).toHaveAttribute('data-wb-type', 'ellipse');
+    await expect(latestEllipse.locator('ellipse').first()).toBeVisible();
+
+    // 2. Draw an open smooth curved edge (moderate bow ~9%) -> must stay Ink, not GeomSegment
+    const arcPoints: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= 14; i++) {
+      const t = i / 14;
+      const x = 220 + t * 220;
+      const y = 480 - Math.sin(t * Math.PI) * 20;
+      arcPoints.push({ x, y });
+    }
+    await canvas.drawStroke(arcPoints);
+    await canvas.waitForObjectCount(initialCount + 2);
+    const latestCurve = canvas.getLatestObject();
+    await expect(latestCurve).toHaveAttribute('data-element-type', 'Ink');
+  });
 });

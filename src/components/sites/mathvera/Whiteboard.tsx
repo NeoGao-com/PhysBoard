@@ -6105,6 +6105,28 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                     },
                   },
                 });
+              } else if (recognized.type === "ellipse") {
+                const ellId = newElId("circ");
+                dispatcher.dispatch({
+                  type: "object.create",
+                  params: {
+                    id: ellId,
+                    type: "GeomCircle",
+                    style: {
+                      stroke: liveStroke.style.stroke ?? "#0891b2",
+                      width: liveStroke.style.width ?? 2,
+                      dash: liveStroke.style.dash ?? false,
+                    },
+                    props: {
+                      center: `${ellId}_c`,
+                      centerPt: recognized.center,
+                      radius: { kind: "value", v: Number(((recognized.rx + recognized.ry) / 2).toFixed(3)) },
+                      rx: Number(recognized.rx.toFixed(3)),
+                      ry: Number(recognized.ry.toFixed(3)),
+                      rotation: Number(recognized.rotation.toFixed(4)),
+                    },
+                  },
+                });
               } else if (recognized.type === "segment") {
                 const segId = newElId("seg");
                 dispatcher.dispatch({

@@ -1978,6 +1978,43 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 </button>
               );
             })}
+            {onToggleInkToShape && (
+              <>
+                <div style={{ height: 1, background: "#e2e8f0", margin: "4px 6px" }} />
+                <button
+                  type="button"
+                  role="menuitemcheckbox"
+                  aria-checked={inkToShape}
+                  data-action="toggle-ink-to-shape"
+                  onClick={() => onToggleInkToShape(!inkToShape)}
+                  style={{
+                    ...portalItemStyle,
+                    justifyContent: "space-between",
+                    gap: 10,
+                    background: inkToShape ? "#eef2ff" : "transparent",
+                    color: inkToShape ? "#4338ca" : "#475569",
+                  }}
+                  title="Tự động nắn nét vẽ tay thành đoạn thẳng, đường tròn, elip, đa giác"
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <IconShapeSnap size={15} />
+                    <span>Tự nắn hình chuẩn</span>
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 6px",
+                      borderRadius: 999,
+                      background: inkToShape ? "#4f46e5" : "#e2e8f0",
+                      color: inkToShape ? "#ffffff" : "#64748b",
+                    }}
+                  >
+                    {inkToShape ? "BẬT" : "TẮT"}
+                  </span>
+                </button>
+              </>
+            )}
           </div>,
           document.body
         )}

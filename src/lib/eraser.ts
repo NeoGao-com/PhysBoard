@@ -168,21 +168,36 @@ export function checkEraserCollision(
       }
     } else if (el.type === "GeomCircle") {
       const center = solved.pts.get(String(el.props.center ?? ""));
-      const r = center
-        ? resolveCircleRadius(
-            el.props.radius as CircleRadiusSpec | undefined,
-            center,
-            (id) => solved.pts.get(id)
-          )
-        : null;
-      if (center && r !== null) {
-        const dCenter = Math.hypot(
-          cursorWorld.x - center.x,
-          cursorWorld.y - center.y
-        );
-        isHit =
-          Math.abs(dCenter - r) <= objectThreshold ||
-          dCenter <= objectThreshold;
+      const rx = typeof el.props.rx === "number" && el.props.rx > 0 ? el.props.rx : null;
+      const ry = typeof el.props.ry === "number" && el.props.ry > 0 ? el.props.ry : null;
+      if (center && rx !== null && ry !== null) {
+        const rot = typeof el.props.rotation === "number" ? el.props.rotation : 0;
+        const dx = cursorWorld.x - center.x;
+        const dy = cursorWorld.y - center.y;
+        const cos = Math.cos(-rot);
+        const sin = Math.sin(-rot);
+        const u = dx * cos - dy * sin;
+        const v = dx * sin + dy * cos;
+        const normR = Math.hypot(u / rx, v / ry);
+        const approxDist = Math.abs(normR - 1) * Math.min(rx, ry);
+        isHit = approxDist <= objectThreshold || Math.hypot(dx, dy) <= objectThreshold;
+      } else {
+        const r = center
+          ? resolveCircleRadius(
+              el.props.radius as CircleRadiusSpec | undefined,
+              center,
+              (id) => solved.pts.get(id)
+            )
+          : null;
+        if (center && r !== null) {
+          const dCenter = Math.hypot(
+            cursorWorld.x - center.x,
+            cursorWorld.y - center.y
+          );
+          isHit =
+            Math.abs(dCenter - r) <= objectThreshold ||
+            dCenter <= objectThreshold;
+        }
       }
     } else if (el.type === "GeomPolygon") {
       const coords: Point2D[] = [];

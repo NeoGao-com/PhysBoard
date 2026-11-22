@@ -121,6 +121,9 @@ export type CircleRadiusSpec =
 export interface GeomCircleProps {
   center: string;
   radius: CircleRadiusSpec;
+  rx?: number;
+  ry?: number;
+  rotation?: number;
 }
 
 export type TrianglePresetKind = "right" | "rightIsosceles" | "isosceles" | "equilateral";
@@ -2529,6 +2532,30 @@ export function getGeometryBoundingBox(
   if (el.type === "GeomCircle") {
     const center = points.get(String(el.props.center ?? ""));
     if (!center) return null;
+    if (
+      typeof el.props.rx === "number" &&
+      typeof el.props.ry === "number" &&
+      el.props.rx > 0 &&
+      el.props.ry > 0
+    ) {
+      const rx = el.props.rx;
+      const ry = el.props.ry;
+      const rot = typeof el.props.rotation === "number" ? el.props.rotation : 0;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const wx = Math.hypot(rx * cos, ry * sin);
+      const wy = Math.hypot(rx * sin, ry * cos);
+      return {
+        minX: center.x - wx,
+        maxX: center.x + wx,
+        minY: center.y - wy,
+        maxY: center.y + wy,
+        width: 2 * wx,
+        height: 2 * wy,
+        centerX: center.x,
+        centerY: center.y,
+      };
+    }
     const r = resolveCircleRadius(el.props.radius as CircleRadiusSpec | undefined, center, (id) => points.get(id));
     if (r === null) return null;
     return {
