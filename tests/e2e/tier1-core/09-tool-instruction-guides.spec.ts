@@ -120,21 +120,6 @@ test.describe("Tool Instruction Guides Coverage Audit", () => {
     "p3:chart",
     "p3:bayes",
     "p3:numberline",
-
-    // 12. Physical Measurement Instruments
-    "phys:inst:ruler",
-    "phys:inst:protractor",
-    "phys:inst:setsquare",
-    "phys:inst:compass",
-    "phys:inst:stopwatch",
-    "phys:labtable",
-
-    // 13. Physics Diagrams & Simulations
-    "phys:diag:circuit",
-    "phys:diag:circuit_parallel",
-    "phys:diag:fbd",
-    "phys:diag:optics",
-    "htmlsim",
   ];
 
   test("every tool has a valid, non-empty Vietnamese guide and icon", () => {

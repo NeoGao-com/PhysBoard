@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { PageBoardConfig, BOARD_SURFACE_PRESETS } from "@/lib/board-themes";
 import { importPdfPages, ImportedPdfPage } from "@/lib/pdf-import";
-import { IconPdf, IconHtmlSim, IconTrash, IconUndo, IconRedo, IconSettings, IconCommand } from "./ToolbarIcons";
+import { IconPdf, IconTrash, IconUndo, IconRedo, IconSettings, IconCommand } from "./ToolbarIcons";
 import { Folder } from "lucide-react";
 
 export interface PageSidebarProps {
@@ -14,7 +14,6 @@ export interface PageSidebarProps {
   onDeletePage?: (page: number) => void;
   onOpenPageManager?: () => void;
   onInsertPdfPages?: (pages: ImportedPdfPage[]) => void;
-  onOpenHtmlSimModal?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
   onUndo?: () => void;
@@ -40,7 +39,6 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onDeletePage,
   onOpenPageManager,
   onInsertPdfPages,
-  onOpenHtmlSimModal,
   canUndo = false,
   canRedo = false,
   onUndo,
@@ -691,33 +689,6 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           <IconPdf size={13} color="#e11d48" />
           <span>{pdfImporting ? "Đang nạp..." : "Chèn PDF"}</span>
         </button>
-
-        {/* Nạp HTML Sim */}
-        {onOpenHtmlSimModal && (
-          <button
-            type="button"
-            onClick={onOpenHtmlSimModal}
-            title="Nạp & nhúng file mô phỏng HTML thí nghiệm trực tiếp vào bảng"
-            style={{
-              width: "100%",
-              background: "#f0fdf4",
-              color: "#16a34a",
-              border: "1px solid #bbf7d0",
-              borderRadius: 6,
-              padding: "6px 0",
-              fontSize: 11.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-            }}
-          >
-            <IconHtmlSim size={13} color="#16a34a" />
-            <span>Nạp HTML</span>
-          </button>
-        )}
 
         <button
           type="button"

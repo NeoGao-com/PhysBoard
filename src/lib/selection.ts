@@ -526,55 +526,6 @@ export function getElementBoundingBox(
     return makeBox(tx - 1, tx + 1, ty - 0.5, ty + 0.5);
   }
 
-  if (
-    el.type === "PhysicsDiagram" ||
-    el.type === "PhysicsInstrument" ||
-    el.type === "PhysicsLabTable" ||
-    el.type === "HtmlSim"
-  ) {
-    const defaultW =
-      el.type === "HtmlSim"
-        ? (typeof el.props?.widthPx === "number" ? el.props.widthPx / 45 : 19.1)
-        : el.type === "PhysicsDiagram"
-          ? 10.0
-          : el.type === "PhysicsLabTable"
-            ? 7.2
-            : el.props?.instrumentKind === "ruler"
-              ? 8.0
-              : el.props?.instrumentKind === "protractor"
-                ? 6.4
-                : el.props?.instrumentKind === "setsquare"
-                  ? 6.5
-                  : el.props?.instrumentKind === "compass"
-                    ? 5.0
-                    : 4.8;
-    const defaultH =
-      el.type === "HtmlSim"
-        ? (typeof el.props?.heightPx === "number" ? (el.props.heightPx + 38) / 45 : 13.3)
-        : el.type === "PhysicsDiagram"
-          ? 6.4
-          : el.type === "PhysicsLabTable"
-            ? 4.6
-            : el.props?.instrumentKind === "ruler"
-              ? 1.4
-              : el.props?.instrumentKind === "protractor"
-                ? 3.6
-                : el.props?.instrumentKind === "setsquare"
-                  ? 5.0
-                  : el.props?.instrumentKind === "compass"
-                    ? 5.0
-                    : 2.8;
-    const w =
-      (typeof el.props?.width === "number" && el.props.width > 0
-        ? el.props.width
-        : defaultW) * sc;
-    const h =
-      (typeof el.props?.height === "number" && el.props.height > 0
-        ? el.props.height
-        : defaultH) * sc;
-    return makeBox(tx - w / 2, tx + w / 2, ty - h / 2, ty + h / 2);
-  }
-
   if (el.type === "Shape") {
     return makeBox(tx - 1.5 * sc, tx + 1.5 * sc, ty - 1 * sc, ty + 1 * sc);
   }

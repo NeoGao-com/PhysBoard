@@ -114,7 +114,6 @@ import {
   type RealWorldArtItem,
   recordRecentRealWorldId,
 } from "@/lib/realworld-art";
-import { snapPointToInstruments } from "@/lib/instruments";
 import { buildShareUrl, sanitizeRoomId } from "@/lib/room";
 import {
   downloadBlob,
@@ -159,14 +158,6 @@ import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportPdfModal } from "./ExportPdfModal";
 import { BoardManagerModal } from "./BoardManagerModal";
 import { retrievePendingPdfPages } from "@/lib/board-manager";
-import type {
-  PhysicsInstrumentKind,
-  PhysicsInstrumentProps,
-  PhysicsLabTableProps,
-} from "@/types/physics";
-import { createDefaultCircuitDiagramProps } from "@/lib/physics-circuit";
-import { createDefaultFbdDiagramProps } from "@/lib/physics-forces";
-import { createDefaultOpticsDiagramProps } from "@/lib/physics-optics";
 import {
   addYjsPage,
   deleteYjsPages,
@@ -199,14 +190,6 @@ import { CircleElement } from "./elements/CircleElement";
 import { PolygonElement } from "./elements/PolygonElement";
 import { GeometryConstructionElement } from "./elements/GeometryConstructionElement";
 import { Solid3DElement } from "./elements/Solid3DElement";
-import { PhysicsDiagramElement } from "./elements/PhysicsDiagramElement";
-import { PhysicsInstrumentElement } from "./elements/PhysicsInstrumentElement";
-import {
-  PhysicsLabTableElement,
-  computeLinearRegression,
-} from "./elements/PhysicsLabTableElement";
-import { HtmlSimElement } from "./elements/HtmlSimElement";
-import { HtmlSimModal } from "./HtmlSimModal";
 import { LaserSettingsModal } from "./LaserSettingsModal";
 import { SettingsModal } from "./SettingsModal";
 import { InstructionGuideBar } from "./InstructionGuideBar";
@@ -686,7 +669,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [realWorldDrawerOpen, setRealWorldDrawerOpen] = useState(false);
   const [physicsDrawerOpen, setPhysicsDrawerOpen] = useState(false);
   const [mathDrawerOpen, setMathDrawerOpen] = useState(false);
-  const [htmlSimModalOpen, setHtmlSimModalOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false);
   const isPortrait = useWindowOrientation();
@@ -886,14 +868,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [elements, currentPage, isA4Format]
   );
 
-  const hasActiveInstruments = useMemo(
-    () =>
-      pageElements.some(
-        (el) => !el.style?.hidden && el.type === "PhysicsInstrument"
-      ),
-    [pageElements]
-  );
-
   const hiddenCount = useMemo(
     () => pageElements.filter((el) => el.style?.hidden).length,
     [pageElements]
@@ -930,17 +904,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const selectedAxes2D = useMemo(
     () =>
       selectedElements.length === 1 && selectedElements[0].type === "Axes2D"
-        ? selectedElements[0]
-        : null,
-    [selectedElements]
-  );
-
-  const selectedPhysicsEl = useMemo(
-    () =>
-      selectedElements.length === 1 &&
-      (selectedElements[0].type === "PhysicsDiagram" ||
-        selectedElements[0].type === "PhysicsInstrument" ||
-        selectedElements[0].type === "PhysicsLabTable")
         ? selectedElements[0]
         : null,
     [selectedElements]
@@ -1855,250 +1818,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
   handleAddPageRef.current = handleAddPage;
 
-  // --- Physics Teaching Suite Handlers ---
-  const handlePhysicsAction = useCallback(
-    (action: string) => {
-      if (action === "phys:drawer") {
-        handleSelectTool("select");
-        setPhysicsDrawerOpen(true);
-        return;
-      }
-      const center = getViewCenter();
-      if (action === "phys:diag:circuit" || action === "phys:diag:circuit_parallel") {
-        const props = createDefaultCircuitDiagramProps(
-          action === "phys:diag:circuit_parallel" ? "parallel" : "series"
-        );
-        const res = dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "PhysicsDiagram",
-            transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-            props: { ...props },
-          },
-        });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
-      } else if (action === "phys:diag:fbd") {
-        const res = dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "PhysicsDiagram",
-            transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-            props: { ...createDefaultFbdDiagramProps() },
-          },
-        });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
-      } else if (action === "phys:diag:optics") {
-        const res = dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "PhysicsDiagram",
-            transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-            props: { ...createDefaultOpticsDiagramProps("converging_lens") },
-          },
-        });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
-      } else if (
-        action === "phys:inst:ruler" ||
-        action === "phys:inst:protractor" ||
-        action === "phys:inst:stopwatch" ||
-        action === "phys:inst:setsquare" ||
-        action === "phys:inst:compass"
-      ) {
-        const instrumentKind = action.slice(10) as PhysicsInstrumentKind;
-        const res = dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "PhysicsInstrument",
-            transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-            props: {
-              instrumentKind,
-              ...(instrumentKind === "ruler" ? { lengthCm: 20 } : {}),
-              ...(instrumentKind === "stopwatch" ? { running: false, elapsedSec: 0, laps: [] } : {}),
-              ...(instrumentKind === "setsquare" ? { setSquareKind: "30-60-90" } : {}),
-              ...(instrumentKind === "protractor" ? { protractorType: "180", protractorAngle: 45 } : {}),
-              ...(instrumentKind === "compass" ? { compassRadius: 3.0, compassAngle: 0 } : {}),
-            },
-          },
-        });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
-      } else if (action === "phys:labtable") {
-        const res = dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "PhysicsLabTable",
-            transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-            props: {
-              title: "Bảng số liệu thực hành",
-              xLabel: "x",
-              yLabel: "y",
-              rows: [],
-            },
-          },
-        });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
-      }
-      handleSelectTool("select");
-    },
-    [getViewCenter, dispatcher, handleSelectTool]
-  );
-
-  const handleCompassDrawArc = useCallback(
-    (cx: number, cy: number, r: number, startDeg = 0, endDeg = 360) => {
-      const pts: number[] = [];
-      const pressures: number[] = [];
-      const step = 4;
-      const span = Math.abs(endDeg - startDeg);
-      const count = Math.max(16, Math.round(span / step));
-      for (let i = 0; i <= count; i++) {
-        const aDeg = startDeg + (i / count) * (endDeg - startDeg);
-        const rad = (aDeg * Math.PI) / 180;
-        pts.push(Number((cx + r * Math.cos(rad)).toFixed(3)));
-        pts.push(Number((cy + r * Math.sin(rad)).toFixed(3)));
-        pressures.push(0.65);
-      }
-      dispatcher.dispatch({
-        type: "ink.stroke",
-        params: {
-          points: pts,
-          pressures,
-          nib: "fountain",
-          style: { stroke: "#2563eb", width: 2.2 },
-        },
-      });
-    },
-    [dispatcher]
-  );
-
-  const handleRecordPhysicsSample = useCallback(
-    (sourceId: string, sample: { x: number; y: number }) => {
-      const existing = pageElements.find(
-        (el) =>
-          !el.style?.hidden &&
-          el.type === "PhysicsLabTable" &&
-          (el.props.linkedSimId === sourceId || !el.props.linkedSimId)
-      );
-      const newRow = { id: newElId("row"), x: sample.x, y: sample.y };
-      if (existing) {
-        const curRows = Array.isArray(existing.props.rows)
-          ? (existing.props.rows as PhysicsLabTableProps["rows"])
-          : [];
-        dispatcher.dispatch({
-          type: "object.update",
-          params: {
-            id: existing.id,
-            props: {
-              ...existing.props,
-              linkedSimId: existing.props.linkedSimId ?? sourceId,
-              rows: [...curRows, newRow],
-            },
-          },
-        });
-      } else {
-        const center = getViewCenter();
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "PhysicsLabTable",
-            transform: {
-              x: center.x + 10.0,
-              y: center.y - 1.5,
-              scale: 1,
-              rotation: 0,
-              z: 0,
-            },
-            props: {
-              title: "Bảng số liệu thực hành",
-              xLabel: "x",
-              yLabel: "y",
-              linkedSimId: sourceId,
-              rows: [newRow],
-            },
-          },
-        });
-      }
-      setStatusHint(`Đã ghi số đo (${sample.x}; ${sample.y}) vào bảng thực hành`);
-    },
-    [pageElements, dispatcher, getViewCenter]
-  );
-
-  const handlePlotLabRegression = useCallback(
-    (tableId: string) => {
-      const tableEl = byId.get(tableId);
-      if (!tableEl || tableEl.type !== "PhysicsLabTable") return;
-      const tProps = tableEl.props as unknown as PhysicsLabTableProps;
-      const rows = tProps.rows ?? [];
-      if (rows.length === 0) return;
-
-      const maxAbs = Math.max(1, ...rows.flatMap((r) => [Math.abs(r.x), Math.abs(r.y)]));
-      const scaleFactor = maxAbs > 4.5 ? 4.2 / maxAbs : 1;
-      const axesId = newElId("axes");
-      const axX = tableEl.transform.x + 8.8;
-      const axY = tableEl.transform.y;
-      const reg = computeLinearRegression(rows);
-
-      dispatcher.batch(() => {
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            id: axesId,
-            type: "Axes2D",
-            transform: { x: axX, y: axY, scale: 1, rotation: 0, z: 0 },
-            style: { stroke: "#475569", width: 1.5 },
-            props: { size: 5, grid: true, ticks: "int", legend: true },
-          },
-        });
-        rows.forEach((r, idx) => {
-          const sx = Number((r.x * scaleFactor).toFixed(3));
-          const sy = Number((r.y * scaleFactor).toFixed(3));
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomPoint",
-              transform: { x: axX + sx, y: axY + sy, scale: 1, rotation: 0, z: 0 },
-              style: { stroke: "#dc2626", fill: "#dc2626" },
-              props: {
-                name: `M_${idx + 1}`,
-                constraint: { kind: "oxy", axes: axesId, x: sx, y: sy },
-              },
-            },
-          });
-        });
-        if (reg) {
-          const bScaled = reg.b * scaleFactor;
-          const exprLatex = `${reg.a.toFixed(4)}*x + ${bScaled.toFixed(4)}`;
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "Plot",
-              transform: { x: axX, y: axY, scale: 1, rotation: 0, z: 0 },
-              style: { stroke: "#0f766e", width: 2.2 },
-              props: {
-                exprLatex,
-                params: {},
-                axes: axesId,
-                color: "#0f766e",
-                marks: { roots: false, extrema: false, yIntercept: false },
-              },
-            },
-          });
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "MathText",
-              transform: { x: axX, y: axY + 5.4, scale: 1, rotation: 0, z: 0 },
-              style: { stroke: "#0f766e" },
-              props: {
-                latex: `y = ${reg.a.toFixed(2)}x ${reg.b >= 0 ? "+" : "-"} ${Math.abs(reg.b).toFixed(2)}\\;(R^2=${reg.r2.toFixed(3)})`,
-              },
-            },
-          });
-        }
-      });
-      setStatusHint("Đã vẽ điểm thực nghiệm & đường hồi quy trên hệ trục Oxy");
-    },
-    [byId, dispatcher]
-  );
-
   // Execute any registered command from Command Palette or Keyboard Shortcut
   const executeCommand = useCallback(
     (commandId: string) => {
@@ -2106,8 +1825,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         handleSelectTool(commandId.slice(5) as WhiteboardTool);
         return;
       }
-      if (commandId.startsWith("phys:")) {
-        handlePhysicsAction(commandId);
+      if (commandId === "phys:drawer") {
+        handleSelectTool("select");
+        setPhysicsDrawerOpen(true);
         return;
       }
       switch (commandId) {
@@ -2187,7 +1907,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     },
     [
       handleSelectTool,
-      handlePhysicsAction,
       handleDuplicateSelected,
       zoomIn,
       zoomOut,
@@ -5577,17 +5296,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           }
         }
         dispatcher.gesture(true);
-        // Magnetic snap to Ruler or Set Square edges if nearby (only scan if an instrument exists)
-        const drawPt = hasActiveInstruments
-          ? (() => {
-              const instrumentSnap = snapPointToInstruments(
-                worldPos,
-                pageElements,
-                0.45
-              );
-              return instrumentSnap.didSnap ? instrumentSnap.snapped : worldPos;
-            })()
-          : worldPos;
+        const drawPt = worldPos;
 
         const nib = resolvePenNib(activeTool) ?? undefined;
         const smooth = nib === "fountain" || nib === "brush";
@@ -5635,7 +5344,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       activeTool,
       navPointerDown,
       pageElements,
-      hasActiveInstruments,
       dispatcher,
       hydratedPts,
       currentStyle,
@@ -5945,24 +5653,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   props: nextProps,
                 },
               });
-            } else if (
-              initEl.type === "PhysicsDiagram" ||
-              initEl.type === "PhysicsInstrument" ||
-              initEl.type === "PhysicsLabTable" ||
-              initEl.type === "HtmlSim"
-            ) {
-              const s = Math.max(0.45, Math.abs(avgScale));
-              dispatcher.dispatch({
-                type: "object.update",
-                params: {
-                  id: initEl.id,
-                  transform: {
-                    x: handle.anchorX + (initEl.transform.x - handle.anchorX) * s,
-                    y: handle.anchorY + (initEl.transform.y - handle.anchorY) * s,
-                    scale: Math.max(0.45, (initEl.transform.scale || 1) * s),
-                  },
-                },
-              });
             } else {
               dispatcher.dispatch({
                 type: "object.update",
@@ -6063,12 +5753,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             viewport.scale,
             rect
           );
-          const drawPt = hasActiveInstruments
-            ? (() => {
-                const snap = snapPointToInstruments(evWorld, pageElements, 0.45);
-                return snap.didSnap ? snap.snapped : evWorld;
-              })()
-            : evWorld;
+          const drawPt = evWorld;
           const ts = ev.timeStamp || performance.now();
           const x = smooth
             ? filterXRef.current.filter(drawPt.x, ts)
@@ -6147,7 +5832,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       dispatcher,
       activeTool,
       pageElements,
-      hasActiveInstruments,
       buildLiveStrokePathData,
       laserConfig,
       liveLaserScreenPos,
@@ -6492,7 +6176,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       dispatcher,
       viewport,
       pageElements,
-      hasActiveInstruments,
       isA4Format,
       currentPage,
       containerRef,
@@ -6564,16 +6247,15 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [navPointerCancel, dispatcher, liveStroke, spenConfig]
   );
 
-  // Drag-and-drop image or HTML simulation file onto canvas
+  // Drag-and-drop image or PDF file onto canvas
   const handleDropOnCanvas = useCallback(
     async (e: React.DragEvent<HTMLDivElement>) => {
       const file = e.dataTransfer.files?.[0];
       if (!file) return;
 
       const isImage = file.type.startsWith("image/");
-      const isHtml = file.name.endsWith(".html") || file.name.endsWith(".htm") || file.type === "text/html";
       const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
-      if (!isImage && !isHtml && !isPdf) return;
+      if (!isImage && !isPdf) return;
 
       e.preventDefault();
 
@@ -6609,33 +6291,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           pt.x = Math.max(-hw, Math.min(hw, pt.x));
           pt.y = Math.max(-hh, Math.min(hh, pt.y));
         }
-      }
-
-      if (isHtml) {
-        try {
-          const text = await file.text();
-          if (text) {
-            const titleMatch = /<title>(.*?)<\/title>/i.exec(text);
-            const title = titleMatch ? titleMatch[1].trim() : file.name.replace(/\.[^/.]+$/, "");
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "HtmlSim",
-                transform: { x: pt.x, y: pt.y, scale: 1, rotation: 0, z: 0 },
-                props: {
-                  title,
-                  htmlContent: text,
-                  widthPx: 860,
-                  heightPx: 560,
-                },
-              },
-            });
-            setStatusHint(`✓ Đã nhúng mô phỏng HTML: ${title}`);
-          }
-        } catch {
-          // Ignore invalid dropped html
-        }
-        return;
       }
 
       if (isImage) {
@@ -7116,53 +6771,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           />
         );
 
-      case "PhysicsDiagram":
-        return (
-          <PhysicsDiagramElement
-            key={el.id}
-            element={el}
-            isSelected={isSel}
-            onPointerDown={(e) => handleElementPointerDown(e, el.id)}
-            onUpdateProps={handleUpdateElementProps}
-          />
-        );
-
-      case "PhysicsInstrument":
-        return (
-          <PhysicsInstrumentElement
-            key={el.id}
-            element={el}
-            isSelected={isSel}
-            onPointerDown={(e) => handleElementPointerDown(e, el.id)}
-            onUpdateProps={handleUpdateElementProps}
-            onDrawArcStroke={handleCompassDrawArc}
-          />
-        );
-
-      case "PhysicsLabTable":
-        return (
-          <PhysicsLabTableElement
-            key={el.id}
-            element={el}
-            isSelected={isSel}
-            onPointerDown={(e) => handleElementPointerDown(e, el.id)}
-            onUpdateProps={handleUpdateElementProps}
-            onPlotRegression={handlePlotLabRegression}
-          />
-        );
-
-      case "HtmlSim":
-        return (
-          <HtmlSimElement
-            key={el.id}
-            element={el}
-            scale={viewport.scale}
-            isSelected={isSel}
-            onPointerDown={(e) => handleElementPointerDown(e, el.id)}
-            onUpdateProps={handleUpdateElementProps}
-          />
-        );
-
       default:
         return null;
     }
@@ -7194,8 +6802,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       handleUpdatePlotParam,
       handleChangeSliderValue,
       handleUpdateElementProps,
-      handleCompassDrawArc,
-      handlePlotLabRegression,
     ]
   );
 
@@ -7244,20 +6850,18 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 activeTool === "select:marquee"
               }
               boxInteriorPassthrough={
-                Boolean(selectedPhysicsEl) ||
-                (selectedElements.length === 1 &&
-                  (selectedElements[0].type === "Slider" ||
-                    selectedElements[0].type === "Solid3D" ||
-                    selectedElements[0].type === "VarTable" ||
-                    selectedElements[0].type === "TrigCircle" ||
-                    selectedElements[0].type === "Counting" ||
-                    selectedElements[0].type === "Venn" ||
-                    selectedElements[0].type === "Network" ||
-                    selectedElements[0].type === "Table" ||
-                    selectedElements[0].type === "Axes2D" ||
-                    selectedElements[0].type === "HtmlSim" ||
-                    selectedElements[0].type === "GeomSegment" ||
-                    selectedElements[0].type === "LineDecor"))
+                selectedElements.length === 1 &&
+                (selectedElements[0].type === "Slider" ||
+                  selectedElements[0].type === "Solid3D" ||
+                  selectedElements[0].type === "VarTable" ||
+                  selectedElements[0].type === "TrigCircle" ||
+                  selectedElements[0].type === "Counting" ||
+                  selectedElements[0].type === "Venn" ||
+                  selectedElements[0].type === "Network" ||
+                  selectedElements[0].type === "Table" ||
+                  selectedElements[0].type === "Axes2D" ||
+                  selectedElements[0].type === "GeomSegment" ||
+                  selectedElements[0].type === "LineDecor")
               }
               onHandlePointerDown={handleHandlePointerDown}
               onBoxPointerDown={handleBoxPointerDown}
@@ -7477,10 +7081,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setPhysicsDrawerOpen(false);
         setMathDrawerOpen(true);
       }}
-      onOpenHtmlSimModal={() => {
-        handleSelectTool("select");
-        setHtmlSimModalOpen(true);
-      }}
       onOpenCalculator={() => {
         if (!calculatorOpen) handleSelectTool("select");
         setCalculatorOpen((prev) => !prev);
@@ -7588,10 +7188,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onToggleOpen={() => setPageSidebarOpen((v) => !v)}
         onOpenPageManager={() => setPageManagerOpen(true)}
         onInsertPdfPages={handleInsertPdfPages}
-        onOpenHtmlSimModal={() => {
-          handleSelectTool("select");
-          setHtmlSimModalOpen(true);
-        }}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={undo}
@@ -8268,7 +7864,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               ? selectedElements[0]
               : null
           }
-          selectedPhysicsEl={selectedPhysicsEl}
           selectedSolidEl={
             selectedElements.length === 1 && selectedElements[0].type === "Solid3D"
               ? selectedElements[0]
@@ -8828,25 +8423,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               }
             });
           }}
-          onPhysicsRotateInstrument={(deltaDeg) => {
-            if (selectedPhysicsEl?.type !== "PhysicsInstrument") return;
-            dispatcher.dispatch({
-              type: "object.update",
-              params: {
-                id: selectedPhysicsEl.id,
-                transform: {
-                  rotation: ((selectedPhysicsEl.transform.rotation || 0) + deltaDeg) % 360,
-                },
-              },
-            });
-          }}
-          onPhysicsPlotRegression={() => {
-            if (selectedPhysicsEl?.type === "PhysicsLabTable") {
-              handlePlotLabRegression(selectedPhysicsEl.id);
-            }
-          }}
           onLockSelection={handleLockSelection}
-          onUpdateInstrumentProps={handleUpdateElementProps}
         />
 
       {/* 3D Orbital Controls Bar */}
@@ -9639,7 +9216,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       <PhysicsDrawer
         open={physicsDrawerOpen}
         onClose={() => setPhysicsDrawerOpen(false)}
-        onInsertAction={handlePhysicsAction}
         onInsertFormulaLatex={(latex) => {
           const center = getViewCenter();
           const res = dispatcher.dispatch({
@@ -9659,10 +9235,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           handleSelectTool("select");
-        }}
-        onOpenHtmlSimModal={() => {
-          handleSelectTool("select");
-          setHtmlSimModalOpen(true);
         }}
       />
 
@@ -9689,36 +9261,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           });
           if (res.created?.[0]) setSelectedIds([res.created[0]]);
           handleSelectTool("select");
-        }}
-      />
-
-      <HtmlSimModal
-        open={htmlSimModalOpen}
-        onClose={() => setHtmlSimModalOpen(false)}
-        onInsertToCanvas={(sim) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "HtmlSim",
-              transform: {
-                x: center.x,
-                y: center.y,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              props: {
-                title: sim.title,
-                htmlContent: sim.htmlContent,
-                widthPx: sim.widthPx,
-                heightPx: sim.heightPx,
-              },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          handleSelectTool("select");
-          setStatusHint(`✓ Đã nhúng mô phỏng HTML: ${sim.title}`);
         }}
       />
 

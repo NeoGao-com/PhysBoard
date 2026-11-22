@@ -17,9 +17,7 @@ export type PhysicsDrawerTab = "formulas" | "constants" | "units";
 export interface PhysicsDrawerProps {
   open: boolean;
   onClose: () => void;
-  onInsertAction?: (action: string) => void;
   onInsertFormulaLatex: (latex: string) => void;
-  onOpenHtmlSimModal?: () => void;
 }
 
 const TABS: Array<{ id: PhysicsDrawerTab; label: string }> = [
@@ -36,7 +34,6 @@ export const PhysicsDrawer: React.FC<PhysicsDrawerProps> = (props) => {
 const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
   onClose,
   onInsertFormulaLatex,
-  onOpenHtmlSimModal,
 }) => {
   const [tab, setTab] = useState<PhysicsDrawerTab>("formulas");
   const [topicFilter, setTopicFilter] = useState<PhysicsTopicCategory | "all">("all");
@@ -137,47 +134,6 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
           ✕
         </button>
       </div>
-
-      {/* HTML Simulation Callout */}
-      {onOpenHtmlSimModal && (
-        <div
-          style={{
-            margin: "8px 12px 2px",
-            padding: "8px 10px",
-            background: "#f0fdf4",
-            border: "1px solid #bbf7d0",
-            borderRadius: 8,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 8,
-          }}
-        >
-          <div style={{ fontSize: 11.5, color: "#166534" }}>
-            💡 Cần mô phỏng? Nạp file <strong>HTML</strong> thí nghiệm riêng của bạn.
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onOpenHtmlSimModal();
-            }}
-            style={{
-              padding: "4px 8px",
-              background: "#16a34a",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Nạp HTML...
-          </button>
-        </div>
-      )}
 
       {/* Search */}
       <div style={{ padding: "8px 12px 4px" }}>

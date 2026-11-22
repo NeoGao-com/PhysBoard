@@ -636,78 +636,6 @@ export const TOOL_GUIDE_CATALOG: Record<string, ToolGuideInfo> = {
     icon: "━",
     desc: "Vẽ trục số và biểu diễn các khoảng, đoạn số thực kèm các phép toán giao, hợp, hiệu.",
   },
-
-  // --- 12. Physical Instruments (Dụng cụ đo đạc thực tế) ---
-  "phys:inst:ruler": {
-    title: "Thước kẻ học sinh (cm / mm)",
-    badge: "Thước kẻ",
-    icon: "📏",
-    desc: "Kéo thân thước để di chuyển, kéo núm xoay ở đầu thước để đổi góc nghiêng đo đạc hoặc kẻ đường thẳng theo mép thước.",
-    tips: "Đặt thước lên các đoạn thẳng hình học để đo chiều dài thực tế.",
-  },
-  "phys:inst:protractor": {
-    title: "Thước đo góc (0°–180° / 360°)",
-    badge: "Thước đo góc",
-    icon: "📐",
-    desc: "Kéo tâm thước vào đỉnh góc, xoay vạch 0° trùng cạnh góc ban đầu để đọc số đo góc trên vạch chia độ.",
-  },
-  "phys:inst:setsquare": {
-    title: "Thước Êke (30°-60°-90° hoặc 45°-45°-90°)",
-    badge: "Êke",
-    icon: "📐",
-    desc: "Kéo đặt êke vào vị trí cần vẽ, xoay góc theo đường thẳng để kẻ đường vuông góc hoặc góc mẫu chuẩn xác.",
-  },
-  "phys:inst:compass": {
-    title: "Compa vẽ đường tròn thực hành",
-    badge: "Compa",
-    icon: "🧭",
-    desc: "Kéo chân kim vào tâm, chỉnh bán kính độ mở của compa và kéo đầu bút chì để quay đường tròn.",
-  },
-  "phys:inst:stopwatch": {
-    title: "Đồng hồ bấm giây thực hành",
-    badge: "Bấm giây",
-    icon: "⏱",
-    desc: "Bấm Bắt đầu/Dừng (Start/Stop) để đếm thời gian thực hiện thí nghiệm, bấm Vòng (Lap) để ghi mốc đo.",
-  },
-  "phys:labtable": {
-    title: "Bảng số liệu thực hành & Đường hồi quy",
-    badge: "Bảng thực hành",
-    icon: "📝",
-    desc: "Nhập các cặp giá trị (x, y) đo được từ thực tế để tự động tính toán và vẽ đường hồi quy tương quan lên Oxy.",
-  },
-
-  // --- 13. Physics Diagrams & Simulations (Mô phỏng & Thí nghiệm Vật lý) ---
-  "phys:diag:circuit": {
-    title: "Mạch điện DC định luật Ôm toàn mạch",
-    badge: "Mạch điện DC",
-    icon: "⚡",
-    desc: "Bấm lên bảng để đặt sơ đồ mạch điện. Bấm công tắc K để đóng/ngắt mạch, quan sát số chỉ Ampe kế & Vôn kế tức thời.",
-    tips: "Thay đổi giá trị suất điện động E và điện trở R để xem dòng điện thay đổi theo định luật Ôm.",
-  },
-  "phys:diag:circuit_parallel": {
-    title: "Mạch điện phân nhánh R1 // R2",
-    badge: "Mạch song song",
-    icon: "⚡",
-    desc: "Sơ đồ mạch điện gồm các điện trở song song, tự động tính điện trở tương đương và dòng điện qua từng nhánh.",
-  },
-  "phys:diag:fbd": {
-    title: "Sơ đồ phân tích lực (Mặt phẳng nghiêng)",
-    badge: "Phân tích lực",
-    icon: "↗",
-    desc: "Kéo thanh trượt góc nghiêng α, khối lượng m và hệ số ma sát để xem trực quan các vectơ lực P, N, Fms và hợp lực.",
-  },
-  "phys:diag:optics": {
-    title: "Quang hình học (Thấu kính & Gương)",
-    badge: "Quang hình",
-    icon: "🔍",
-    desc: "Kéo thay đổi tiêu cự f và vị trí vật d để quan sát đường đi của 3 tia sáng đặc biệt và ảnh A'B' (thật/ảo, cùng/ngược chiều).",
-  },
-  htmlsim: {
-    title: "Mô phỏng thí nghiệm Vật lý tương tác",
-    badge: "Mô phỏng HTML",
-    icon: "🔬",
-    desc: "Khung mô phỏng thí nghiệm trực quan: bấm chạy, tạm dừng, kéo các con lắc, lò xo hoặc tương tác trực tiếp trên mô phỏng.",
-  },
 };
 
 /** Contextual guide when objects are selected on canvas */
@@ -766,13 +694,6 @@ export function getSelectionGuide(
           icon: "∑",
           desc: "Nhấp đúp vào công thức để mở trình soạn thảo KaTeX hoặc sửa mã LaTeX. Kéo để di chuyển vị trí.",
         };
-      case "PhysicsInstrument":
-        return {
-          title: "Đang chọn Dụng cụ thực hành đo đạc",
-          badge: "Dụng cụ",
-          icon: "📏",
-          desc: "Kéo thân dụng cụ để di chuyển trên bảng. Kéo núm xoay để điều chỉnh góc nghiêng đo đạc hoặc chỉnh vạch đo.",
-        };
       case "Axes2D":
       case "Axes3D":
         return {
@@ -787,13 +708,6 @@ export function getSelectionGuide(
           badge: "Bảng",
           icon: "↗",
           desc: "Kéo để di chuyển bảng. Nhấp đúp để chỉnh sửa hàm số hoặc khoảng xét biến thiên.",
-        };
-      case "HtmlSim":
-        return {
-          title: "Đang chọn Khung mô phỏng thí nghiệm",
-          badge: "Mô phỏng",
-          icon: "🔬",
-          desc: "Kéo thanh tiêu đề để di chuyển khung mô phỏng. Bấm các nút điều khiển bên trong để thao tác thí nghiệm trực tiếp.",
         };
       default:
         return {

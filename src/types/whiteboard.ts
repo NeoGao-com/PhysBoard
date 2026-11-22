@@ -106,11 +106,7 @@ export type WhiteboardElementType =
   | "NumberLine"
   | "Network"
   | "RealObject"
-  | "LineDecor"
-  | "PhysicsDiagram"
-  | "PhysicsInstrument"
-  | "PhysicsLabTable"
-  | "HtmlSim";
+  | "LineDecor";
 
 // --- Discriminated Element Interfaces ---
 export interface InkElement extends CanvasElement {

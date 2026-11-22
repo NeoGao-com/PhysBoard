@@ -9,7 +9,6 @@ export interface SelectionBarProps {
   hiddenCount?: number;
   selectedAxes2D?: CanvasElement | null;
   selectedAxes3D?: CanvasElement | null;
-  selectedPhysicsEl?: CanvasElement | null;
   selectedSolidEl?: CanvasElement | null;
   selectedPoints?: CanvasElement[];
   selectedMathText?: CanvasElement | null;
@@ -47,9 +46,6 @@ export interface SelectionBarProps {
   onAxesOpenInequality?: () => void;
   onAxesOpenParametric?: () => void;
   onAxesOpenSequence?: () => void;
-  onPhysicsRotateInstrument?: (deltaDeg: number) => void;
-  onPhysicsPlotRegression?: () => void;
-  onUpdateInstrumentProps?: (id: string, patch: Record<string, unknown>) => void;
   onSolidUnfold?: () => void;
   onSolidFaceFlatten?: () => void;
   onSolidFaceFill?: () => void;
@@ -137,7 +133,6 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   hiddenCount = 0,
   selectedAxes2D = null,
   selectedAxes3D = null,
-  selectedPhysicsEl = null,
   selectedSolidEl = null,
   selectedPoints = [],
   selectedMathText = null,
@@ -175,9 +170,6 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onAxesOpenInequality,
   onAxesOpenParametric,
   onAxesOpenSequence,
-  onPhysicsRotateInstrument,
-  onPhysicsPlotRegression,
-  onUpdateInstrumentProps,
   onSolidUnfold,
   onSolidFaceFlatten,
   onSolidFaceFill,
@@ -777,138 +769,6 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
               ◯ Mặt cầu (S)
             </button>
           </>
-        )}
-
-        {/* Contextual Physics Element Actions */}
-        
-        {selectedPhysicsEl?.type === "PhysicsInstrument" &&
-          selectedPhysicsEl.props.instrumentKind !== "stopwatch" && (
-            <>
-              <button
-                type="button"
-                data-action="phys-rotate-ccw"
-                onClick={() => onPhysicsRotateInstrument?.(-15)}
-                style={actionBtnStyle}
-              >
-                ↺ Xoay -15°
-              </button>
-              <button
-                type="button"
-                data-action="phys-rotate-cw"
-                onClick={() => onPhysicsRotateInstrument?.(15)}
-                style={actionBtnStyle}
-              >
-                ↻ Xoay +15°
-              </button>
-
-              {/* SetSquare angle mode switch */}
-              {selectedPhysicsEl.props.instrumentKind === "setsquare" && (
-                <button
-                  type="button"
-                  data-action="switch-setsquare-kind"
-                  onClick={() => {
-                    const current = selectedPhysicsEl.props.setSquareKind;
-                    const next = current === "30-60-90" ? "45-45-90" : "30-60-90";
-                    onUpdateInstrumentProps?.(selectedPhysicsEl.id, { setSquareKind: next });
-                  }}
-                  style={{
-                    ...actionBtnStyle,
-                    background: "#fef3c7",
-                    color: "#92400e",
-                    fontWeight: 600,
-                  }}
-                >
-                  📐 {selectedPhysicsEl.props.setSquareKind === "30-60-90" ? "Đổi sang 45°–45°" : "Đổi sang 30°–60°"}
-                </button>
-              )}
-
-              {/* Protractor 180 / 360 mode switch */}
-              {selectedPhysicsEl.props.instrumentKind === "protractor" && (
-                <>
-                  <button
-                    type="button"
-                    data-action="switch-protractor-type"
-                    onClick={() => {
-                      const is360 = selectedPhysicsEl.props.protractorType === "360";
-                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
-                        protractorType: is360 ? "180" : "360",
-                      });
-                    }}
-                    style={{
-                      ...actionBtnStyle,
-                      background: "#e0f2fe",
-                      color: "#0369a1",
-                      fontWeight: 600,
-                    }}
-                  >
-                    🔄 {selectedPhysicsEl.props.protractorType === "360" ? "Đổi sang 180°" : "Đổi sang 360°"}
-                  </button>
-                  <button
-                    type="button"
-                    data-action="step-protractor-angle"
-                    onClick={() => {
-                      const cur = Number(selectedPhysicsEl.props.protractorAngle ?? 45);
-                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
-                        protractorAngle: (cur + 15) % (selectedPhysicsEl.props.protractorType === "360" ? 360 : 180),
-                      });
-                    }}
-                    style={actionBtnStyle}
-                    title="Thay đổi góc đo trên thước"
-                  >
-                    Đo góc +15°
-                  </button>
-                </>
-              )}
-
-              {/* Compass radius adjustment */}
-              {selectedPhysicsEl.props.instrumentKind === "compass" && (
-                <>
-                  <button
-                    type="button"
-                    data-action="compass-radius-dec"
-                    onClick={() => {
-                      const cur = Number(selectedPhysicsEl.props.compassRadius ?? 3.0);
-                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
-                        compassRadius: Math.max(1.0, Number((cur - 0.5).toFixed(1))),
-                      });
-                    }}
-                    style={actionBtnStyle}
-                  >
-                    R -0.5cm
-                  </button>
-                  <button
-                    type="button"
-                    data-action="compass-radius-inc"
-                    onClick={() => {
-                      const cur = Number(selectedPhysicsEl.props.compassRadius ?? 3.0);
-                      onUpdateInstrumentProps?.(selectedPhysicsEl.id, {
-                        compassRadius: Math.min(8.0, Number((cur + 0.5).toFixed(1))),
-                      });
-                    }}
-                    style={actionBtnStyle}
-                  >
-                    R +0.5cm
-                  </button>
-                </>
-              )}
-            </>
-          )}
-
-        {selectedPhysicsEl?.type === "PhysicsLabTable" && (
-          <button
-            type="button"
-            data-action="phys-plot-regression"
-            onClick={onPhysicsPlotRegression}
-            style={{
-              ...actionBtnStyle,
-              border: "none",
-              background: "#0f766e",
-              color: "#ffffff",
-              fontWeight: 700,
-            }}
-          >
-            📈 Vẽ hồi quy Oxy
-          </button>
         )}
 
         {/* Rotate buttons for 2D/Image elements */}

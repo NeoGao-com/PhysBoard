@@ -146,7 +146,6 @@ export interface ToolbarProps {
   onOpenDecorHelp?: () => void;
   onOpenPhysicsDrawer?: () => void;
   onOpenMathDrawer?: () => void;
-  onOpenHtmlSimModal?: () => void;
   onGoHome?: () => void;
   onShare?: () => void;
   getBoardElement?: () => SVGSVGElement | HTMLElement | null;
@@ -226,7 +225,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenDecorHelp,
   onOpenPhysicsDrawer,
   onOpenMathDrawer,
-  onOpenHtmlSimModal,
   onGoHome,
   onShare,
   getBoardElement,

@@ -566,17 +566,3 @@ export const IconSettings: React.FC<IconProps> = ({ size = 15, color, className,
     />
   </svg>
 );
-
-export const IconHtmlSim: React.FC<IconProps> = ({ size = 15, color, className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <rect x="2.5" y="4" width="19" height="16" rx="3.5" fill="currentColor" fillOpacity={0.12} />
-    <path d="m8 9-3.5 3 3.5 3" strokeWidth={1.8} />
-    <path d="m16 9 3.5 3-3.5 3" strokeWidth={1.8} />
-    <line x1="13" y1="8" x2="11" y2="16" strokeWidth={1.8} />
-    <path
-      d="M18.5 4.5c-.4 0-.8-.4-.8-.8 0 .4-.4.8-.8.8.4 0 .8.4.8.8 0-.4.4-.8.8-.8z"
-      fill="currentColor"
-      stroke="none"
-    />
-  </svg>
-);
