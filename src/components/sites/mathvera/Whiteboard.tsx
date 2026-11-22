@@ -900,7 +900,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const selectedElements = useMemo(
     () =>
       pageElements.filter(
-        (el) => selectedIds.includes(el.id) && !el.style?.hidden
+        (el) =>
+          selectedIds.includes(el.id) &&
+          !el.style?.hidden &&
+          !el.props?.locked &&
+          !el.style?.locked
       ),
     [pageElements, selectedIds]
   );
@@ -1650,17 +1654,19 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   }, [elements]);
 
   const handleDeleteSelected = useCallback(() => {
-    if (selectedIds.length === 0) return;
-    dispatcher.deleteObjects(selectedIds);
+    const targetIds = selectedElements.map((el) => el.id);
+    if (targetIds.length === 0) return;
+    dispatcher.deleteObjects(targetIds);
     setSelectedIds([]);
     setOrbitActiveId(null);
-  }, [selectedIds, dispatcher]);
+  }, [selectedElements, dispatcher]);
 
   const handleDuplicateSelected = useCallback(() => {
-    if (selectedIds.length === 0) return;
-    const newIds = dispatcher.duplicate(selectedIds);
+    const targetIds = selectedElements.map((el) => el.id);
+    if (targetIds.length === 0) return;
+    const newIds = dispatcher.duplicate(targetIds);
     setSelectedIds(newIds);
-  }, [selectedIds, dispatcher]);
+  }, [selectedElements, dispatcher]);
 
   const handleCopySelected = useCallback(() => {
     if (selectedElements.length === 0) return;
@@ -1668,12 +1674,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   }, [selectedElements]);
 
   const handleCutSelected = useCallback(() => {
-    if (selectedElements.length === 0) return;
+    const targetIds = selectedElements.map((el) => el.id);
+    if (targetIds.length === 0) return;
     setClipboard(JSON.parse(JSON.stringify(selectedElements)));
-    dispatcher.deleteObjects(selectedIds);
+    dispatcher.deleteObjects(targetIds);
     setSelectedIds([]);
     setOrbitActiveId(null);
-  }, [selectedElements, selectedIds, dispatcher]);
+  }, [selectedElements, dispatcher]);
 
   const handlePaste = useCallback(() => {
     if (clipboard.length === 0) return;
@@ -1700,10 +1707,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   }, [clipboard, dispatcher]);
 
   const handleHideSelected = useCallback(() => {
-    if (selectedIds.length === 0) return;
-    dispatcher.hideObjects(selectedIds);
+    const targetIds = selectedElements.map((el) => el.id);
+    if (targetIds.length === 0) return;
+    dispatcher.hideObjects(targetIds);
     setSelectedIds([]);
-  }, [selectedIds, dispatcher]);
+  }, [selectedElements, dispatcher]);
 
   const handleUnhideAll = useCallback(() => {
     dispatcher.unhideAll(currentPage);
@@ -2282,7 +2290,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         e.preventDefault();
         setSolidSubSel(null);
         setSelectedIds(
-          pageElements.filter((el) => !el.style?.hidden).map((el) => el.id)
+          pageElements
+            .filter(
+              (el) => !el.style?.hidden && !el.props?.locked && !el.style?.locked
+            )
+            .map((el) => el.id)
         );
         return;
       }
@@ -6646,7 +6658,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     (rawEl: CanvasElement) => {
     if (rawEl.style?.hidden) return null;
     const el = adaptElementForBoard(rawEl, currentBoardTheme.isDark);
-    const isSel = selectedIds.includes(el.id);
+    const isSel =
+      !rawEl.props?.locked &&
+      !rawEl.style?.locked &&
+      selectedIds.includes(el.id);
 
     switch (el.type) {
       case "Ink": {
@@ -7416,7 +7431,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       canRedo={canRedo}
       onUndo={undo}
       onRedo={redo}
-      selectedCount={selectedIds.length}
+      selectedCount={selectedElements.length}
       onDeleteSelected={handleDeleteSelected}
       isFullscreen={isFullscreen}
       onToggleFullscreen={handleToggleFullscreen}
@@ -7543,7 +7558,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
-        selectedCount={selectedIds.length}
+        selectedCount={selectedElements.length}
         onDeleteSelected={handleDeleteSelected}
         onOpenSettings={() => setSettingsModalOpen(true)}
         onOpenBoardManager={() => {
@@ -8103,7 +8118,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       <SelectionBar
           sidebarOpen={pageSidebarOpen}
           isPortrait={isPortrait}
-          selectedCount={selectedIds.length}
+          selectedCount={selectedElements.length}
           hiddenCount={hiddenCount}
           selectedAxes2D={selectedAxes2D}
           selectedAxes3D={

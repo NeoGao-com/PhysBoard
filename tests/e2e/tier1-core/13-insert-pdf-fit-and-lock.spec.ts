@@ -173,6 +173,15 @@ test.describe("Tier 1: 13 Insert PDF Fit to Paper & Lock Controls", () => {
     const strokes = page.locator('g[data-element-type="Ink"][data-id]');
     await expect(strokes).toHaveCount(1);
 
+    // 3b. Ctrl+A must select the ink stroke and NEVER select the locked PDF
+    await page.keyboard.press("Control+a");
+    await expect(strokes.first().locator("g[data-element-type=\"Ink\"]")).toHaveAttribute(
+      "data-selected",
+      "true"
+    );
+    await expect(pdfEl).not.toHaveAttribute("data-selected", "true");
+    await page.keyboard.press("Escape");
+
     // 4. Contact Eraser: erasing the stroke should delete the ink but NOT delete the PDF
     await toolbar.selectTool("erase");
     await page.mouse.move(cx - 50, cy - 20);
