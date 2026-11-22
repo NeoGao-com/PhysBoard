@@ -2,7 +2,6 @@
 
 import React, { Suspense, useState, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
-import { AuthDashboard } from "@/components/sites/mathvera/AuthDashboard";
 import { Whiteboard } from "@/components/sites/mathvera/Whiteboard";
 import { parseRoomFromUrl, sanitizeRoomId } from "@/lib/room";
 
