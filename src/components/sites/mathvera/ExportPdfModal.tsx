@@ -116,6 +116,9 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Xuất tài liệu PDF"
         style={{
           width: "100%",
           maxWidth: 420,

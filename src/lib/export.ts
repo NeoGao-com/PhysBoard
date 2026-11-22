@@ -769,12 +769,33 @@ export async function exportPNG(
         offscreen.appendChild(clone);
         document.body.appendChild(offscreen);
         try {
+          let fontEmbedCSS = "";
+          try {
+            const origin = typeof window !== "undefined" ? window.location.origin : "";
+            const rules: string[] = [];
+            for (const sheet of Array.from(document.styleSheets)) {
+              if (sheet.href && origin && !sheet.href.startsWith(origin)) continue;
+              try {
+                for (const rule of Array.from(sheet.cssRules || [])) {
+                  if (rule.type === CSSRule.FONT_FACE_RULE) {
+                    rules.push(rule.cssText);
+                  }
+                }
+              } catch {
+                // Ignore cross-origin stylesheets that block cssRules access
+              }
+            }
+            fontEmbedCSS = rules.join("\n");
+          } catch {
+            fontEmbedCSS = "";
+          }
           const captured = await toBlob(offscreen, {
             pixelRatio: 1,
             width: widthPx,
             height: heightPx,
             backgroundColor: options?.whitePaper ? "#ffffff" : theme.bg,
             skipFonts: false,
+            fontEmbedCSS,
           });
           if (captured && (await hasValidPngMagic(captured))) {
             return captured;

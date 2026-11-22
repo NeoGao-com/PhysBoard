@@ -169,13 +169,14 @@ function drawComponentSymbol(
           ? `${comp.label} (${((comp.value || 12) * (comp.extra ?? 0.5)).toFixed(1)}Ω)`
           : comp.label;
 
+  const isVertical = rot === 90 || rot === 270;
   return (
     <g key={comp.id} transform={`translate(${gx}, ${gy})`}>
       <g transform={`rotate(${rot})`}>{body}</g>
       <text
-        x={0}
-        y={rot === 90 || rot === 270 ? 28 : -20}
-        textAnchor="middle"
+        x={isVertical ? -21 : 0}
+        y={isVertical ? 4 : -20}
+        textAnchor={isVertical ? "end" : "middle"}
         fontSize={10.5}
         fontWeight={700}
         fill={comp.kind === "ammeter" ? "#1d4ed8" : comp.kind === "voltmeter" ? "#be123c" : "#334155"}

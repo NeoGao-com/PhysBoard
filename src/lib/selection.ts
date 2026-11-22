@@ -203,7 +203,7 @@ function estimateLatexBoxPx(latex: string): { w: number; h: number } {
     ? glyphCount * 0.72
     : glyphCount;
 
-  const w = Math.max(44, Math.round(effectiveUnits * 12) + 20);
+  const w = Math.max(48, Math.round(effectiveUnits * 13) + 28);
   const h = hasStacked ? 52 : 38;
   return { w, h };
 }

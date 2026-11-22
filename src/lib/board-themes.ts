@@ -247,7 +247,11 @@ export function adaptStrokeForBoard(
 ): string | undefined {
   if (!isDarkBoard) return color ?? undefined;
   if (!color) return "#F8FAFC";
-  if (DARK_DEFAULT_INK_HEXES.has(color.trim().toLowerCase())) {
+  const lower = color.trim().toLowerCase();
+  if (lower === "#0f766e") {
+    return "#5EEAD4";
+  }
+  if (DARK_DEFAULT_INK_HEXES.has(lower)) {
     return "#F8FAFC";
   }
   return color;
