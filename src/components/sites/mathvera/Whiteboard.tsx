@@ -7721,7 +7721,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           style={{
             position: "fixed",
             bottom: 14,
-            left: "50%",
+            left: isPortrait ? "50%" : pageSidebarOpen ? "calc(50% + 70px)" : "50%",
             transform: "translateX(-50%)",
             zIndex: 62,
             background: "#0f172a",
@@ -7826,16 +7826,20 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       {selectedSegment && (
         <div
           data-export-skip="true"
+          data-wb-segment-decor-bar="true"
           style={{
             position: "fixed",
-            bottom: 60,
-            left: 12,
-            zIndex: 62,
+            bottom: 64,
+            left: pageSidebarOpen ? 152 : 38,
+            zIndex: 85,
+            maxWidth: `calc(100vw - ${(pageSidebarOpen ? 152 : 38) + 12}px)`,
+            transition: "left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
             background: "#ffffff",
             border: "1px solid #cbd5e1",
             borderRadius: 10,
             padding: "5px 8px",
             display: "flex",
+            flexWrap: "wrap",
             gap: 6,
             boxShadow: "0 4px 14px rgba(15, 23, 42, 0.12)",
             fontSize: 12,
