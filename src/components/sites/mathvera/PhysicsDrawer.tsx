@@ -12,7 +12,7 @@ import {
 } from "@/lib/physics-formulas";
 import { KaTeXFormula } from "./elements/MathElement";
 
-export type PhysicsDrawerTab = "formulas" | "units";
+export type PhysicsDrawerTab = "formulas" | "constants" | "units";
 
 export interface PhysicsDrawerProps {
   open: boolean;
@@ -24,6 +24,7 @@ export interface PhysicsDrawerProps {
 
 const TABS: Array<{ id: PhysicsDrawerTab; label: string }> = [
   { id: "formulas", label: "Bảng Công thức" },
+  { id: "constants", label: "Hằng số Vật lý" },
   { id: "units", label: "Đổi đơn vị" },
 ];
 
@@ -232,34 +233,7 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
       <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
         {tab === "formulas" && (
           <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f766e" }}>
-              BẢNG HẰNG SỐ VẬT LÝ (1 CHẠM CHÈN LATEX)
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-              {filteredConstants.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  title={`${c.name}: ${c.valueText}`}
-                  onClick={() => {
-                    onInsertFormulaLatex(c.latex);
-                    onClose();
-                  }}
-                  style={{
-                    padding: "4px 8px",
-                    borderRadius: 7,
-                    border: "1px solid #cbd5e1",
-                    background: "#f8fafc",
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {c.symbol} = {c.valueText}
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#1e3a8a", marginTop: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#1e3a8a" }}>
               CÔNG THỨC SGK 10–11–12 THEO CHỦ ĐỀ
             </div>
             {/* Topic Filter Pills */}
@@ -385,6 +359,66 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
                 </div>
               );
             })}
+          </>
+        )}
+
+        {tab === "constants" && (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f766e" }}>
+              BẢNG HẰNG SỐ VẬT LÝ (1 CHẠM CHÈN LATEX)
+            </div>
+            {filteredConstants.length === 0 ? (
+              <div style={{ padding: 20, textAlign: "center", color: "#64748b", fontSize: 13 }}>
+                Không tìm thấy hằng số nào khớp với “{query}”.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {filteredConstants.map((c) => (
+                  <div
+                    key={c.id}
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 9,
+                      padding: "8px 10px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>
+                        {c.name}
+                      </span>
+                      <span style={{ fontSize: 12, color: "#0f766e", fontWeight: 600 }}>
+                        {c.symbol} = {c.valueText}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      data-physics-insert-constant={c.id}
+                      onClick={() => {
+                        onInsertFormulaLatex(c.latex);
+                        onClose();
+                      }}
+                      style={{
+                        padding: "4px 9px",
+                        borderRadius: 6,
+                        border: "none",
+                        background: "#0f766e",
+                        color: "#ffffff",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      + Chèn
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
