@@ -504,8 +504,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   useEffect(() => {
     if (!openMenu) return;
     const handlePointerDown = (e: PointerEvent) => {
-      const target = e.target as Node;
+      const target = e.target as Node | null;
+      const targetEl = target instanceof Element ? target : null;
       if (portalMenuRef.current?.contains(target)) return;
+      if (
+        targetEl?.closest(
+          '[data-wb-portal-menu="true"], [data-wb-menu="functions"], [data-wb-menu="statistics"], [data-wb-menu="realworld"]'
+        )
+      ) {
+        return;
+      }
       if (
         selectBtnRef.current?.contains(target) ||
         penBtnRef.current?.contains(target) ||

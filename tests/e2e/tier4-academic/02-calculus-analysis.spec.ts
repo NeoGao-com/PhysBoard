@@ -166,4 +166,48 @@ test.describe('Tier 4: Academic Scenarios - Calculus & Function Analysis (Scenar
       }
     }
   });
+
+  test('should strictly allow interacting with Hàm số, Thống kê, and Thực tế menus, dialogs, and placed interactive widgets', async ({ page }) => {
+    // 1. Hàm số -> Vẽ đồ thị dialog must open strictly on menu item click
+    await page.locator('button[data-dropdown="functions"]').first().click();
+    await expect(page.locator('[data-wb-menu="functions"]')).toBeVisible();
+    await page.locator('[data-menu-item="p3:plot"]').click();
+    await expect(page.locator('[data-wb-plot-dialog="true"]')).toBeVisible();
+    await page.locator('[data-wb-plot-dialog="true"] button:has-text("Huỷ")').click();
+    await expect(page.locator('[data-wb-plot-dialog="true"]')).toBeHidden();
+
+    // 2. Thống kê -> Hoán vị places an interactive Counting widget whose internal controls work while selected
+    await page.locator('button[data-dropdown="statistics"]').first().click();
+    await expect(page.locator('[data-wb-menu="statistics"]')).toBeVisible();
+    await page.locator('[data-menu-item="count-perm"]').click();
+    const center = await canvas.getCanvasCenter();
+    await canvas.clickAt({ x: center.x - 120, y: center.y });
+
+    const counting = canvas.boardContent.locator('[data-wb-type="Counting"]').first();
+    await expect(counting).toBeVisible();
+    await expect(counting).toHaveAttribute('data-selected', 'true');
+    // Click "☰ Liệt kê hết" inside Counting widget WHILE it is selected (tests boxInteriorPassthrough)
+    const listBtn = counting.locator('button:has-text("Liệt kê hết")');
+    await expect(listBtn).toBeVisible();
+    await listBtn.click();
+    await expect(counting.locator('button:has-text("Ẩn danh sách")')).toBeVisible();
+
+    // 3. Thống kê -> Biểu đồ opens ChartConfigDialog strictly and creates a Chart element
+    await page.locator('button[data-dropdown="statistics"]').first().click();
+    await page.locator('[data-menu-item="chart"]').click();
+    const chartSubmitBtn = page.locator('button:has-text("Đặt biểu đồ")');
+    await expect(chartSubmitBtn).toBeVisible();
+    await chartSubmitBtn.click();
+    await expect(canvas.boardContent.locator('[data-wb-type="Chart"]').first()).toBeVisible();
+
+    // 4. Thực tế -> Tìm vật khác… strictly opens RealWorldDrawer and inserts RealObject onto canvas
+    await page.locator('button[data-dropdown="realworld"]').first().click();
+    await expect(page.locator('[data-wb-menu="realworld"]')).toBeVisible();
+    await page.locator('[data-menu-item="realworld-drawer"]').click();
+    const rwDrawer = page.locator('[data-testid="realworld-drawer"]');
+    await expect(rwDrawer).toBeVisible();
+    await rwDrawer.locator('input[type="search"]').fill('cây');
+    await rwDrawer.locator('button[data-wb-art-id="tree"]').click();
+    await expect(canvas.boardContent.locator('[data-wb-type="RealObject"]').first()).toBeVisible();
+  });
 });

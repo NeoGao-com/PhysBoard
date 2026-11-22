@@ -7245,6 +7245,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   (selectedElements[0].type === "Slider" ||
                     selectedElements[0].type === "Solid3D" ||
                     selectedElements[0].type === "VarTable" ||
+                    selectedElements[0].type === "TrigCircle" ||
+                    selectedElements[0].type === "Counting" ||
+                    selectedElements[0].type === "Venn" ||
+                    selectedElements[0].type === "Network" ||
+                    selectedElements[0].type === "Table" ||
+                    selectedElements[0].type === "Axes2D" ||
                     selectedElements[0].type === "HtmlSim" ||
                     selectedElements[0].type === "GeomSegment" ||
                     selectedElements[0].type === "LineDecor"))

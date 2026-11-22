@@ -127,6 +127,7 @@ export const FunctionsMenu: React.FC<FunctionsMenuProps> = ({
       role="menu"
       aria-label="Hàm số"
       data-wb-menu="functions"
+      data-wb-portal-menu="true"
       style={{
         ...dropdownPanelStyle,
         minWidth: 288,
@@ -302,6 +303,7 @@ export const StatsMenu: React.FC<StatsMenuProps> = ({
       role="menu"
       aria-label="Thống kê"
       data-wb-menu="statistics"
+      data-wb-portal-menu="true"
       style={{
         ...dropdownPanelStyle,
         minWidth: 278,
@@ -461,6 +463,7 @@ export const RealWorldMenu: React.FC<RealWorldMenuProps> = ({
       role="menu"
       aria-label="Thực tế"
       data-wb-menu="realworld"
+      data-wb-portal-menu="true"
       style={{
         ...dropdownPanelStyle,
         minWidth: 270,
