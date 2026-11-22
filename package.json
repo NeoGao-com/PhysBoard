@@ -1,6 +1,6 @@
 {
   "name": "physboard",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "description": "PhysBoard — Bảng trắng tương tác dạy Toán & Vật lý Offline (Desktop & Android)",
   "author": "PhysBoard",
@@ -64,7 +64,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": "always",
+      "createDesktopShortcut": "ask",
       "createStartMenuShortcut": true,
       "shortcutName": "PhysBoard",
       "runAfterFinish": true,
