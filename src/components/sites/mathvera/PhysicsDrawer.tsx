@@ -3,9 +3,12 @@
 import React, { useMemo, useState } from "react";
 import {
   filterPhysicsFormulas,
+  getPhysicsTopicCategory,
   normalizeVietnameseQuery,
   PHYSICS_CONSTANTS,
+  PHYSICS_TOPIC_GROUPS,
   PHYSICS_UNIT_CONVERSIONS,
+  type PhysicsTopicCategory,
 } from "@/lib/physics-formulas";
 import { KaTeXFormula } from "./elements/MathElement";
 
@@ -35,6 +38,7 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
   onOpenHtmlSimModal,
 }) => {
   const [tab, setTab] = useState<PhysicsDrawerTab>("formulas");
+  const [topicFilter, setTopicFilter] = useState<PhysicsTopicCategory | "all">("all");
   const [query, setQuery] = useState("");
   const [convId, setConvId] = useState(PHYSICS_UNIT_CONVERSIONS[0].id);
   const [convInput, setConvInput] = useState("72");
@@ -256,52 +260,131 @@ const PhysicsDrawerContent: React.FC<PhysicsDrawerProps> = ({
               ))}
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#1e3a8a", marginTop: 6 }}>
-              CÔNG THỨC SGK 10–11–12
+              CÔNG THỨC SGK 10–11–12 THEO CHỦ ĐỀ
             </div>
-            {filteredFormulas.map((f) => (
-              <div
-                key={f.id}
+            {/* Topic Filter Pills */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              <button
+                type="button"
+                data-physics-topic="all"
+                onClick={() => setTopicFilter("all")}
                 style={{
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 9,
-                  padding: 9,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  border: topicFilter === "all" ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
+                  background: topicFilter === "all" ? "#eff6ff" : "#f8fafc",
+                  color: topicFilter === "all" ? "#1d4ed8" : "#475569",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}>
-                  <span>{f.name}</span>
-                  <span style={{ color: "#64748b" }}>{f.topic}</span>
-                </div>
-                <div style={{ overflowX: "auto", padding: "3px 0", fontSize: 13 }}>
-                  <KaTeXFormula latex={f.latex} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 11, color: "#64748b" }}>{f.note}</span>
+                Tất cả ({filteredFormulas.length})
+              </button>
+              {PHYSICS_TOPIC_GROUPS.map((grp) => {
+                const count = filteredFormulas.filter(
+                  (f) => getPhysicsTopicCategory(f) === grp.id
+                ).length;
+                if (count === 0) return null;
+                const active = topicFilter === grp.id;
+                return (
                   <button
+                    key={grp.id}
                     type="button"
-                    data-physics-insert-formula={f.id}
-                    onClick={() => {
-                      onInsertFormulaLatex(f.latex);
-                      onClose();
-                    }}
+                    data-physics-topic={grp.id}
+                    onClick={() => setTopicFilter(grp.id)}
                     style={{
-                      padding: "3px 9px",
-                      borderRadius: 6,
-                      border: "none",
-                      background: "#16a34a",
-                      color: "#ffffff",
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      border: active ? "1px solid #1d4ed8" : "1px solid #cbd5e1",
+                      background: active ? "#eff6ff" : "#f8fafc",
+                      color: active ? "#1d4ed8" : "#475569",
                       fontSize: 11,
                       fontWeight: 600,
                       cursor: "pointer",
                     }}
                   >
-                    + Chèn
+                    {grp.label} ({count})
                   </button>
+                );
+              })}
+            </div>
+
+            {PHYSICS_TOPIC_GROUPS.filter(
+              (grp) => topicFilter === "all" || topicFilter === grp.id
+            ).map((grp) => {
+              const items = filteredFormulas.filter(
+                (f) => getPhysicsTopicCategory(f) === grp.id
+              );
+              if (items.length === 0) return null;
+              return (
+                <div
+                  key={grp.id}
+                  data-physics-topic-section={grp.id}
+                  style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      color: "#334155",
+                      background: "#f1f5f9",
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>{grp.label}</span>
+                    <span style={{ color: "#64748b", fontWeight: 600 }}>{items.length}</span>
+                  </div>
+                  {items.map((f) => (
+                    <div
+                      key={f.id}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 9,
+                        padding: 9,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}>
+                        <span>{f.name}</span>
+                        <span style={{ color: "#64748b", fontSize: 11 }}>{f.topic}</span>
+                      </div>
+                      <div style={{ overflowX: "auto", padding: "3px 0", fontSize: 13 }}>
+                        <KaTeXFormula latex={f.latex} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 11, color: "#64748b" }}>{f.note}</span>
+                        <button
+                          type="button"
+                          data-physics-insert-formula={f.id}
+                          onClick={() => {
+                            onInsertFormulaLatex(f.latex);
+                            onClose();
+                          }}
+                          style={{
+                            padding: "3px 9px",
+                            borderRadius: 6,
+                            border: "none",
+                            background: "#16a34a",
+                            color: "#ffffff",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          + Chèn
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </>
         )}
 

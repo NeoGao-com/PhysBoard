@@ -154,6 +154,7 @@ import { OrbitBar } from "./OrbitBar";
 import { MathEditor, ensureMathLiveRegistered } from "./MathEditor";
 import { RealWorldDrawer } from "./RealWorldDrawer";
 import { PhysicsDrawer } from "./PhysicsDrawer";
+import { MathFormulasDrawer } from "./MathFormulasDrawer";
 import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportPdfModal } from "./ExportPdfModal";
 import { BoardManagerModal } from "./BoardManagerModal";
@@ -684,6 +685,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [numberLineDialogOpen, setNumberLineDialogOpen] = useState(false);
   const [realWorldDrawerOpen, setRealWorldDrawerOpen] = useState(false);
   const [physicsDrawerOpen, setPhysicsDrawerOpen] = useState(false);
+  const [mathDrawerOpen, setMathDrawerOpen] = useState(false);
   const [htmlSimModalOpen, setHtmlSimModalOpen] = useState(false);
   const [calculatorOpen, setCalculatorOpen] = useState(false);
   const [exportPdfModalOpen, setExportPdfModalOpen] = useState(false);
@@ -2315,6 +2317,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           setRealWorldDrawerOpen(false);
         } else if (physicsDrawerOpen) {
           setPhysicsDrawerOpen(false);
+        } else if (mathDrawerOpen) {
+          setMathDrawerOpen(false);
         } else if (calculatorOpen) {
           setCalculatorOpen(false);
         } else if (draftTwoPtRef.current || draftPolygonPts.length > 0 || pickedItems.length > 0) {
@@ -7465,7 +7469,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }}
       onOpenPhysicsDrawer={() => {
         handleSelectTool("select");
+        setMathDrawerOpen(false);
         setPhysicsDrawerOpen(true);
+      }}
+      onOpenMathDrawer={() => {
+        handleSelectTool("select");
+        setPhysicsDrawerOpen(false);
+        setMathDrawerOpen(true);
       }}
       onOpenHtmlSimModal={() => {
         handleSelectTool("select");
@@ -9653,6 +9663,32 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onOpenHtmlSimModal={() => {
           handleSelectTool("select");
           setHtmlSimModalOpen(true);
+        }}
+      />
+
+      {/* Math Formulas Drawer */}
+      <MathFormulasDrawer
+        open={mathDrawerOpen}
+        onClose={() => setMathDrawerOpen(false)}
+        onInsertFormulaLatex={(latex) => {
+          const center = getViewCenter();
+          const res = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "MathText",
+              transform: {
+                x: center.x,
+                y: center.y,
+                scale: 1,
+                rotation: 0,
+                z: 0,
+              },
+              style: { stroke: currentStyle.stroke ?? "#0f172a" },
+              props: { latex },
+            },
+          });
+          if (res.created?.[0]) setSelectedIds([res.created[0]]);
+          handleSelectTool("select");
         }}
       />
 

@@ -281,6 +281,50 @@ export const PHYSICS_UNIT_CONVERSIONS: ReadonlyArray<UnitConversionSpec> = [
   },
 ];
 
+export type PhysicsTopicCategory =
+  | "mechanics"
+  | "waves"
+  | "electromagnetism"
+  | "thermal"
+  | "optics_quantum";
+
+export const PHYSICS_TOPIC_GROUPS: ReadonlyArray<{
+  id: PhysicsTopicCategory;
+  label: string;
+}> = [
+  { id: "mechanics", label: "Cơ học" },
+  { id: "waves", label: "Dao động & Sóng" },
+  { id: "electromagnetism", label: "Điện & Từ" },
+  { id: "thermal", label: "Nhiệt & Khí lý tưởng" },
+  { id: "optics_quantum", label: "Quang & Hạt nhân" },
+];
+
+const PHYSICS_TOPIC_MAP: Record<string, PhysicsTopicCategory> = {
+  "Động học": "mechanics",
+  "Động lực học": "mechanics",
+  "Tĩnh học": "mechanics",
+  "Năng lượng": "mechanics",
+  "Động lượng": "mechanics",
+  "Chuyển động tròn": "mechanics",
+  "Dao động": "waves",
+  "Sóng": "waves",
+  "Sóng ánh sáng": "waves",
+  "Điện trường": "electromagnetism",
+  "Dòng điện không đổi": "electromagnetism",
+  "Từ trường & Cảm ứng điện từ": "electromagnetism",
+  "Dòng xoay chiều": "electromagnetism",
+  "Vật lý nhiệt": "thermal",
+  "Khí lý tưởng": "thermal",
+  "Quang hình học": "optics_quantum",
+  "Vật lý hạt nhân & Lượng tử": "optics_quantum",
+};
+
+export function getPhysicsTopicCategory(
+  item: PhysicsFormulaItem
+): PhysicsTopicCategory {
+  return PHYSICS_TOPIC_MAP[item.topic] ?? "mechanics";
+}
+
 export function filterPhysicsFormulas(
   query: string,
   grade: PhysicsGrade | "all"

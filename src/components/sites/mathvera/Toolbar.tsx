@@ -145,6 +145,7 @@ export interface ToolbarProps {
   onOpenRealWorldDrawer?: () => void;
   onOpenDecorHelp?: () => void;
   onOpenPhysicsDrawer?: () => void;
+  onOpenMathDrawer?: () => void;
   onOpenHtmlSimModal?: () => void;
   onGoHome?: () => void;
   onShare?: () => void;
@@ -224,6 +225,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenRealWorldDrawer,
   onOpenDecorHelp,
   onOpenPhysicsDrawer,
+  onOpenMathDrawer,
   onOpenHtmlSimModal,
   onGoHome,
   onShare,
@@ -1676,7 +1678,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
         )}
 
-        {/* Physics Drawer Button (Mở thư viện Thí nghiệm Vật lý) */}
+        {/* Physics Drawer Button (Mở thư viện Công thức Vật lý) */}
         {vis.toolPhysics && onOpenPhysicsDrawer && (
           <button
             type="button"
@@ -1684,10 +1686,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             data-action="open-physics-drawer"
             onClick={onOpenPhysicsDrawer}
             style={btnBaseStyle}
-            title="Thư viện thí nghiệm Vật lý 10–11–12, Công thức & Mô phỏng"
+            title="Bảng công thức, hằng số Vật lý 10–11–12 & Đổi đơn vị"
           >
             <IconPhysics size={14} color="#7c3aed" />
             <span>Vật lý</span>
+          </button>
+        )}
+
+        {/* Math Formulas Drawer Button */}
+        {onOpenMathDrawer && (
+          <button
+            type="button"
+            data-tool="math-formulas"
+            data-action="open-math-drawer"
+            onClick={onOpenMathDrawer}
+            style={btnBaseStyle}
+            title="Bảng công thức Toán 10–11–12 theo từng chủ đề"
+          >
+            <span style={{ color: "#2563eb", fontWeight: 800, fontSize: 13, lineHeight: 1 }}>
+              ∑
+            </span>
+            <span>Toán</span>
           </button>
         )}
 
