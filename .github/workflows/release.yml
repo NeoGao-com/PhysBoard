@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build Windows Installer & Portable EXE
+    name: Build Windows Installer & Portable EXE (Tauri Rust)
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -23,16 +23,29 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Next.js App
-        run: npm run build
+      - name: Build Tauri Windows Installer & EXE
+        run: npx tauri build --bundles nsis
 
-      - name: Package Windows Installer & Portable EXE
-        run: npx electron-builder --win nsis portable
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare Windows Release Artifacts
+        shell: pwsh
+        run: |
+          $pkgVersion = (Get-Content package.json | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $nsisExe = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis/*-setup.exe" | Select-Object -First 1
+          if (-not $nsisExe) { throw "NSIS installer not found in src-tauri/target/release/bundle/nsis/" }
+          Copy-Item $nsisExe.FullName -Destination "dist/PhysBoard-Setup-$pkgVersion.exe" -Force
+          Copy-Item "src-tauri/target/release/physboard.exe" -Destination "dist/PhysBoard-Portable-$pkgVersion.exe" -Force
 
       - name: Upload Windows EXE Artifact
         uses: actions/upload-artifact@v4

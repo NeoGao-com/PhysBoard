@@ -43,6 +43,10 @@ next-env.d.ts
 # Local temp files
 temp/
 
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+
 # Playwright Test Artifacts
 test-results/
 playwright-report/

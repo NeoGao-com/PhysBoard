@@ -129,30 +129,39 @@ async function main() {
   const buildDir = path.join(ROOT, 'build');
   const publicDir = path.join(ROOT, 'public');
   const appDir = path.join(ROOT, 'src', 'app');
+  const tauriIconsDir = path.join(ROOT, 'src-tauri', 'icons');
 
   await fs.mkdir(assetsDir, { recursive: true });
   await fs.mkdir(buildDir, { recursive: true });
   await fs.mkdir(publicDir, { recursive: true });
   await fs.mkdir(appDir, { recursive: true });
+  await fs.mkdir(tauriIconsDir, { recursive: true });
 
   const svgBuf = Buffer.from(LOGO_SVG);
   const fgBuf = Buffer.from(FOREGROUND_SVG);
   const bgBuf = Buffer.from(BACKGROUND_SVG);
 
   console.log('Rendering modern master icons (1024x1024)...');
-  await sharp(svgBuf).resize(1024, 1024).png().toFile(path.join(assetsDir, 'logo.png'));
-  await sharp(svgBuf).resize(512, 512).png().toFile(path.join(buildDir, 'icon.png'));
-  await sharp(svgBuf).resize(256, 256).png().toFile(path.join(publicDir, 'logo.png'));
-  await sharp(fgBuf).resize(1024, 1024).png().toFile(path.join(assetsDir, 'icon-foreground.png'));
-  await sharp(bgBuf).resize(1024, 1024).png().toFile(path.join(assetsDir, 'icon-background.png'));
+  await sharp(svgBuf).resize(1024, 1024).ensureAlpha().png().toFile(path.join(assetsDir, 'logo.png'));
+  await sharp(svgBuf).resize(512, 512).ensureAlpha().png().toFile(path.join(buildDir, 'icon.png'));
+  await sharp(svgBuf).resize(256, 256).ensureAlpha().png().toFile(path.join(publicDir, 'logo.png'));
+  await sharp(fgBuf).resize(1024, 1024).ensureAlpha().png().toFile(path.join(assetsDir, 'icon-foreground.png'));
+  await sharp(bgBuf).resize(1024, 1024).ensureAlpha().png().toFile(path.join(assetsDir, 'icon-background.png'));
+
+  console.log('Generating Tauri RGBA icons in src-tauri/icons/...');
+  await sharp(svgBuf).resize(32, 32).ensureAlpha().png().toFile(path.join(tauriIconsDir, '32x32.png'));
+  await sharp(svgBuf).resize(128, 128).ensureAlpha().png().toFile(path.join(tauriIconsDir, '128x128.png'));
+  await sharp(svgBuf).resize(256, 256).ensureAlpha().png().toFile(path.join(tauriIconsDir, '128x128@2x.png'));
+  await sharp(svgBuf).resize(512, 512).ensureAlpha().png().toFile(path.join(tauriIconsDir, 'icon.png'));
 
   console.log('Generating Windows multi-resolution icon.ico...');
   const pngSizes = [16, 24, 32, 48, 64, 128, 256];
   const pngBuffers = await Promise.all(
-    pngSizes.map((sz) => sharp(svgBuf).resize(sz, sz).png().toBuffer())
+    pngSizes.map((sz) => sharp(svgBuf).resize(sz, sz).ensureAlpha().png().toBuffer())
   );
   const icoBuf = await pngToIco(pngBuffers);
   await fs.writeFile(path.join(buildDir, 'icon.ico'), icoBuf);
+  await fs.writeFile(path.join(tauriIconsDir, 'icon.ico'), icoBuf);
   await fs.writeFile(path.join(appDir, 'favicon.ico'), icoBuf);
   await fs.writeFile(path.join(publicDir, 'favicon.ico'), icoBuf);
 
@@ -170,15 +179,15 @@ async function main() {
     const targetDir = path.join(androidResDir, m.dir);
     try {
       await fs.mkdir(targetDir, { recursive: true });
-      await sharp(svgBuf).resize(m.size, m.size).png().toFile(path.join(targetDir, 'ic_launcher.png'));
-      await sharp(svgBuf).resize(m.size, m.size).png().toFile(path.join(targetDir, 'ic_launcher_round.png'));
-      await sharp(fgBuf).resize(m.fgSize, m.fgSize).png().toFile(path.join(targetDir, 'ic_launcher_foreground.png'));
+      await sharp(svgBuf).resize(m.size, m.size).ensureAlpha().png().toFile(path.join(targetDir, 'ic_launcher.png'));
+      await sharp(svgBuf).resize(m.size, m.size).ensureAlpha().png().toFile(path.join(targetDir, 'ic_launcher_round.png'));
+      await sharp(fgBuf).resize(m.fgSize, m.fgSize).ensureAlpha().png().toFile(path.join(targetDir, 'ic_launcher_foreground.png'));
     } catch {
       // Ignore if directory does not exist
     }
   }
 
-  console.log('✓ Hoàn tất làm mới logo cho toàn bộ nền tảng (Web, Windows .ico, Android App Icon)!');
+  console.log('✓ Hoàn tất làm mới logo cho toàn bộ nền tảng (Web, Tauri/Windows .ico, Android App Icon)!');
 }
 
 main().catch((err) => {

@@ -12,7 +12,7 @@
     </a>
   </p>
   <p>
-    <em>Next.js 16 (Static Export) · React 19 · Tailwind CSS v4 · Electron · Capacitor Android</em>
+    <em>Next.js 16 (Static Export) · React 19 · Tailwind CSS v4 · Tauri v2 (Rust) · Capacitor Android</em>
   </p>
 </div>
 
@@ -55,7 +55,7 @@
 ```text
 ├── assets/                 # Logo gốc 1024x1024 & lớp adaptive icon
 ├── build/                  # Icon đóng gói Windows (icon.ico, icon.png)
-├── electron/               # Main process Electron (main.js) cho bản desktop .exe
+├── src-tauri/              # Nhân Rust & Tauri v2 cho bản desktop Windows (.exe)
 ├── android/                # Dự án Capacitor Android (đã đồng bộ mipmap & web assets)
 ├── public/                 # Tài nguyên tĩnh (logo.png)
 ├── scripts/                # Script sinh bộ icon đa nền tảng (generate-icons.mjs)
@@ -69,7 +69,7 @@
 ├── tests/e2e/              # Bộ kiểm thử Playwright E2E
 ├── capacitor.config.json   # Cấu hình Capacitor (com.physboard.app)
 ├── next.config.ts          # Next.js Static Export (out/, assetPrefix tương đối khi build)
-└── package.json            # Scripts dev, check, electron-builder (.exe) & cap sync
+└── package.json            # Scripts dev, check, tauri build (.exe) & cap sync
 ```
 
 ---
@@ -100,13 +100,15 @@ npx playwright test tests/e2e/tier4-academic/ --reporter=list
 
 ## Đóng gói Offline: Windows `.exe` & Android `.apk`
 
-### Windows Portable (`.exe`) với Electron
+### Windows Desktop (`.exe`) với Tauri v2 (Rust)
+
+> Yêu cầu máy đã cài **Rust toolchain** (`rustup`) và **Microsoft C++ Build Tools**.
 
 ```bash
-# Chạy thử cửa sổ Desktop Electron trực tiếp từ bản build mới nhất
-npm run electron:dev
+# Chạy thử cửa sổ Desktop Tauri (Rust) trực tiếp
+npm run tauri:dev
 
-# Đóng gói ra file chạy trực tiếp dist/PhysBoard 1.0.0.exe
+# Đóng gói bộ cài Windows NSIS (.exe) & file thực thi Rust
 npm run build:exe
 ```
 
