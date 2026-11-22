@@ -4,6 +4,7 @@ import React, { useRef, useState } from "react";
 import { PageBoardConfig, BOARD_SURFACE_PRESETS } from "@/lib/board-themes";
 import { importPdfPages, ImportedPdfPage } from "@/lib/pdf-import";
 import { IconPdf, IconHtmlSim, IconTrash, IconUndo, IconRedo, IconSettings, IconSave, IconOpenFile, IconCommand } from "./ToolbarIcons";
+import { Folder } from "lucide-react";
 
 export interface PageSidebarProps {
   currentPage: number;
@@ -143,10 +144,9 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
               marginBottom: 6,
               background: "#ffffff",
               border: "1px solid #cbd5e1",
-              borderRadius: 4,
-              width: 20,
-              height: 24,
-              fontSize: 11,
+              borderRadius: 6,
+              width: 24,
+              height: 26,
               color: "#0f172a",
               cursor: "pointer",
               display: "flex",
@@ -155,7 +155,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
               padding: 0,
             }}
           >
-            📁
+            <Folder size={14} strokeWidth={1.75} color="#0284c7" />
           </button>
         )}
 
@@ -598,10 +598,9 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 12,
               }}
             >
-              <span>📁</span>
+              <Folder size={14} strokeWidth={1.75} color="#0284c7" />
             </button>
           )}
 

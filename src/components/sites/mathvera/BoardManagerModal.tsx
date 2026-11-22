@@ -13,6 +13,26 @@ import {
 } from "@/lib/board-manager";
 import { generateRoomId, sanitizeRoomId } from "@/lib/room";
 import { importPdfPages } from "@/lib/pdf-import";
+import {
+  Menu,
+  Plus,
+  FileUp,
+  X,
+  FileText,
+  Trash2,
+  Folder,
+  FolderPlus,
+  Search,
+  Settings,
+  Edit2,
+  RotateCcw,
+  Sun,
+  Moon,
+  Clock,
+  ExternalLink,
+  ChevronRight,
+  MoreVertical,
+} from "lucide-react";
 
 export interface BoardManagerModalProps {
   open: boolean;
@@ -43,6 +63,7 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
   const [renameValue, setRenameValue] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+  const [isDarkTheme, setIsDarkTheme] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -125,7 +146,6 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
       const nextFolders = folders.filter((f) => f.id !== folderId);
       setFolders(nextFolders);
       saveFolders(nextFolders);
-      // unassign folder from boards
       const nextBoards = boards.map((b) => (b.folderId === folderId ? { ...b, folderId: null } : b));
       setBoards(nextBoards);
       saveBoards(nextBoards);
@@ -185,14 +205,12 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
         return;
       }
 
-      // If onInsertPdfIntoCurrentBoard is provided, insert directly into current board
       if (onInsertPdfIntoCurrentBoard) {
         onInsertPdfIntoCurrentBoard(res.pages);
         onClose();
         return;
       }
 
-      // Fallback: create a new board with PDF pages
       const newId = generateRoomId("pdf");
       const baseName = file.name.replace(/\.[^/.]+$/, "");
       const newBoard: BoardItem = {
@@ -206,9 +224,7 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
       setBoards(next);
       saveBoards(next);
 
-      // Store initial PDF pages in IndexedDB & sessionStorage for Whiteboard to import upon load
       await storePendingPdfPages(newId, res.pages);
-
       onSelectBoard(newId);
       onClose();
     } catch (err) {
@@ -219,34 +235,47 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
 
   if (!open) return null;
 
+  // Theme tokens
+  const bgMain = isDarkTheme ? "#0d0f12" : "#f8fafc";
+  const bgSidebar = isDarkTheme ? "#13171d" : "#ffffff";
+  const bgCard = isDarkTheme ? "#171c24" : "#ffffff";
+  const bgCardHover = isDarkTheme ? "#1d232e" : "#f1f5f9";
+  const borderCol = isDarkTheme ? "#1e242c" : "#e2e8f0";
+  const borderCardCol = isDarkTheme ? "#242c38" : "#e2e8f0";
+  const textPrimary = isDarkTheme ? "#f1f5f9" : "#0f172a";
+  const textSecondary = isDarkTheme ? "#94a3b8" : "#64748b";
+  const activeNavBg = isDarkTheme ? "#222a36" : "#eff6ff";
+  const activeNavText = isDarkTheme ? "#38bdf8" : "#2563eb";
+
   return (
     <div
       data-testid="board-manager-modal"
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "#0d0f12",
-        color: "#f1f5f9",
+        backgroundColor: bgMain,
+        color: textPrimary,
         zIndex: 9999,
         display: "flex",
         flexDirection: "column",
-        fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif",
+        fontFamily: "'Be Vietnam Pro', 'Inter', -apple-system, BlinkMacSystemFont, Roboto, sans-serif",
       }}
     >
       {/* Top Header Bar */}
       <header
         style={{
-          height: 48,
+          height: 52,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 16px",
-          borderBottom: "1px solid #1e242c",
-          backgroundColor: "#0d0f12",
+          padding: "0 20px",
+          borderBottom: `1px solid ${borderCol}`,
+          backgroundColor: bgSidebar,
           flexShrink: 0,
+          boxShadow: isDarkTheme ? "0 1px 3px rgba(0,0,0,0.3)" : "0 1px 3px rgba(0,0,0,0.05)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <button
             type="button"
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -254,24 +283,65 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
             style={{
               background: "none",
               border: "none",
-              color: "#94a3b8",
-              fontSize: 18,
+              color: textSecondary,
               cursor: "pointer",
-              padding: 4,
+              padding: 6,
+              borderRadius: 8,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            ☰
+            <Menu size={18} strokeWidth={1.75} />
           </button>
-          <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em", color: "#e2e8f0" }}>
-            PhysBoard
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 7,
+                backgroundColor: "#2563eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                fontWeight: 800,
+                fontSize: 13,
+              }}
+            >
+              P
+            </div>
+            <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em", color: textPrimary }}>
+              PhysBoard Notes
+            </span>
+          </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {/* Create Note Button */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {/* Theme toggle */}
+          <button
+            type="button"
+            onClick={() => setIsDarkTheme(!isDarkTheme)}
+            title={isDarkTheme ? "Chuyển sang giao diện Sáng" : "Chuyển sang giao diện Tối"}
+            style={{
+              background: isDarkTheme ? "#1e242c" : "#f1f5f9",
+              border: `1px solid ${borderCol}`,
+              color: textSecondary,
+              padding: "6px 10px",
+              borderRadius: 8,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              fontWeight: 500,
+            }}
+          >
+            {isDarkTheme ? <Sun size={14} strokeWidth={1.75} /> : <Moon size={14} strokeWidth={1.75} />}
+            <span>{isDarkTheme ? "Sáng" : "Tối"}</span>
+          </button>
+
+          {/* Create Board Button */}
           <button
             type="button"
             onClick={handleCreateNewBoard}
@@ -282,15 +352,16 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
               background: "#2563eb",
               border: "none",
               color: "#ffffff",
-              padding: "6px 14px",
-              borderRadius: 6,
-              fontSize: 12.5,
+              padding: "7px 16px",
+              borderRadius: 8,
+              fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(37,99,235,0.3)",
+              boxShadow: "0 2px 10px rgba(37,99,235,0.28)",
+              transition: "all 0.15s ease",
             }}
           >
-            <span>📝</span>
+            <Plus size={15} strokeWidth={2} />
             <span>Tạo bảng mới</span>
           </button>
 
@@ -302,17 +373,18 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
               display: "flex",
               alignItems: "center",
               gap: 6,
-              background: "transparent",
-              border: "1px solid #334155",
-              color: "#cbd5e1",
-              padding: "5px 12px",
-              borderRadius: 6,
-              fontSize: 12.5,
+              background: isDarkTheme ? "#1a2028" : "#ffffff",
+              border: `1px solid ${isDarkTheme ? "#334155" : "#cbd5e1"}`,
+              color: textPrimary,
+              padding: "6px 14px",
+              borderRadius: 8,
+              fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           >
-            <span>📄</span>
+            <FileUp size={15} strokeWidth={1.75} />
             <span>Chèn PDF</span>
           </button>
           <input
@@ -323,6 +395,8 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
             onChange={handleImportPdf}
           />
 
+          <div style={{ width: 1, height: 20, backgroundColor: borderCol, margin: "0 4px" }} />
+
           {/* Close button */}
           <button
             type="button"
@@ -331,14 +405,16 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
             style={{
               background: "none",
               border: "none",
-              color: "#94a3b8",
-              fontSize: 18,
+              color: textSecondary,
               cursor: "pointer",
-              padding: "4px 8px",
-              marginLeft: 4,
+              padding: 6,
+              borderRadius: 8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            ✕
+            <X size={18} strokeWidth={1.75} />
           </button>
         </div>
       </header>
@@ -349,12 +425,12 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
         {!isSidebarCollapsed && (
           <aside
             style={{
-              width: 220,
-              backgroundColor: "#13171d",
-              borderRight: "1px solid #1e242c",
+              width: 240,
+              backgroundColor: bgSidebar,
+              borderRight: `1px solid ${borderCol}`,
               display: "flex",
               flexDirection: "column",
-              padding: "16px 8px",
+              padding: "16px 12px",
               flexShrink: 0,
             }}
           >
@@ -369,21 +445,36 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 10,
+                  justifyContent: "space-between",
                   width: "100%",
                   padding: "9px 12px",
-                  borderRadius: 6,
+                  borderRadius: 8,
                   border: "none",
-                  backgroundColor: activeSection === "all" ? "#222a36" : "transparent",
-                  color: activeSection === "all" ? "#ffffff" : "#94a3b8",
-                  fontSize: 13,
+                  backgroundColor: activeSection === "all" ? activeNavBg : "transparent",
+                  color: activeSection === "all" ? activeNavText : textSecondary,
+                  fontSize: 13.5,
                   fontWeight: activeSection === "all" ? 600 : 500,
                   cursor: "pointer",
                   textAlign: "left",
+                  transition: "all 0.15s ease",
                 }}
               >
-                <span>📋</span>
-                <span>Tất cả bảng ({boards.filter((b) => !b.trashed).length})</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <FileText size={16} strokeWidth={1.75} />
+                  <span>Tất cả bảng</span>
+                </div>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    padding: "2px 7px",
+                    borderRadius: 999,
+                    backgroundColor: isDarkTheme ? "#1e242c" : "#e2e8f0",
+                    color: textSecondary,
+                    fontWeight: 600,
+                  }}
+                >
+                  {boards.filter((b) => !b.trashed).length}
+                </span>
               </button>
 
               {/* Trash */}
@@ -396,24 +487,39 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 10,
+                  justifyContent: "space-between",
                   width: "100%",
                   padding: "9px 12px",
-                  borderRadius: 6,
+                  borderRadius: 8,
                   border: "none",
-                  backgroundColor: activeSection === "trash" ? "#222a36" : "transparent",
-                  color: activeSection === "trash" ? "#ffffff" : "#94a3b8",
-                  fontSize: 13,
+                  backgroundColor: activeSection === "trash" ? activeNavBg : "transparent",
+                  color: activeSection === "trash" ? activeNavText : textSecondary,
+                  fontSize: 13.5,
                   fontWeight: activeSection === "trash" ? 600 : 500,
                   cursor: "pointer",
                   textAlign: "left",
+                  transition: "all 0.15s ease",
                 }}
               >
-                <span>🗑️</span>
-                <span>Thùng rác ({boards.filter((b) => b.trashed).length})</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Trash2 size={16} strokeWidth={1.75} />
+                  <span>Thùng rác</span>
+                </div>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    padding: "2px 7px",
+                    borderRadius: 999,
+                    backgroundColor: isDarkTheme ? "#1e242c" : "#e2e8f0",
+                    color: textSecondary,
+                    fontWeight: 600,
+                  }}
+                >
+                  {boards.filter((b) => b.trashed).length}
+                </span>
               </button>
 
-              <div style={{ height: 1, backgroundColor: "#1e242c", margin: "10px 4px" }} />
+              <div style={{ height: 1, backgroundColor: borderCol, margin: "10px 4px" }} />
 
               {/* Folders Section Header */}
               <div
@@ -424,7 +530,15 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                   padding: "4px 8px 6px 8px",
                 }}
               >
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: textSecondary,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                  }}
+                >
                   Thư mục ({folders.length})
                 </span>
                 <button
@@ -435,19 +549,20 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                     background: "none",
                     border: "none",
                     color: "#38bdf8",
-                    fontSize: 15,
                     cursor: "pointer",
-                    padding: 0,
-                    lineHeight: 1,
+                    padding: 3,
+                    borderRadius: 6,
+                    display: "flex",
+                    alignItems: "center",
                   }}
                 >
-                  +
+                  <FolderPlus size={15} strokeWidth={1.75} />
                 </button>
               </div>
 
               {/* Add folder input */}
               {showNewFolderInput && (
-                <div style={{ padding: "4px 8px", display: "flex", gap: 4 }}>
+                <div style={{ padding: "4px 8px", display: "flex", gap: 6 }}>
                   <input
                     type="text"
                     value={newFolderName}
@@ -460,13 +575,12 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                     }}
                     style={{
                       flex: 1,
-                      height: 26,
-                      background: "#1e242c",
-                      border: "1px solid #3b82f6",
-                      borderRadius: 4,
-                      color: "#ffffff",
+                      backgroundColor: isDarkTheme ? "#0d0f12" : "#ffffff",
+                      border: "1px solid #38bdf8",
+                      borderRadius: 6,
+                      padding: "4px 8px",
+                      color: textPrimary,
                       fontSize: 12,
-                      padding: "0 6px",
                       outline: "none",
                     }}
                   />
@@ -474,22 +588,23 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                     type="button"
                     onClick={handleCreateFolder}
                     style={{
-                      background: "#2563eb",
-                      border: "none",
-                      borderRadius: 4,
+                      backgroundColor: "#2563eb",
                       color: "#ffffff",
-                      fontSize: 11,
-                      padding: "0 6px",
+                      border: "none",
+                      borderRadius: 6,
+                      padding: "4px 8px",
+                      fontSize: 12,
+                      fontWeight: 600,
                       cursor: "pointer",
                     }}
                   >
-                    ✓
+                    Lưu
                   </button>
                 </div>
               )}
 
-              {/* Folders list */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
+              {/* Folder List */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, overflowY: "auto" }}>
                 {folders.map((folder) => {
                   const isSelected = activeSection === "folder" && selectedFolderId === folder.id;
                   const count = boards.filter((b) => !b.trashed && b.folderId === folder.id).length;
@@ -504,22 +619,34 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "7px 10px",
-                        borderRadius: 6,
-                        backgroundColor: isSelected ? "#222a36" : "transparent",
-                        color: isSelected ? "#ffffff" : "#94a3b8",
-                        fontSize: 12.5,
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        backgroundColor: isSelected ? activeNavBg : "transparent",
+                        color: isSelected ? activeNavText : textSecondary,
+                        fontSize: 13,
+                        fontWeight: isSelected ? 600 : 500,
                         cursor: "pointer",
+                        transition: "all 0.15s ease",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
-                        <span>📁</span>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
+                        <Folder size={15} strokeWidth={1.75} color={isSelected ? "#38bdf8" : "#f59e0b"} />
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {folder.name}
                         </span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontSize: 11, color: "#64748b" }}>{count}</span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            padding: "1px 6px",
+                            borderRadius: 999,
+                            backgroundColor: isDarkTheme ? "#1e242c" : "#e2e8f0",
+                            color: textSecondary,
+                          }}
+                        >
+                          {count}
+                        </span>
                         <button
                           type="button"
                           onClick={(e) => handleDeleteFolder(folder.id, e)}
@@ -527,13 +654,13 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                           style={{
                             background: "none",
                             border: "none",
-                            color: "#64748b",
+                            color: textSecondary,
                             cursor: "pointer",
-                            padding: 0,
-                            fontSize: 11,
+                            padding: 2,
+                            display: "flex",
                           }}
                         >
-                          ✕
+                          <X size={12} strokeWidth={2} />
                         </button>
                       </div>
                     </div>
@@ -555,17 +682,18 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                   gap: 10,
                   width: "100%",
                   padding: "10px 12px",
-                  borderRadius: 6,
+                  borderRadius: 8,
                   border: "none",
                   backgroundColor: "transparent",
-                  color: "#94a3b8",
-                  fontSize: 12.5,
+                  color: textSecondary,
+                  fontSize: 13,
                   cursor: "pointer",
-                  borderTop: "1px solid #1e242c",
+                  borderTop: `1px solid ${borderCol}`,
                   marginTop: "auto",
+                  transition: "all 0.15s ease",
                 }}
               >
-                <span>⚙️</span>
+                <Settings size={16} strokeWidth={1.75} />
                 <span>Cài đặt hệ thống</span>
               </button>
             )}
@@ -576,11 +704,11 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
         <main
           style={{
             flex: 1,
-            backgroundColor: "#0d0f12",
+            backgroundColor: bgMain,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            padding: "20px 28px",
+            padding: "24px 32px",
           }}
         >
           {/* Main Title & Search Header */}
@@ -589,61 +717,69 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              marginBottom: 20,
+              marginBottom: 24,
               gap: 16,
               flexWrap: "wrap",
             }}
           >
             <div>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#f8fafc" }}>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: textPrimary, letterSpacing: "-0.02em" }}>
                 {activeSection === "all"
                   ? "Tất cả bảng vẽ"
                   : activeSection === "trash"
                   ? "Thùng rác"
                   : folders.find((f) => f.id === selectedFolderId)?.name || "Thư mục"}
               </h2>
-              <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                {filteredBoards.length} bảng
-              </div>
+              <p style={{ margin: "4px 0 0 0", fontSize: 13, color: textSecondary }}>
+                {activeSection === "trash"
+                  ? "Các bảng vẽ đã xóa. Bạn có thể khôi phục hoặc xóa hẳn."
+                  : `Tổng cộng ${filteredBoards.length} bảng ghi chú & bài giảng.`}
+              </p>
             </div>
 
-            {/* Search Input */}
-            <div style={{ position: "relative", minWidth: 220 }}>
+            {/* Search bar */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: bgSidebar,
+                border: `1px solid ${borderCol}`,
+                borderRadius: 10,
+                padding: "8px 14px",
+                width: 260,
+                boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+              }}
+            >
+              <Search size={15} strokeWidth={1.75} color={textSecondary} />
               <input
                 type="text"
+                placeholder="Tìm kiếm bảng vẽ..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm bảng..."
                 style={{
-                  width: "100%",
-                  height: 34,
-                  backgroundColor: "#161b22",
-                  border: "1px solid #28303d",
-                  borderRadius: 6,
-                  padding: "0 10px 0 30px",
-                  color: "#e2e8f0",
-                  fontSize: 12.5,
+                  background: "transparent",
+                  border: "none",
                   outline: "none",
-                  boxSizing: "border-box",
+                  color: textPrimary,
+                  fontSize: 13,
+                  width: "100%",
                 }}
               />
-              <span style={{ position: "absolute", left: 9, top: 8, fontSize: 13, color: "#64748b" }}>🔍</span>
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
                   style={{
-                    position: "absolute",
-                    right: 8,
-                    top: 8,
                     background: "none",
                     border: "none",
-                    color: "#94a3b8",
+                    color: textSecondary,
                     cursor: "pointer",
-                    fontSize: 12,
+                    padding: 0,
+                    display: "flex",
                   }}
                 >
-                  ✕
+                  <X size={14} strokeWidth={2} />
                 </button>
               )}
             </div>
@@ -655,9 +791,10 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
               flex: 1,
               overflowY: "auto",
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-              gap: 16,
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: 18,
               alignContent: "start",
+              paddingBottom: 20,
             }}
           >
             {/* Create new card shortcut */}
@@ -665,43 +802,42 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
               <div
                 onClick={handleCreateNewBoard}
                 style={{
-                  height: 140,
-                  backgroundColor: "#13171d",
-                  border: "1px dashed #334155",
-                  borderRadius: 10,
+                  height: 150,
+                  backgroundColor: isDarkTheme ? "#13171d" : "#ffffff",
+                  border: `1.5px dashed ${isDarkTheme ? "#334155" : "#cbd5e1"}`,
+                  borderRadius: 14,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: 8,
+                  gap: 10,
                   cursor: "pointer",
-                  transition: "all 0.15s ease",
+                  transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = "#38bdf8";
-                  e.currentTarget.style.backgroundColor = "#1a202c";
+                  e.currentTarget.style.backgroundColor = isDarkTheme ? "#1a222d" : "#f0f9ff";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "#334155";
-                  e.currentTarget.style.backgroundColor = "#13171d";
+                  e.currentTarget.style.borderColor = isDarkTheme ? "#334155" : "#cbd5e1";
+                  e.currentTarget.style.backgroundColor = isDarkTheme ? "#13171d" : "#ffffff";
                 }}
               >
                 <div
                   style={{
-                    width: 38,
-                    height: 38,
+                    width: 42,
+                    height: 42,
                     borderRadius: "50%",
-                    backgroundColor: "#1e293b",
+                    backgroundColor: isDarkTheme ? "#1e293b" : "#e0f2fe",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 18,
-                    color: "#38bdf8",
+                    color: "#0284c7",
                   }}
                 >
-                  +
+                  <Plus size={22} strokeWidth={2} />
                 </div>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: "#94a3b8" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: textSecondary }}>
                   Tạo bảng mới
                 </span>
               </div>
@@ -725,44 +861,56 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                     onClose();
                   }}
                   style={{
-                    height: 140,
-                    backgroundColor: "#161b22",
-                    border: isCurrent ? "1.5px solid #2563eb" : "1px solid #262e3b",
-                    borderRadius: 10,
-                    padding: "12px 14px",
+                    height: 150,
+                    backgroundColor: bgCard,
+                    border: isCurrent
+                      ? "2px solid #2563eb"
+                      : `1px solid ${borderCardCol}`,
+                    borderRadius: 14,
+                    padding: "14px 16px",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "space-between",
                     cursor: activeSection === "trash" ? "default" : "pointer",
                     position: "relative",
-                    transition: "all 0.15s ease",
+                    boxShadow: isDarkTheme ? "0 2px 8px rgba(0,0,0,0.2)" : "0 2px 8px rgba(0,0,0,0.04)",
+                    transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                   }}
                   onMouseEnter={(e) => {
                     if (activeSection !== "trash") {
-                      e.currentTarget.style.backgroundColor = "#1c232d";
-                      e.currentTarget.style.borderColor = isCurrent ? "#3b82f6" : "#475569";
+                      e.currentTarget.style.backgroundColor = bgCardHover;
+                      e.currentTarget.style.borderColor = isCurrent ? "#3b82f6" : "#64748b";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = isDarkTheme
+                        ? "0 8px 20px rgba(0,0,0,0.35)"
+                        : "0 8px 20px rgba(0,0,0,0.08)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (activeSection !== "trash") {
-                      e.currentTarget.style.backgroundColor = "#161b22";
-                      e.currentTarget.style.borderColor = isCurrent ? "#2563eb" : "#262e3b";
+                      e.currentTarget.style.backgroundColor = bgCard;
+                      e.currentTarget.style.borderColor = isCurrent ? "#2563eb" : borderCardCol;
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = isDarkTheme
+                        ? "0 2px 8px rgba(0,0,0,0.2)"
+                        : "0 2px 8px rgba(0,0,0,0.04)";
                     }
                   }}
                 >
                   {/* Top card indicator */}
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 16 }}>📋</span>
+                      <FileText size={16} strokeWidth={1.75} color={isCurrent ? "#3b82f6" : textSecondary} />
                       {isCurrent && (
                         <span
                           style={{
-                            fontSize: 10,
-                            padding: "2px 6px",
-                            backgroundColor: "#1d4ed8",
+                            fontSize: 10.5,
+                            padding: "2px 7px",
+                            backgroundColor: "#2563eb",
                             color: "#ffffff",
-                            borderRadius: 4,
+                            borderRadius: 6,
                             fontWeight: 700,
+                            letterSpacing: "0.02em",
                           }}
                         >
                           Đang mở
@@ -781,13 +929,14 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                             style={{
                               background: "none",
                               border: "none",
-                              color: "#64748b",
+                              color: textSecondary,
                               cursor: "pointer",
-                              padding: 2,
-                              fontSize: 12,
+                              padding: 4,
+                              borderRadius: 6,
+                              display: "flex",
                             }}
                           >
-                            ✏️
+                            <Edit2 size={13} strokeWidth={1.75} />
                           </button>
                           <button
                             type="button"
@@ -796,13 +945,14 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                             style={{
                               background: "none",
                               border: "none",
-                              color: "#64748b",
+                              color: textSecondary,
                               cursor: "pointer",
-                              padding: 2,
-                              fontSize: 12,
+                              padding: 4,
+                              borderRadius: 6,
+                              display: "flex",
                             }}
                           >
-                            🗑️
+                            <Trash2 size={13} strokeWidth={1.75} />
                           </button>
                         </>
                       ) : (
@@ -812,32 +962,42 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                             onClick={(e) => handleRestoreBoard(board.id, e)}
                             title="Khôi phục lại bảng"
                             style={{
-                              background: "#1e293b",
-                              border: "1px solid #334155",
-                              color: "#38bdf8",
+                              background: isDarkTheme ? "#1e293b" : "#f1f5f9",
+                              border: `1px solid ${borderCol}`,
+                              color: "#0284c7",
                               cursor: "pointer",
-                              padding: "2px 6px",
-                              borderRadius: 4,
-                              fontSize: 11,
+                              padding: "3px 8px",
+                              borderRadius: 6,
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
                             }}
                           >
-                            Khôi phục
+                            <RotateCcw size={12} strokeWidth={2} />
+                            <span>Khôi phục</span>
                           </button>
                           <button
                             type="button"
                             onClick={(e) => handlePermanentDelete(board.id, e)}
                             title="Xóa vĩnh viễn"
                             style={{
-                              background: "#450a0a",
-                              border: "1px solid #991b1b",
-                              color: "#f87171",
+                              background: isDarkTheme ? "#450a0a" : "#fee2e2",
+                              border: "1px solid #ef4444",
+                              color: "#dc2626",
                               cursor: "pointer",
-                              padding: "2px 6px",
-                              borderRadius: 4,
-                              fontSize: 11,
+                              padding: "3px 8px",
+                              borderRadius: 6,
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
                             }}
                           >
-                            Xóa hẳn
+                            <Trash2 size={12} strokeWidth={2} />
+                            <span>Xóa hẳn</span>
                           </button>
                         </>
                       )}
@@ -850,8 +1010,9 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                       <input
                         type="text"
                         value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
                         autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={() => handleSaveRename(board.id)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleSaveRename(board.id);
@@ -859,60 +1020,86 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                         }}
                         style={{
                           width: "100%",
-                          background: "#0d0f12",
-                          border: "1px solid #3b82f6",
-                          color: "#ffffff",
-                          fontSize: 13,
+                          backgroundColor: isDarkTheme ? "#0d0f12" : "#ffffff",
+                          border: "1.5px solid #2563eb",
+                          borderRadius: 6,
+                          color: textPrimary,
+                          fontSize: 14,
                           fontWeight: 600,
-                          borderRadius: 4,
-                          padding: "2px 6px",
+                          padding: "4px 8px",
                           outline: "none",
-                          boxSizing: "border-box",
                         }}
                       />
                     ) : (
                       <div
                         style={{
-                          fontSize: 13.5,
+                          fontSize: 14.5,
                           fontWeight: 600,
-                          color: "#f1f5f9",
+                          color: textPrimary,
+                          whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
                         }}
+                        title={board.name}
                       >
                         {board.name}
                       </div>
                     )}
+                    <div
+                      style={{
+                        fontSize: 11.5,
+                        color: textSecondary,
+                        marginTop: 4,
+                        fontFamily: "monospace",
+                        opacity: 0.8,
+                      }}
+                    >
+                      ID: {board.id}
+                    </div>
                   </div>
 
-                  {/* Bottom details: date */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "#64748b" }}>
-                    <span>{dateStr}</span>
-                    <span style={{ fontSize: 10 }}>{board.id.slice(0, 8)}</span>
+                  {/* Card Footer: Folder badge & Date */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      fontSize: 11.5,
+                      color: textSecondary,
+                      borderTop: `1px solid ${borderCol}`,
+                      paddingTop: 8,
+                      marginTop: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      {board.folderId ? (
+                        <span
+                          style={{
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            backgroundColor: isDarkTheme ? "#1e293b" : "#f1f5f9",
+                            fontSize: 10.5,
+                            color: textSecondary,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 3,
+                          }}
+                        >
+                          <Folder size={11} strokeWidth={2} />
+                          {folders.find((f) => f.id === board.folderId)?.name || "Thư mục"}
+                        </span>
+                      ) : (
+                        <span>Mặc định</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <Clock size={11} strokeWidth={1.75} />
+                      <span>{dateStr}</span>
+                    </div>
                   </div>
                 </div>
               );
             })}
-
-            {filteredBoards.length === 0 && (
-              <div
-                style={{
-                  gridColumn: "1 / -1",
-                  textAlign: "center",
-                  padding: "48px 0",
-                  color: "#64748b",
-                }}
-              >
-                <div style={{ fontSize: 28, marginBottom: 8 }}>📂</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8" }}>Không có bảng nào</div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>
-                  {activeSection === "trash"
-                    ? "Thùng rác trống"
-                    : "Bấm 'Tạo bảng mới' hoặc 'Chèn PDF' ở trên để bắt đầu"}
-                </div>
-              </div>
-            )}
           </div>
         </main>
       </div>
