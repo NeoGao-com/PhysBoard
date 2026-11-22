@@ -7245,7 +7245,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                   (selectedElements[0].type === "Slider" ||
                     selectedElements[0].type === "Solid3D" ||
                     selectedElements[0].type === "VarTable" ||
-                    selectedElements[0].type === "HtmlSim"))
+                    selectedElements[0].type === "HtmlSim" ||
+                    selectedElements[0].type === "GeomSegment" ||
+                    selectedElements[0].type === "LineDecor"))
               }
               onHandlePointerDown={handleHandlePointerDown}
               onBoxPointerDown={handleBoxPointerDown}
@@ -7522,10 +7524,30 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     />
   );
 
-  const selectedSegment =
-    selectedElements.length === 1 && selectedElements[0].type === "GeomSegment"
+  const selectedLineDecor =
+    selectedElements.length === 1 && selectedElements[0].type === "LineDecor"
       ? selectedElements[0]
       : null;
+
+  const selectedSegment = (() => {
+    if (selectedElements.length !== 1) return null;
+    const sel = selectedElements[0];
+    if (sel.type === "GeomSegment") return sel;
+    if (sel.type === "LineDecor" && typeof sel.props?.target === "string") {
+      const target = byId.get(sel.props.target);
+      if (target && target.type === "GeomSegment") return target;
+    }
+    return null;
+  })();
+
+  const attachedSegmentDecors = selectedSegment
+    ? pageElements.filter(
+        (el) =>
+          !el.style?.hidden &&
+          el.type === "LineDecor" &&
+          el.props?.target === selectedSegment.id
+      )
+    : [];
 
   return (
     <div
@@ -8068,6 +8090,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             padding: "5px 8px",
             display: "flex",
             flexWrap: "wrap",
+            alignItems: "center",
             gap: 6,
             boxShadow: "0 4px 14px rgba(15, 23, 42, 0.12)",
             fontSize: 12,
@@ -8075,42 +8098,145 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         >
           {(
             [
-              { kind: "dim", label: "📏 Kích thước", text: "a" },
-              { kind: "label", label: "🏷 Ghi chữ", text: "cạnh" },
-              { kind: "ground", label: "▨ Mặt đất", text: "" },
-              { kind: "water", label: "〰 Mặt nước", text: "" },
+              { kind: "dim", label: "📏 Kích thước", text: "a", defaultSide: 1 as const },
+              { kind: "label", label: "🏷 Ghi chữ", text: "cạnh", defaultSide: 1 as const },
+              { kind: "ground", label: "▨ Mặt đất", text: "", defaultSide: -1 as const },
+              { kind: "water", label: "〰 Mặt nước", text: "", defaultSide: -1 as const },
             ] as const
-          ).map((d) => (
-            <button
-              key={d.kind}
-              type="button"
-              onClick={() => {
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    type: "LineDecor",
-                    props: {
-                      target: selectedSegment.id,
-                      kind: d.kind,
-                      side: 1,
-                      ...(d.text ? { text: d.text } : {}),
-                    },
-                  },
-                });
-              }}
-              style={{
-                padding: "4px 8px",
-                borderRadius: 6,
-                border: "1px solid #e2e8f0",
-                background: "#f8fafc",
-                color: "#1e293b",
-                cursor: "pointer",
-                fontWeight: 500,
-              }}
-            >
-              {d.label}
-            </button>
-          ))}
+          ).map((d) => {
+            const matchingDecors = attachedSegmentDecors.filter(
+              (el) => el.props?.kind === d.kind
+            );
+            const isActive = matchingDecors.length > 0;
+            return (
+              <button
+                key={d.kind}
+                type="button"
+                data-decor-kind={d.kind}
+                data-active={isActive ? "true" : "false"}
+                aria-pressed={isActive}
+                title={
+                  isActive
+                    ? `Bấm để xoá trang trí ${d.label}`
+                    : `Thêm trang trí ${d.label}`
+                }
+                onClick={() => {
+                  if (isActive) {
+                    const deleteIds = matchingDecors.map((el) => el.id);
+                    dispatcher.deleteObjects(deleteIds);
+                    if (
+                      selectedLineDecor &&
+                      deleteIds.includes(selectedLineDecor.id)
+                    ) {
+                      setSelectedIds([selectedSegment.id]);
+                    }
+                  } else {
+                    dispatcher.dispatch({
+                      type: "object.create",
+                      params: {
+                        type: "LineDecor",
+                        props: {
+                          target: selectedSegment.id,
+                          kind: d.kind,
+                          side: d.defaultSide,
+                          ...(d.text ? { text: d.text } : {}),
+                        },
+                      },
+                    });
+                  }
+                }}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: isActive ? "1px solid #3b82f6" : "1px solid #e2e8f0",
+                  background: isActive ? "#eff6ff" : "#f8fafc",
+                  color: isActive ? "#1d4ed8" : "#1e293b",
+                  cursor: "pointer",
+                  fontWeight: isActive ? 600 : 500,
+                }}
+              >
+                {d.label}
+              </button>
+            );
+          })}
+          {attachedSegmentDecors.length > 0 && (
+            <>
+              <div
+                style={{
+                  width: 1,
+                  alignSelf: "stretch",
+                  background: "#e2e8f0",
+                  margin: "2px 0",
+                }}
+              />
+              <button
+                type="button"
+                data-action="line-decor-flip"
+                title="Đảo mặt trang trí giữa mặt trên và mặt dưới đoạn thẳng"
+                onClick={() => {
+                  const targets = selectedLineDecor
+                    ? [selectedLineDecor]
+                    : attachedSegmentDecors;
+                  dispatcher.batch(() => {
+                    for (const decor of targets) {
+                      const kindVal = decor.props?.kind as string | undefined;
+                      const defSide: 1 | -1 =
+                        kindVal === "ground" || kindVal === "water" ? -1 : 1;
+                      const curSide: 1 | -1 =
+                        decor.props?.side === -1
+                          ? -1
+                          : decor.props?.side === 1
+                            ? 1
+                            : defSide;
+                      const nextSide: 1 | -1 = curSide === 1 ? -1 : 1;
+                      dispatcher.dispatch({
+                        type: "object.update",
+                        params: {
+                          id: decor.id,
+                          props: { ...decor.props, side: nextSide },
+                        },
+                      });
+                    }
+                  });
+                }}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  background: "#f8fafc",
+                  color: "#334155",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                }}
+              >
+                ⇅ Đổi mặt
+              </button>
+              <button
+                type="button"
+                data-action="line-decor-clear"
+                title="Xoá toàn bộ trang trí trên đoạn thẳng này"
+                onClick={() => {
+                  dispatcher.deleteObjects(
+                    attachedSegmentDecors.map((el) => el.id)
+                  );
+                  if (selectedLineDecor) {
+                    setSelectedIds([selectedSegment.id]);
+                  }
+                }}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #fecaca",
+                  background: "#fef2f2",
+                  color: "#dc2626",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                🗑 Xoá trang trí
+              </button>
+            </>
+          )}
         </div>
       )}
 

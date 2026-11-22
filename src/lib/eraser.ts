@@ -305,6 +305,77 @@ export function checkEraserCollision(
             cursorWorld.y <= box.maxY + objectThreshold;
         }
       }
+    } else if (el.type === "LineDecor") {
+      const target =
+        typeof el.props?.target === "string"
+          ? byId.get(el.props.target)
+          : undefined;
+      const ends = target ? resolveLineEndpoints(target, solved.pts, byId) : null;
+      if (ends) {
+        const [a, b] = ends;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const len = Math.hypot(dx, dy);
+        if (len > 1e-9) {
+          const ux = dx / len;
+          const uy = dy / len;
+          let n0x = -uy;
+          let n0y = ux;
+          if (n0y < -1e-5 || (Math.abs(n0y) <= 1e-5 && n0x < 0)) {
+            n0x = -n0x;
+            n0y = -n0y;
+          }
+          const kind = el.props?.kind as string | undefined;
+          const defSide: 1 | -1 = kind === "ground" || kind === "water" ? -1 : 1;
+          const side: 1 | -1 =
+            el.props?.side === -1 ? -1 : el.props?.side === 1 ? 1 : defSide;
+          const nx = n0x * side;
+          const ny = n0y * side;
+          const offset =
+            typeof el.props?.offset === "number"
+              ? el.props.offset
+              : kind === "dim"
+                ? 0.6
+                : kind === "label"
+                  ? 0.28
+                  : kind === "water"
+                    ? 0.24
+                    : 0.11;
+          const p1 = { x: a.x + nx * offset, y: a.y + ny * offset };
+          const p2 = { x: b.x + nx * offset, y: b.y + ny * offset };
+          if (kind === "label") {
+            const midX = (p1.x + p2.x) / 2;
+            const midY = (p1.y + p2.y) / 2;
+            isHit =
+              Math.hypot(cursorWorld.x - midX, cursorWorld.y - midY) <=
+              objectThreshold + 0.2;
+          } else {
+            const bandPad = kind === "ground" || kind === "water" ? 0.16 : 0;
+            isHit =
+              pointToSegmentDistance(
+                cursorWorld.x,
+                cursorWorld.y,
+                p1.x,
+                p1.y,
+                p2.x,
+                p2.y
+              ) <=
+              objectThreshold + bandPad;
+          }
+        }
+      } else {
+        const box = getElementBoundingBox(el, {
+          solved,
+          byId,
+          allElements: elements,
+          viewScale: safeScale,
+        });
+        isHit =
+          cursorWorld.x >= box.minX - objectThreshold &&
+          cursorWorld.x <= box.maxX + objectThreshold &&
+          cursorWorld.y >= box.minY - objectThreshold &&
+          cursorWorld.y <= box.maxY + objectThreshold;
+      }
     } else {
       const box = getElementBoundingBox(el, {
         solved,

@@ -205,9 +205,26 @@ function unitBasis(a: Point2D, b: Point2D, side: number) {
   if (len < 1e-9) return null;
   const ux = dx / len;
   const uy = dy / len;
-  const nx = -uy * side;
-  const ny = ux * side;
-  return { u: { x: ux, y: uy }, n: { x: nx, y: ny }, len };
+  // Canonical tangent (left-to-right; bottom-to-top if vertical)
+  const flipT = ux < -1e-5 || (Math.abs(ux) <= 1e-5 && uy < 0);
+  const tx = flipT ? -ux : ux;
+  const ty = flipT ? -uy : uy;
+  // Canonical upward normal in math world (+y up, or +x right if vertical)
+  let n0x = -uy;
+  let n0y = ux;
+  if (n0y < -1e-5 || (Math.abs(n0y) <= 1e-5 && n0x < 0)) {
+    n0x = -n0x;
+    n0y = -n0y;
+  }
+  const nx = n0x * side;
+  const ny = n0y * side;
+  return {
+    u: { x: ux, y: uy },
+    t: { x: tx, y: ty },
+    n: { x: nx, y: ny },
+    len,
+    flipT,
+  };
 }
 
 /**
@@ -224,7 +241,13 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
     typeof element.props?.target === "string" ? element.props.target : "";
   const kind =
     (element.props?.kind as "ground" | "water" | "dim" | "label") ?? "ground";
-  const side: 1 | -1 = element.props?.side === -1 ? -1 : 1;
+  const defaultSide: 1 | -1 = kind === "ground" || kind === "water" ? -1 : 1;
+  const side: 1 | -1 =
+    element.props?.side === -1
+      ? -1
+      : element.props?.side === 1
+        ? 1
+        : defaultSide;
   const text = typeof element.props?.text === "string" ? element.props.text : "";
   const offset =
     typeof element.props?.offset === "number"
@@ -241,8 +264,20 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
       const pts = resolvePointCoords(allElements);
       const fromId = String(seg.props?.from ?? "");
       const toId = String(seg.props?.to ?? "");
-      const pa = points?.get(fromId) ?? pts.get(fromId);
-      const pb = points?.get(toId) ?? pts.get(toId);
+      const fromPtInline = seg.props?.fromPt as Point2D | undefined;
+      const toPtInline = seg.props?.toPt as Point2D | undefined;
+      const pa =
+        points?.get(fromId) ??
+        pts.get(fromId) ??
+        (fromPtInline && typeof fromPtInline.x === "number" && typeof fromPtInline.y === "number"
+          ? { x: fromPtInline.x + seg.transform.x, y: fromPtInline.y + seg.transform.y }
+          : undefined);
+      const pb =
+        points?.get(toId) ??
+        pts.get(toId) ??
+        (toPtInline && typeof toPtInline.x === "number" && typeof toPtInline.y === "number"
+          ? { x: toPtInline.x + seg.transform.x, y: toPtInline.y + seg.transform.y }
+          : undefined);
       if (pa && pb) return { a: pa, b: pb };
     }
     return {
@@ -254,6 +289,8 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
   const basis = useMemo(() => unitBasis(a, b, side), [a, b, side]);
   if (!basis) return null;
 
+  const pStart = basis.flipT ? b : a;
+  const pEnd = basis.flipT ? a : b;
   const strokeColor = isSelected ? "#f59e0b" : (element.style?.stroke ?? "#334155");
 
   if (kind === "ground") {
@@ -263,13 +300,14 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
     const hatchLen = 0.22;
     const dParts: string[] = [];
     for (let i = 1; i <= count; i++) {
-      const px = a.x + basis.u.x * i * spacing;
-      const py = a.y + basis.u.y * i * spacing;
-      const qx = px + (basis.n.x - basis.u.x) * hatchLen;
-      const qy = py + (basis.n.y - basis.u.y) * hatchLen;
+      const px = pStart.x + basis.t.x * i * spacing;
+      const py = pStart.y + basis.t.y * i * spacing;
+      const qx = px + (basis.n.x - basis.t.x * 0.85) * hatchLen;
+      const qy = py + (basis.n.y - basis.t.y * 0.85) * hatchLen;
       dParts.push(`M${px.toFixed(4)},${(-py).toFixed(4)}L${qx.toFixed(4)},${(-qy).toFixed(4)}`);
     }
     const d = dParts.join(" ");
+    const hitMidOff = hatchLen * 0.72;
     return (
       <g
         data-id={element.id}
@@ -277,15 +315,18 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
         data-element-type="LineDecor"
         data-wb-type="LineDecor"
         data-wb-decor="ground"
+        data-selected={isSelected ? "true" : undefined}
         className="wb-line-decor"
         onPointerDown={onPointerDown}
         style={{ cursor: "pointer" }}
       >
-        <path
-          d={d}
-          fill="none"
+        <line
+          x1={pStart.x + basis.n.x * hitMidOff}
+          y1={-(pStart.y + basis.n.y * hitMidOff)}
+          x2={pEnd.x + basis.n.x * hitMidOff}
+          y2={-(pEnd.y + basis.n.y * hitMidOff)}
           stroke="rgba(0,0,0,0.001)"
-          strokeWidth={12}
+          strokeWidth={10}
           vectorEffect="non-scaling-stroke"
         />
         <path
@@ -315,8 +356,8 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
         const off =
           (row + 1) * rowOffset +
           amp * Math.sin(((dist - startDist) / waveLen) * Math.PI * 2);
-        const wx = a.x + basis.u.x * dist + basis.n.x * off;
-        const wy = a.y + basis.u.y * dist + basis.n.y * off;
+        const wx = pStart.x + basis.t.x * dist + basis.n.x * off;
+        const wy = pStart.y + basis.t.y * dist + basis.n.y * off;
         pts.push(`${i === 0 ? "M" : "L"}${wx.toFixed(4)},${(-wy).toFixed(4)}`);
       }
       paths.push(pts.join(" "));
@@ -329,6 +370,7 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
         data-element-type="LineDecor"
         data-wb-type="LineDecor"
         data-wb-decor="water"
+        data-selected={isSelected ? "true" : undefined}
         className="wb-line-decor"
         onPointerDown={onPointerDown}
         style={{ cursor: "pointer" }}
@@ -337,7 +379,7 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
           d={d}
           fill="none"
           stroke="rgba(0,0,0,0.001)"
-          strokeWidth={12}
+          strokeWidth={14}
           vectorEffect="non-scaling-stroke"
         />
         <path
@@ -376,10 +418,21 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
         data-element-type="LineDecor"
         data-wb-type="LineDecor"
         data-wb-decor="dim"
+        data-selected={isSelected ? "true" : undefined}
         className="wb-line-decor"
         onPointerDown={onPointerDown}
         style={{ cursor: "pointer" }}
       >
+        {/* Wide hit target along dimension line */}
+        <line
+          x1={p1.x}
+          y1={-p1.y}
+          x2={p2.x}
+          y2={-p2.y}
+          stroke="rgba(0,0,0,0.001)"
+          strokeWidth={16}
+          vectorEffect="non-scaling-stroke"
+        />
         {/* Extension lines */}
         <path
           d={`M${a.x},${-a.y}L${ext1.x},${-ext1.y} M${b.x},${-b.y}L${ext2.x},${-ext2.y}`}
@@ -444,6 +497,7 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
       data-element-type="LineDecor"
       data-wb-type="LineDecor"
       data-wb-decor="label"
+      data-selected={isSelected ? "true" : undefined}
       className="wb-line-decor"
       onPointerDown={onPointerDown}
       style={{ cursor: "pointer" }}
@@ -451,7 +505,7 @@ export const LineDecorElement: React.FC<LineDecorElementProps> = ({
       <circle
         cx={labelPos.x}
         cy={-labelPos.y}
-        r={0.3}
+        r={0.45}
         fill="#ffffff"
         fillOpacity={0.001}
       />
