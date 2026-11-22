@@ -392,7 +392,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           display: "flex",
           flexDirection: isMobile ? "column" : "row",
           overflow: "hidden",
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+          fontFamily: 'var(--font-sans, "Be Vietnam Pro", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif)',
           border: isMobile ? "none" : "1px solid #e2e8f0",
         }}
       >
