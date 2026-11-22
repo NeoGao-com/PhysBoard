@@ -921,6 +921,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [pageElements]
   );
 
+  const [hoveredLockedId, setHoveredLockedId] = useState<string | null>(null);
+
   const selectedElements = useMemo(
     () =>
       pageElements.filter(
@@ -998,6 +1000,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     () => hydrateInlinePoints(pageElements, solved3D.pts),
     [pageElements, solved3D.pts]
   );
+
+  const hoveredLockedBox = useMemo(() => {
+    if (!hoveredLockedId) return null;
+    const target = byId.get(hoveredLockedId);
+    if (!target) return null;
+    return getCompositeBoundingBox([target], pageElements, viewport.scale);
+  }, [hoveredLockedId, byId, pageElements, viewport.scale]);
 
   // View center in math world coordinates
   const getViewCenter = useCallback((): Point2D => {
@@ -1597,9 +1606,26 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     });
     setSelectedIds([]);
     setStatusHint(
-      '🔒 Đã khóa đối tượng vào trang giấy. Bấm nút "🔓 Mở khoá" ở góc dưới trái để mở lại.'
+      '🔒 Đã khóa khối vào trang. Nhấp đúp lên khối hoặc mở danh sách "🔒 khối đang khoá" ở góc dưới trái để mở lại.'
     );
   }, [selectedIds, dispatcher, byId]);
+
+  const handleUnlockElement = useCallback(
+    (id: string) => {
+      dispatcher.dispatch({
+        type: "object.update",
+        params: {
+          id,
+          props: { locked: false },
+          style: { locked: false },
+        },
+      });
+      setSelectedIds([id]);
+      setHoveredLockedId((prev) => (prev === id ? null : prev));
+      setStatusHint("🔓 Đã mở khoá khối. Bạn có thể di chuyển hoặc chỉnh sửa.");
+    },
+    [dispatcher]
+  );
 
   const handleUnlockAllLocked = useCallback(() => {
     if (lockedElements.length === 0) return;
@@ -4514,6 +4540,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [dispatcher, containerRef, viewport, selectedElements, penOnlyMode, navPointerDown, buildDragTransformMap]
   );
 
+  const lastLockedTapRef = useRef<{ id: string; time: number; x: number; y: number } | null>(null);
+
   const handleElementPointerDown = useCallback(
     (e: React.PointerEvent, elementId: string) => {
       if (penOnlyMode && e.pointerType === "touch") {
@@ -4522,9 +4550,32 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       }
       if (activeTool === "erase") return;
 
-      // If clicked element is locked, skip selection and let canvas handle it
+      // Locked element: ignore single taps so writing/drawing passes through,
+      // but double-tap/double-click in Select mode unlocks ONLY that specific element.
       const targetEl = byId.get(elementId);
-      if (targetEl?.props?.locked || targetEl?.style?.locked) return;
+      if (targetEl?.props?.locked || targetEl?.style?.locked) {
+        if (
+          activeTool === null ||
+          activeTool === "select" ||
+          activeTool === "select:marquee"
+        ) {
+          const now = Date.now();
+          const prev = lastLockedTapRef.current;
+          if (
+            prev &&
+            prev.id === elementId &&
+            now - prev.time < 380 &&
+            Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < 24
+          ) {
+            lastLockedTapRef.current = null;
+            e.stopPropagation();
+            handleUnlockElement(elementId);
+            return;
+          }
+          lastLockedTapRef.current = { id: elementId, time: now, x: e.clientX, y: e.clientY };
+        }
+        return;
+      }
 
       if (
         activeTool === null ||
@@ -4632,6 +4683,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       penOnlyMode,
       navPointerDown,
       buildDragTransformMap,
+      handleUnlockElement,
       dispatcher,
     ]
   );
@@ -6990,6 +7042,20 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
                 vectorEffect="non-scaling-stroke"
               />
             ))}
+          {hoveredLockedBox && (
+            <rect
+              x={hoveredLockedBox.minX - 0.12}
+              y={-hoveredLockedBox.maxY - 0.12}
+              width={Math.max(0.24, hoveredLockedBox.maxX - hoveredLockedBox.minX + 0.24)}
+              height={Math.max(0.24, hoveredLockedBox.maxY - hoveredLockedBox.minY + 0.24)}
+              fill="rgba(37, 99, 235, 0.12)"
+              stroke="#2563eb"
+              strokeWidth={2.2}
+              strokeDasharray="6 4"
+              vectorEffect="non-scaling-stroke"
+              style={{ pointerEvents: "none" }}
+            />
+          )}
           {draftPolygonPts.length > 0 && (
             <polyline
               points={draftPolygonPts.map((p) => `${p.x},${-p.y}`).join(" ")}
@@ -7976,8 +8042,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           isPortrait={isPortrait}
           selectedCount={selectedElements.length}
           hiddenCount={hiddenCount}
-          lockedCount={lockedElements.length}
+          lockedElements={lockedElements}
+          onUnlockElement={handleUnlockElement}
           onUnlockAll={handleUnlockAllLocked}
+          onHoverLockedElement={setHoveredLockedId}
           selectedAxes2D={selectedAxes2D}
           selectedAxes3D={
             selectedElements.length === 1 && selectedElements[0].type === "Axes3D"

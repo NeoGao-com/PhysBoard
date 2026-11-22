@@ -7,7 +7,7 @@ import type { SolidSubSelection } from "@/lib/geometry3d";
 export interface SelectionBarProps {
   selectedCount: number;
   hiddenCount?: number;
-  lockedCount?: number;
+  lockedElements?: CanvasElement[];
   selectedAxes2D?: CanvasElement | null;
   selectedAxes3D?: CanvasElement | null;
   selectedSolidEl?: CanvasElement | null;
@@ -26,7 +26,9 @@ export interface SelectionBarProps {
   onCut: () => void;
   onHide: () => void;
   onUnhideAll?: () => void;
+  onUnlockElement?: (id: string) => void;
   onUnlockAll?: () => void;
+  onHoverLockedElement?: (id: string | null) => void;
   onPointRename?: () => void;
   onPointToggleHideName?: () => void;
   onPointCycleDot?: () => void;
@@ -130,10 +132,50 @@ const pillMiniBtnStyle: React.CSSProperties = {
   lineHeight: 1.2,
 };
 
+function describeLockedElement(el: CanvasElement): string {
+  switch (el.type) {
+    case "Image":
+      return el.props?.isPdfPage ? "📄 Trang PDF" : "🖼 Hình ảnh";
+    case "MathText": {
+      const latex = typeof el.props?.latex === "string" ? el.props.latex.trim() : "";
+      const short = latex.replace(/\\text\{([^}]*)\}/g, "$1").slice(0, 26);
+      return short ? `∑ ${short}${latex.length > 26 ? "…" : ""}` : "∑ Công thức / Chữ";
+    }
+    case "Ink":
+      return "✏ Nét vẽ tay";
+    case "Solid3D":
+      return `📐 Hình 3D (${String(el.props?.kind ?? "khối")})`;
+    case "Axes2D":
+      return "📊 Hệ trục Oxy";
+    case "Axes3D":
+      return "🧊 Hệ trục Oxyz";
+    case "Plot":
+      return "📈 Đồ thị hàm số";
+    case "GeomPoint":
+    case "Point":
+      return `📍 Điểm ${String(el.props?.name ?? el.props?.label ?? "")}`.trim();
+    case "GeomSegment":
+    case "Segment":
+      return "📏 Đoạn / Đường thẳng";
+    case "GeomCircle":
+    case "Circle":
+      return "⭕ Đường tròn";
+    case "GeomPolygon":
+    case "Polygon":
+      return "⬟ Đa giác";
+    case "Table":
+      return "📋 Bảng số liệu";
+    case "VarTable":
+      return "📉 Bảng biến thiên";
+    default:
+      return `🔷 Khối ${el.type}`;
+  }
+}
+
 export const SelectionBar: React.FC<SelectionBarProps> = ({
   selectedCount,
   hiddenCount = 0,
-  lockedCount = 0,
+  lockedElements = [],
   selectedAxes2D = null,
   selectedAxes3D = null,
   selectedSolidEl = null,
@@ -152,7 +194,9 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onCut,
   onHide,
   onUnhideAll,
+  onUnlockElement,
   onUnlockAll,
+  onHoverLockedElement,
   onPointRename,
   onPointToggleHideName,
   onPointCycleDot,
@@ -190,8 +234,32 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   isPortrait = false,
 }) => {
   const [moreAxesOpen, setMoreAxesOpen] = useState(false);
+  const [lockedMenuOpen, setLockedMenuOpen] = useState(false);
   const moreWrapRef = useRef<HTMLDivElement>(null);
+  const lockedWrapRef = useRef<HTMLDivElement>(null);
   const barLeft = sidebarOpen ? 152 : 38;
+
+  useEffect(() => {
+    if (!lockedMenuOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (lockedWrapRef.current && !lockedWrapRef.current.contains(e.target as Node)) {
+        setLockedMenuOpen(false);
+        onHoverLockedElement?.(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setLockedMenuOpen(false);
+        onHoverLockedElement?.(null);
+      }
+    };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [lockedMenuOpen, onHoverLockedElement]);
 
   useEffect(() => {
     if (!moreAxesOpen) return;
@@ -1202,7 +1270,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   }
 
   // Restore hidden or locked elements buttons
-  if ((hiddenCount > 0 && onUnhideAll) || (lockedCount > 0 && onUnlockAll)) {
+  if ((hiddenCount > 0 && onUnhideAll) || (lockedElements.length > 0 && onUnlockElement)) {
     return (
       <div
         data-export-skip="true"
@@ -1228,22 +1296,145 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
             👁 Hiện {hiddenCount} hình đã ẩn
           </button>
         )}
-        {lockedCount > 0 && onUnlockAll && (
-          <button
-            type="button"
-            data-action="unlock-all"
-            onClick={onUnlockAll}
-            title="Mở khoá tất cả các khối đang bị khoá vào trang giấy"
-            style={{
-              ...actionBtnStyle,
-              background: "#eff6ff",
-              color: "#1d4ed8",
-              border: "1px solid #93c5fd",
-              fontWeight: 700,
-            }}
-          >
-            🔓 Mở khoá {lockedCount} khối
-          </button>
+        {lockedElements.length > 0 && onUnlockElement && (
+          <div ref={lockedWrapRef} style={{ position: "relative" }}>
+            {lockedMenuOpen && (
+              <div
+                data-testid="locked-elements-popover"
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  bottom: "calc(100% + 8px)",
+                  width: 290,
+                  maxWidth: "calc(100vw - 32px)",
+                  maxHeight: 280,
+                  overflowY: "auto",
+                  background: "#ffffff",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: 12,
+                  boxShadow: "0 12px 32px rgba(15, 23, 42, 0.2)",
+                  padding: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  zIndex: 80,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: "#475569",
+                    padding: "2px 4px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span>Chọn khối muốn mở khoá</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 500, color: "#64748b" }}>
+                    hoặc nhấp đúp lên khối
+                  </span>
+                </div>
+                {lockedElements.map((el, idx) => (
+                  <div
+                    key={el.id}
+                    onMouseEnter={() => onHoverLockedElement?.(el.id)}
+                    onMouseLeave={() => onHoverLockedElement?.(null)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #e2e8f0",
+                      background: "#f8fafc",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: "#0f172a",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={describeLockedElement(el)}
+                    >
+                      {idx + 1}. {describeLockedElement(el)}
+                    </span>
+                    <button
+                      type="button"
+                      data-action={`unlock-el-${el.id}`}
+                      onClick={() => {
+                        onHoverLockedElement?.(null);
+                        onUnlockElement(el.id);
+                        if (lockedElements.length <= 1) setLockedMenuOpen(false);
+                      }}
+                      style={{
+                        flexShrink: 0,
+                        padding: "4px 9px",
+                        borderRadius: 6,
+                        border: "1px solid #93c5fd",
+                        background: "#eff6ff",
+                        color: "#1d4ed8",
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      🔓 Mở
+                    </button>
+                  </div>
+                ))}
+                {lockedElements.length > 1 && onUnlockAll && (
+                  <button
+                    type="button"
+                    data-action="unlock-all"
+                    onClick={() => {
+                      onHoverLockedElement?.(null);
+                      setLockedMenuOpen(false);
+                      onUnlockAll();
+                    }}
+                    style={{
+                      marginTop: 2,
+                      padding: "5px 8px",
+                      borderRadius: 7,
+                      border: "1px dashed #cbd5e1",
+                      background: "#ffffff",
+                      color: "#475569",
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Mở khoá tất cả ({lockedElements.length} khối)
+                  </button>
+                )}
+              </div>
+            )}
+            <button
+              type="button"
+              data-action="toggle-locked-list"
+              onClick={() => {
+                const next = !lockedMenuOpen;
+                setLockedMenuOpen(next);
+                if (!next) onHoverLockedElement?.(null);
+              }}
+              title="Chọn khối đang khoá để mở khoá riêng lẻ (hoặc nhấp đúp trực tiếp lên khối bị khoá)"
+              style={{
+                ...actionBtnStyle,
+                background: lockedMenuOpen ? "#dbeafe" : "#eff6ff",
+                color: "#1d4ed8",
+                border: "1px solid #93c5fd",
+                fontWeight: 700,
+              }}
+            >
+              🔒 {lockedElements.length} khối đang khoá {lockedMenuOpen ? "▴" : "▾"}
+            </button>
+          </div>
         )}
       </div>
     );
