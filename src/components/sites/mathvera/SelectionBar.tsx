@@ -7,6 +7,7 @@ import type { SolidSubSelection } from "@/lib/geometry3d";
 export interface SelectionBarProps {
   selectedCount: number;
   hiddenCount?: number;
+  lockedCount?: number;
   selectedAxes2D?: CanvasElement | null;
   selectedAxes3D?: CanvasElement | null;
   selectedSolidEl?: CanvasElement | null;
@@ -25,6 +26,7 @@ export interface SelectionBarProps {
   onCut: () => void;
   onHide: () => void;
   onUnhideAll?: () => void;
+  onUnlockAll?: () => void;
   onPointRename?: () => void;
   onPointToggleHideName?: () => void;
   onPointCycleDot?: () => void;
@@ -131,6 +133,7 @@ const pillMiniBtnStyle: React.CSSProperties = {
 export const SelectionBar: React.FC<SelectionBarProps> = ({
   selectedCount,
   hiddenCount = 0,
+  lockedCount = 0,
   selectedAxes2D = null,
   selectedAxes3D = null,
   selectedSolidEl = null,
@@ -149,6 +152,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   onCut,
   onHide,
   onUnhideAll,
+  onUnlockAll,
   onPointRename,
   onPointToggleHideName,
   onPointCycleDot,
@@ -1197,8 +1201,8 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
     );
   }
 
-  // Restore hidden elements button
-  if (hiddenCount > 0 && onUnhideAll) {
+  // Restore hidden or locked elements buttons
+  if ((hiddenCount > 0 && onUnhideAll) || (lockedCount > 0 && onUnlockAll)) {
     return (
       <div
         data-export-skip="true"
@@ -1207,17 +1211,40 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
           left: barLeft,
           bottom: 12,
           zIndex: 55,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
           transition: "left 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
         }}
       >
-        <button
-          type="button"
-          onClick={onUnhideAll}
-          title="Hiện lại mọi hình đã ẩn"
-          style={actionBtnStyle}
-        >
-          👁 Hiện {hiddenCount} hình đã ẩn
-        </button>
+        {hiddenCount > 0 && onUnhideAll && (
+          <button
+            type="button"
+            data-action="unhide-all"
+            onClick={onUnhideAll}
+            title="Hiện lại mọi hình đã ẩn"
+            style={actionBtnStyle}
+          >
+            👁 Hiện {hiddenCount} hình đã ẩn
+          </button>
+        )}
+        {lockedCount > 0 && onUnlockAll && (
+          <button
+            type="button"
+            data-action="unlock-all"
+            onClick={onUnlockAll}
+            title="Mở khoá tất cả các khối đang bị khoá vào trang giấy"
+            style={{
+              ...actionBtnStyle,
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              border: "1px solid #93c5fd",
+              fontWeight: 700,
+            }}
+          >
+            🔓 Mở khoá {lockedCount} khối
+          </button>
+        )}
       </div>
     );
   }

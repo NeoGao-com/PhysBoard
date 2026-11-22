@@ -913,6 +913,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     [pageElements]
   );
 
+  const lockedElements = useMemo(
+    () =>
+      pageElements.filter(
+        (el) => !el.style?.hidden && (el.props?.locked || el.style?.locked)
+      ),
+    [pageElements]
+  );
+
   const selectedElements = useMemo(
     () =>
       pageElements.filter(
@@ -1589,9 +1597,29 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     });
     setSelectedIds([]);
     setStatusHint(
-      "🔒 Đã khóa đối tượng vào trang giấy (không thể chọn hoặc di chuyển). Bấm nút 🔒 trên trang để mở khóa."
+      '🔒 Đã khóa đối tượng vào trang giấy. Bấm nút "🔓 Mở khoá" ở góc dưới trái để mở lại.'
     );
   }, [selectedIds, dispatcher, byId]);
+
+  const handleUnlockAllLocked = useCallback(() => {
+    if (lockedElements.length === 0) return;
+    dispatcher.batch(() => {
+      for (const el of lockedElements) {
+        dispatcher.dispatch({
+          type: "object.update",
+          params: {
+            id: el.id,
+            props: { locked: false },
+            style: { locked: false },
+          },
+        });
+      }
+    });
+    setSelectedIds(lockedElements.map((el) => el.id));
+    setStatusHint(
+      `🔓 Đã mở khoá ${lockedElements.length} khối trên trang. Bạn có thể di chuyển hoặc chỉnh sửa.`
+    );
+  }, [lockedElements, dispatcher]);
 
   const handleTogglePagePdfLock = useCallback(
     (targetPage: number) => {
@@ -7920,6 +7948,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           isPortrait={isPortrait}
           selectedCount={selectedElements.length}
           hiddenCount={hiddenCount}
+          lockedCount={lockedElements.length}
+          onUnlockAll={handleUnlockAllLocked}
           selectedAxes2D={selectedAxes2D}
           selectedAxes3D={
             selectedElements.length === 1 && selectedElements[0].type === "Axes3D"
