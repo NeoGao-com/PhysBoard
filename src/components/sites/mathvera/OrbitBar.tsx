@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
+import { IconCube3D } from "./ToolbarIcons";
 
 export interface OrbitBarProps {
   visible?: boolean;
@@ -18,16 +19,21 @@ export interface OrbitBarProps {
 }
 
 const PILL_BTN_STYLE: React.CSSProperties = {
-  padding: "7px 12px",
-  borderRadius: 12,
-  border: "none",
-  color: "#ffffff",
-  fontSize: 12.5,
-  fontWeight: 600,
+  padding: "7px 10px",
+  borderRadius: 11,
+  border: "1px solid #e0e7ff",
+  background: "#f8fafc",
+  color: "#312e81",
+  fontSize: 12,
+  fontWeight: 700,
   cursor: "pointer",
   whiteSpace: "nowrap",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
   fontFamily: 'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, sans-serif)',
-  transition: "transform 0.16s ease, background 0.15s ease, box-shadow 0.16s ease",
+  transition: "transform 0.16s ease, background 0.15s ease, box-shadow 0.16s ease, border-color 0.15s ease",
 };
 
 export const OrbitBar: React.FC<OrbitBarProps> = ({
@@ -105,36 +111,40 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           display: "flex",
           flexDirection: "column",
           alignItems: "stretch",
-          gap: isPortrait ? 6 : 10,
-          width: isPortrait ? 134 : 154,
-          padding: isPortrait ? "10px 8px" : "14px 12px",
+          gap: isPortrait ? 7 : 9,
+          width: isPortrait ? 148 : 168,
+          padding: isPortrait ? "10px 9px" : "13px 12px",
           borderRadius: 18,
-          background: "rgba(15, 23, 42, 0.90)",
-          backdropFilter: "blur(12px)",
-          border: "1.5px solid rgba(255, 255, 255, 0.16)",
-          color: "#ffffff",
+          background: "rgba(255, 255, 255, 0.96)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          border: "1.5px solid #e0e7ff",
+          color: "#1e293b",
           fontFamily: 'var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, sans-serif)',
           fontSize: 12,
-          boxShadow: "0 14px 35px rgba(15, 23, 42, 0.45), 0 0 0 1px rgba(99, 102, 241, 0.2)",
+          boxShadow:
+            "0 14px 34px rgba(99, 102, 241, 0.16), 0 4px 12px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255,255,255,0.9)",
           userSelect: "none",
         }}
       >
+        {/* Header */}
         <div
           style={{
             textAlign: "center",
-            fontWeight: 700,
+            fontWeight: 800,
             fontSize: 13,
-            color: "#e2e8f0",
-            paddingBottom: 6,
-            borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
+            color: "#312e81",
+            paddingBottom: 7,
+            borderBottom: "1px dashed #e0e7ff",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: 5,
+            gap: 6,
             letterSpacing: "-0.2px",
           }}
         >
-          <span>✨ ⟳ Xoay hình 3D</span>
+          <IconCube3D size={16} />
+          <span>Xoay hình 3D</span>
         </div>
 
         {/* Interactive orbital drag handle */}
@@ -167,25 +177,24 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           style={{
             ...PILL_BTN_STYLE,
             width: "100%",
-            padding: "9px 8px",
+            padding: "8px 8px",
             background: draggingHandle
-              ? "linear-gradient(135deg, #3b82f6, #6366f1)"
-              : "linear-gradient(135deg, #1e293b, #334155)",
-            border: draggingHandle ? "1.5px solid #93c5fd" : "1.5px solid #475569",
+              ? "linear-gradient(135deg, #38bdf8, #6366f1)"
+              : "linear-gradient(135deg, #eff6ff, #eef2ff)",
+            color: draggingHandle ? "#ffffff" : "#3730a3",
+            border: draggingHandle ? "1.5px solid #6366f1" : "1.5px solid #c7d2fe",
             cursor: draggingHandle ? "grabbing" : "grab",
             touchAction: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            fontWeight: 700,
-            borderRadius: 14,
+            borderRadius: 12,
             boxShadow: draggingHandle
-              ? "0 4px 14px rgba(59, 130, 246, 0.55)"
-              : "0 2px 6px rgba(0, 0, 0, 0.2)",
+              ? "0 6px 16px rgba(99, 102, 241, 0.35)"
+              : "0 2px 6px rgba(99, 102, 241, 0.1)",
           }}
         >
-          <span>⟲</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <polyline points="21 3 21 9 15 9" />
+          </svg>
           <span>Kéo xoay 3D</span>
         </button>
 
@@ -194,14 +203,29 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 3,
+            gap: 4,
             fontSize: 11,
-            color: "#cbd5e1",
+            color: "#475569",
+            background: "#f8fafc",
+            border: "1px solid #f1f5f9",
+            borderRadius: 10,
+            padding: "6px 8px",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>Ngang (Azimuth)</span>
-            <span style={{ color: "#38bdf8", fontWeight: 600 }}>{azimuth}°</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontWeight: 600 }}>Ngang</span>
+            <span
+              style={{
+                background: "#e0f2fe",
+                color: "#0369a1",
+                fontWeight: 700,
+                fontSize: 10.5,
+                padding: "1px 6px",
+                borderRadius: 999,
+              }}
+            >
+              {azimuth}°
+            </span>
           </div>
           <input
             type="range"
@@ -212,7 +236,7 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             data-wb-orbit="azimuth"
             aria-label="Góc phương vị"
             onChange={(e) => onChangeAzimuth(Number(e.target.value))}
-            style={{ width: "100%", accentColor: "#38bdf8", cursor: "pointer" }}
+            style={{ width: "100%", accentColor: "#0284c7", cursor: "pointer" }}
           />
         </div>
 
@@ -221,14 +245,29 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 3,
+            gap: 4,
             fontSize: 11,
-            color: "#cbd5e1",
+            color: "#475569",
+            background: "#f8fafc",
+            border: "1px solid #f1f5f9",
+            borderRadius: 10,
+            padding: "6px 8px",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>Nghiêng (Elevation)</span>
-            <span style={{ color: "#38bdf8", fontWeight: 600 }}>{elevation}°</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontWeight: 600 }}>Nghiêng</span>
+            <span
+              style={{
+                background: "#ede9fe",
+                color: "#6d28d9",
+                fontWeight: 700,
+                fontSize: 10.5,
+                padding: "1px 6px",
+                borderRadius: 999,
+              }}
+            >
+              {elevation}°
+            </span>
           </div>
           <input
             type="range"
@@ -239,7 +278,7 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             data-wb-orbit="elevation"
             aria-label="Góc nâng"
             onChange={(e) => onChangeElevation(Number(e.target.value))}
-            style={{ width: "100%", accentColor: "#38bdf8", cursor: "pointer" }}
+            style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }}
           />
         </div>
 
@@ -249,12 +288,18 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
           style={{
             ...PILL_BTN_STYLE,
             width: "100%",
-            background: "#334155",
-            fontSize: 12,
+            background: "#ffffff",
+            borderColor: "#cbd5e1",
+            color: "#334155",
+            fontSize: 11.5,
             padding: "6px 8px",
           }}
         >
-          ↺ Góc ban đầu
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+          <span>Góc ban đầu</span>
         </button>
 
         {onToggleSpin && (
@@ -267,14 +312,31 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
               ...PILL_BTN_STYLE,
               width: "100%",
               background: isAutoSpin
-                ? "linear-gradient(135deg, #f59e0b, #d97706)"
-                : "#334155",
-              fontSize: 12,
+                ? "linear-gradient(135deg, #fef3c7, #fde68a)"
+                : "#fdf2f8",
+              borderColor: isAutoSpin ? "#f59e0b" : "#fbcfe8",
+              color: isAutoSpin ? "#b45309" : "#be185d",
+              fontSize: 11.5,
               padding: "6px 8px",
-              boxShadow: isAutoSpin ? "0 3px 10px rgba(245, 158, 11, 0.4)" : "none",
+              boxShadow: isAutoSpin ? "0 3px 10px rgba(245, 158, 11, 0.25)" : "none",
             }}
           >
-            {isAutoSpin ? "⏸ Dừng quay" : "▶ Tự xoay 3D"}
+            {isAutoSpin ? (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <rect x="6" y="5" width="4" height="14" rx="1" />
+                  <rect x="14" y="5" width="4" height="14" rx="1" />
+                </svg>
+                <span>Dừng quay</span>
+              </>
+            ) : (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M8 5.5v13l11-6.5-11-6.5z" />
+                </svg>
+                <span>Tự xoay 3D</span>
+              </>
+            )}
           </button>
         )}
 
@@ -285,14 +347,19 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
             style={{
               ...PILL_BTN_STYLE,
               width: "100%",
-              background: "linear-gradient(135deg, #2563eb, #4f46e5)",
-              fontSize: 13,
+              background: "linear-gradient(135deg, #4f46e5, #6366f1)",
+              border: "none",
+              color: "#ffffff",
+              fontSize: 12.5,
               fontWeight: 700,
               padding: "8px 8px",
-              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.4)",
+              boxShadow: "0 4px 12px rgba(99, 102, 241, 0.35)",
             }}
           >
-            ✓ Hoàn tất
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>Hoàn tất</span>
           </button>
         )}
       </div>
