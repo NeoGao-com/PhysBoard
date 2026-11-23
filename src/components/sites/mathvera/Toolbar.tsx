@@ -32,6 +32,7 @@ import {
   IconBucket,
   IconCalculator,
   IconChart,
+  IconChemistry,
   IconCircle,
   IconCursor,
   IconDashedPen,
@@ -45,6 +46,7 @@ import {
   IconHighlighter,
   IconLaser,
   IconMarquee,
+  IconMath,
   IconPen,
   IconPencil,
   IconPhysics,
@@ -55,6 +57,7 @@ import {
   IconRedo,
   IconSegment,
   IconShapeSnap,
+  IconSimLab,
   IconStylusOnly,
   IconUndo,
 } from "./ToolbarIcons";
@@ -1712,9 +1715,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             style={btnBaseStyle}
             title="Bảng công thức Toán 10–11–12 theo từng chủ đề"
           >
-            <span style={{ color: "#2563eb", fontWeight: 800, fontSize: 13, lineHeight: 1 }}>
-              ∑
-            </span>
+            <IconMath size={15} />
             <span>Toán</span>
           </button>
         )}
@@ -1729,9 +1730,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             style={btnBaseStyle}
             title="Bảng công thức Hoá học 10–11–12 theo từng chủ đề"
           >
-            <span style={{ color: "#059669", fontWeight: 800, fontSize: 12.5, lineHeight: 1 }}>
-              🧪
-            </span>
+            <IconChemistry size={15} />
             <span>Hoá</span>
           </button>
         )}
@@ -1755,9 +1754,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             }}
             title="Thí nghiệm mô phỏng PhET Online & File HTML Offline (toàn màn hình)"
           >
-            <span style={{ color: hasActiveSim ? "#059669" : "#0d9488", fontWeight: 800, fontSize: 13, lineHeight: 1 }}>
-              ⚗
-            </span>
+            <IconSimLab size={15} />
             <span>Thí nghiệm</span>
           </button>
         )}
@@ -2525,7 +2522,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               style={btnBaseStyle}
               title="Bảng công thức Toán"
             >
-              <span style={{ color: "#2563eb", fontWeight: 800, fontSize: 13 }}>∑</span> <span>Toán</span>
+              <IconMath size={15} /> <span>Toán</span>
             </button>
           )}
 
@@ -2536,7 +2533,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               style={btnBaseStyle}
               title="Bảng công thức Hoá học"
             >
-              <span style={{ color: "#059669", fontWeight: 800, fontSize: 12.5 }}>🧪</span> <span>Hoá</span>
+              <IconChemistry size={15} /> <span>Hoá</span>
             </button>
           )}
 
@@ -2547,7 +2544,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               style={btnBaseStyle}
               title="Thí nghiệm mô phỏng PhET & HTML"
             >
-              <span style={{ color: "#0d9488", fontWeight: 800, fontSize: 13 }}>⚗</span> <span>Thí nghiệm</span>
+              <IconSimLab size={15} /> <span>Thí nghiệm</span>
             </button>
           )}
 

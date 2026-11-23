@@ -3,7 +3,7 @@
 import React, { useRef, useState } from "react";
 import { PageBoardConfig, BOARD_SURFACE_PRESETS } from "@/lib/board-themes";
 import { importPdfPages, ImportedPdfPage } from "@/lib/pdf-import";
-import { IconPdf, IconTrash, IconUndo, IconRedo, IconSettings, IconCommand } from "./ToolbarIcons";
+import { IconPdf, IconTrash, IconUndo, IconRedo, IconSettings, IconCommand, IconSimLab } from "./ToolbarIcons";
 import { Folder } from "lucide-react";
 
 export interface PageSidebarProps {
@@ -716,7 +716,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
               gap: 4,
             }}
           >
-            <span>⚗</span>
+            <IconSimLab size={14} />
             <span>{hasActiveSim ? "Thí nghiệm ●" : "Thí nghiệm"}</span>
           </button>
         )}
