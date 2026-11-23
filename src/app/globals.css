@@ -395,11 +395,6 @@ svg.wb-canvas {
   text-rendering: geometricPrecision;
 }
 
-.calc-body canvas {
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-
 .calc-body .calc-key {
   font-weight: 700 !important;
   outline: 0.75px solid rgba(255, 255, 255, 0.14);
