@@ -982,6 +982,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           minWidth: 0,
           flex: "1 1 auto",
           overflowX: "auto",
+          padding: "3px 2px",
+          margin: "-3px 0",
           WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none",
         }}

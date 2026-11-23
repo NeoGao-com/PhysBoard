@@ -317,6 +317,13 @@ math-field {
   box-shadow: 0 0 0 1.5px rgba(239, 68, 68, 0.6) !important;
 }
 
+/* Avoid double nested ring inside split buttons (.wb-tool-split already draws the outer ring) */
+.wb-toolbar .wb-tool-split[data-active="true"] > button[data-active="true"],
+.wb-toolbar .wb-tool-split[data-active="true"] > button[aria-pressed="true"] {
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 /* Cute rounded badge typography & pill aesthetic */
 [data-wb-toolbar-scale="true"] {
   border-radius: 10px !important;
