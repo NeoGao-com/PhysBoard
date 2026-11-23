@@ -388,3 +388,34 @@ svg.wb-canvas {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Crisp HiDPI rendering for Casio fx-580VN X / fx-880BTG Calculator */
+.calc-body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+.calc-body canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.calc-body .calc-key {
+  font-weight: 700 !important;
+  outline: 0.75px solid rgba(255, 255, 255, 0.14);
+  outline-offset: -0.75px;
+}
+
+.calc-body .calc-print {
+  font-weight: 700 !important;
+  letter-spacing: 0.015em;
+  text-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.92);
+  opacity: 1 !important;
+}
+
+.calc-body .calc-lbl {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+
