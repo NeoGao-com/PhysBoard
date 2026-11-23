@@ -794,7 +794,7 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
               gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
               gap: 18,
               alignContent: "start",
-              paddingBottom: 20,
+              padding: "6px 4px 20px 4px",
             }}
           >
             {/* Create new card shortcut */}
