@@ -295,22 +295,19 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
             <Menu size={18} strokeWidth={1.75} />
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="./logo.png"
+              alt="PhysBoard"
+              width={28}
+              height={28}
               style={{
-                width: 26,
-                height: 26,
-                borderRadius: 7,
-                backgroundColor: "#2563eb",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#ffffff",
-                fontWeight: 800,
-                fontSize: 13,
+                borderRadius: 8,
+                display: "block",
+                objectFit: "cover",
+                boxShadow: "0 2px 6px rgba(15, 23, 42, 0.25)",
               }}
-            >
-              P
-            </div>
+            />
             <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em", color: textPrimary }}>
               PhysBoard Notes
             </span>
