@@ -89,3 +89,107 @@ export async function fetchLatestRelease(currentVersion = APP_VERSION): Promise<
     androidApkUrl,
   };
 }
+
+export type RuntimeUpdatePlatform = "tauri-windows" | "capacitor-android" | "web";
+
+interface TauriInternalsLike {
+  invoke?: <T = unknown>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
+}
+
+interface CapacitorAppUpdaterLike {
+  downloadAndInstallApk?: (opts: { url: string }) => Promise<{
+    needsPermission?: boolean;
+    installedPrompted?: boolean;
+  }>;
+  addListener?: (
+    event: string,
+    cb: (data: { percent?: number; downloaded?: number; total?: number }) => void
+  ) => Promise<{ remove?: () => Promise<void> | void }> | { remove?: () => void };
+}
+
+interface CapacitorLike {
+  isNativePlatform?: () => boolean;
+  getPlatform?: () => string;
+  Plugins?: {
+    AppUpdater?: CapacitorAppUpdaterLike;
+  };
+}
+
+export function getRuntimeUpdatePlatform(): RuntimeUpdatePlatform {
+  if (typeof window === "undefined") return "web";
+  const win = window as unknown as {
+    __TAURI_INTERNALS__?: TauriInternalsLike;
+    Capacitor?: CapacitorLike;
+  };
+  if (win.__TAURI_INTERNALS__?.invoke) {
+    return "tauri-windows";
+  }
+  if (win.Capacitor?.isNativePlatform?.() && win.Capacitor?.getPlatform?.() === "android") {
+    return "capacitor-android";
+  }
+  return "web";
+}
+
+export async function downloadAndInstallUpdate(
+  release: AppReleaseInfo,
+  onProgress?: (percent: number | null, status: string) => void
+): Promise<{ needsPermission?: boolean }> {
+  const platform = getRuntimeUpdatePlatform();
+  const win = window as unknown as {
+    __TAURI_INTERNALS__?: TauriInternalsLike;
+    Capacitor?: CapacitorLike;
+  };
+
+  if (platform === "tauri-windows") {
+    if (!release.windowsSetupUrl) {
+      throw new Error("Không tìm thấy file cài đặt Windows (.exe) trong bản phát hành này.");
+    }
+    onProgress?.(null, "Đang tải ngầm bộ cài đặt Windows (.exe)...");
+    await win.__TAURI_INTERNALS__!.invoke!("download_and_install_windows", {
+      url: release.windowsSetupUrl,
+    });
+    onProgress?.(100, "Đang mở trình cài đặt...");
+    return {};
+  }
+
+  if (platform === "capacitor-android") {
+    if (!release.androidApkUrl) {
+      throw new Error("Không tìm thấy file cài đặt Android (.apk) trong bản phát hành này.");
+    }
+    const updater = win.Capacitor?.Plugins?.AppUpdater;
+    if (!updater?.downloadAndInstallApk) {
+      throw new Error("Plugin cập nhật Android chưa sẵn sàng. Vui lòng thử cài đặt lại từ GitHub.");
+    }
+
+    onProgress?.(0, "Đang tải ngầm bản cập nhật Android (.apk)...");
+    let handle: { remove?: () => Promise<void> | void } | undefined;
+    try {
+      if (updater.addListener) {
+        handle = await updater.addListener("downloadProgress", (ev) => {
+          const pct = typeof ev.percent === "number" && ev.percent >= 0 ? ev.percent : null;
+          onProgress?.(
+            pct,
+            pct !== null
+              ? `Đang tải ngầm bản cập nhật Android... ${pct}%`
+              : "Đang tải ngầm bản cập nhật Android..."
+          );
+        });
+      }
+      const res = await updater.downloadAndInstallApk({ url: release.androidApkUrl });
+      if (res?.needsPermission) {
+        onProgress?.(100, "Đã tải xong! Vui lòng bật quyền 'Cho phép từ nguồn này' rồi bấm cập nhật lại.");
+        return { needsPermission: true };
+      }
+      onProgress?.(100, "Đã tải xong! Đang mở trình cài đặt Android...");
+      return {};
+    } finally {
+      try {
+        await handle?.remove?.();
+      } catch {
+        // Ignore cleanup error
+      }
+    }
+  }
+
+  throw new Error("Trình duyệt web không hỗ trợ tự cài đặt trực tiếp. Vui lòng mở bản cài đặt Desktop/Android.");
+}

@@ -26,7 +26,9 @@ import { SPenConfig, DEFAULT_SPEN_CONFIG, SPenButtonAction, SPenButtonBehavior }
 import {
   APP_VERSION,
   type AppReleaseInfo,
+  downloadAndInstallUpdate,
   fetchLatestRelease,
+  getRuntimeUpdatePlatform,
   GITHUB_RELEASES_URL,
 } from "@/lib/app-version";
 
@@ -213,6 +215,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [updateInfo, setUpdateInfo] = useState<AppReleaseInfo | null>(null);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [lastCheckedTime, setLastCheckedTime] = useState<string | null>(null);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
+  const [installProgress, setInstallProgress] = useState<number | null>(null);
+  const [installStatus, setInstallStatus] = useState<string | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
+  const runtimePlatform = getRuntimeUpdatePlatform();
+
+  const handleInstallUpdate = async (release: AppReleaseInfo) => {
+    setInstallingUpdate(true);
+    setInstallError(null);
+    setInstallProgress(runtimePlatform === "capacitor-android" ? 0 : null);
+    setInstallStatus("Đang chuẩn bị tải bản cập nhật...");
+    try {
+      await downloadAndInstallUpdate(release, (pct, status) => {
+        setInstallProgress(pct);
+        setInstallStatus(status);
+      });
+    } catch (err: unknown) {
+      setInstallError(err instanceof Error ? err.message : String(err));
+      setInstallStatus(null);
+    } finally {
+      setInstallingUpdate(false);
+    }
+  };
 
   const handleCheckUpdate = async () => {
     setCheckingUpdate(true);
@@ -2435,64 +2460,140 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           Phiên bản mới nhất mang đến các nâng cấp về hiệu năng vẽ, sửa lỗi và tính năng mới.
                         </div>
 
-                        {/* Download buttons */}
-                        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 10, marginTop: 6 }}>
-                          {updateInfo.windowsSetupUrl && (
-                            <a
-                              href={updateInfo.windowsSetupUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download
+                        {/* Direct In-App Auto Download & Install (Tauri Windows / Capacitor Android) */}
+                        {runtimePlatform !== "web" &&
+                        ((runtimePlatform === "tauri-windows" && updateInfo.windowsSetupUrl) ||
+                          (runtimePlatform === "capacitor-android" && updateInfo.androidApkUrl)) ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 6 }}>
+                            <button
+                              type="button"
+                              disabled={installingUpdate}
+                              onClick={() => handleInstallUpdate(updateInfo)}
                               style={{
-                                flex: 1,
-                                padding: "10px 14px",
-                                borderRadius: 8,
-                                background: "#2563eb",
+                                width: "100%",
+                                padding: "11px 16px",
+                                borderRadius: 10,
+                                border: "none",
+                                background: installingUpdate
+                                  ? "#94a3b8"
+                                  : runtimePlatform === "tauri-windows"
+                                  ? "linear-gradient(135deg, #2563eb, #4f46e5)"
+                                  : "linear-gradient(135deg, #059669, #0d9488)",
                                 color: "#ffffff",
-                                textDecoration: "none",
-                                fontSize: 13,
-                                fontWeight: 600,
-                                textAlign: "center",
+                                fontSize: 13.5,
+                                fontWeight: 700,
+                                cursor: installingUpdate ? "wait" : "pointer",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 gap: 8,
-                                boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
+                                boxShadow: "0 4px 12px rgba(37, 99, 235, 0.28)",
                               }}
                             >
-                              <span>🪟</span>
-                              <span>Tải bản cài đặt Windows (Setup .exe)</span>
-                            </a>
-                          )}
+                              <span>{installingUpdate ? "⏳" : "⬇"}</span>
+                              <span>
+                                {installingUpdate
+                                  ? installStatus || "Đang tải ngầm & chuẩn bị cài đặt..."
+                                  : `Cập nhật & Cài đặt ngay v${updateInfo.version}`}
+                              </span>
+                            </button>
 
-                          {updateInfo.androidApkUrl && (
-                            <a
-                              href={updateInfo.androidApkUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              download
-                              style={{
-                                flex: 1,
-                                padding: "10px 14px",
-                                borderRadius: 8,
-                                background: "#059669",
-                                color: "#ffffff",
-                                textDecoration: "none",
-                                fontSize: 13,
-                                fontWeight: 600,
-                                textAlign: "center",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 8,
-                                boxShadow: "0 2px 6px rgba(5,150,105,0.25)",
-                              }}
-                            >
-                              <span>🤖</span>
-                              <span>Tải bản Android (.apk)</span>
-                            </a>
-                          )}
-                        </div>
+                            {installingUpdate && (
+                              <div
+                                style={{
+                                  width: "100%",
+                                  height: 8,
+                                  borderRadius: 999,
+                                  background: "#dbeafe",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: installProgress !== null ? `${installProgress}%` : "65%",
+                                    height: "100%",
+                                    background:
+                                      runtimePlatform === "tauri-windows"
+                                        ? "linear-gradient(90deg, #2563eb, #6366f1)"
+                                        : "linear-gradient(90deg, #059669, #14b8a6)",
+                                    transition: "width 0.2s ease",
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {!installingUpdate && installStatus && !installError && (
+                              <div style={{ fontSize: 12, color: "#047857", fontWeight: 600 }}>
+                                {installStatus}
+                              </div>
+                            )}
+
+                            {installError && (
+                              <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 600 }}>
+                                ⚠ {installError}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Web browser fallback download buttons */
+                          <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 10, marginTop: 6 }}>
+                            {updateInfo.windowsSetupUrl && (
+                              <a
+                                href={updateInfo.windowsSetupUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                style={{
+                                  flex: 1,
+                                  padding: "10px 14px",
+                                  borderRadius: 8,
+                                  background: "#2563eb",
+                                  color: "#ffffff",
+                                  textDecoration: "none",
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  textAlign: "center",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: 8,
+                                  boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
+                                }}
+                              >
+                                <span>🪟</span>
+                                <span>Tải bản cài đặt Windows (Setup .exe)</span>
+                              </a>
+                            )}
+
+                            {updateInfo.androidApkUrl && (
+                              <a
+                                href={updateInfo.androidApkUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download
+                                style={{
+                                  flex: 1,
+                                  padding: "10px 14px",
+                                  borderRadius: 8,
+                                  background: "#059669",
+                                  color: "#ffffff",
+                                  textDecoration: "none",
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  textAlign: "center",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: 8,
+                                  boxShadow: "0 2px 6px rgba(5,150,105,0.25)",
+                                }}
+                              >
+                                <span>🤖</span>
+                                <span>Tải bản Android (.apk)</span>
+                              </a>
+                            )}
+                          </div>
+                        )}
 
                         {/* Release body preview */}
                         {updateInfo.body && (
