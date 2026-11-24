@@ -316,7 +316,7 @@ function findShortStrawClosedCorners(rawClosed: Point2D[], diag: number): Point2
   }
 
   // Filter out collinear / shallow-bend corners (> 150 deg)
-  let filtered = cornerIndices.slice();
+  const filtered = cornerIndices.slice();
   let removed = true;
   while (removed && filtered.length > 3) {
     removed = false;

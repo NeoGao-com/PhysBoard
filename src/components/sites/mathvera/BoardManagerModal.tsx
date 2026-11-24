@@ -13,6 +13,8 @@ import {
 } from "@/lib/board-manager";
 import { generateRoomId, sanitizeRoomId } from "@/lib/room";
 import { importPdfPages } from "@/lib/pdf-import";
+import { exportAllNotebooksBackup, importNotebooksBackup } from "@/lib/board-backup";
+import { downloadBlob } from "@/lib/export";
 import {
   Menu,
   Plus,
@@ -64,17 +66,51 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
   const [newFolderName, setNewFolderName] = useState("");
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(true);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupMsg, setBackupMsg] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backupInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportBackup = async () => {
+    setBackupBusy(true);
+    setBackupMsg(null);
+    try {
+      const res = await exportAllNotebooksBackup();
+      downloadBlob(res.blob, res.fileName);
+      setBackupMsg(`✓ Đã sao lưu ${res.boardCount} bảng thành file ${res.fileName}`);
+    } catch (err) {
+      setBackupMsg(err instanceof Error ? `⚠ ${err.message}` : "⚠ Sao lưu thất bại");
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleImportBackup = async (file: File) => {
+    setBackupBusy(true);
+    setBackupMsg(null);
+    try {
+      const res = await importNotebooksBackup(file);
+      setBoards(loadBoards());
+      setFolders(loadFolders());
+      setBackupMsg(`✓ Đã khôi phục ${res.importedBoards} bảng & ${res.importedFolders} thư mục!`);
+    } catch (err) {
+      setBackupMsg(err instanceof Error ? `⚠ ${err.message}` : "⚠ Khôi phục thất bại");
+    } finally {
+      setBackupBusy(false);
+    }
+  };
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const id = requestAnimationFrame(() => {
       setBoards(loadBoards());
       setFolders(loadFolders());
       setSearchQuery("");
       setShowNewFolderInput(false);
       setRenamingId(null);
-    }
+    });
+    return () => cancelAnimationFrame(id);
   }, [open]);
 
   // Escape key handler
@@ -314,7 +350,71 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {backupMsg && (
+            <span
+              style={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: backupMsg.startsWith("⚠") ? "#ef4444" : "#10b981",
+                maxWidth: 260,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={backupMsg}
+            >
+              {backupMsg}
+            </span>
+          )}
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept=".json,.physbackup.json"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleImportBackup(f);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            disabled={backupBusy}
+            onClick={handleExportBackup}
+            title="Sao lưu toàn bộ bảng & thư mục thành 1 file .physbackup.json"
+            style={{
+              background: isDarkTheme ? "#1e242c" : "#f1f5f9",
+              border: `1px solid ${borderCol}`,
+              color: textSecondary,
+              padding: "6px 10px",
+              borderRadius: 8,
+              cursor: backupBusy ? "wait" : "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            💾 Sao lưu
+          </button>
+          <button
+            type="button"
+            disabled={backupBusy}
+            onClick={() => backupInputRef.current?.click()}
+            title="Khôi phục sổ tay từ file .physbackup.json"
+            style={{
+              background: isDarkTheme ? "#1e242c" : "#f1f5f9",
+              border: `1px solid ${borderCol}`,
+              color: textSecondary,
+              padding: "6px 10px",
+              borderRadius: 8,
+              cursor: backupBusy ? "wait" : "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            📥 Khôi phục
+          </button>
+
           {/* Theme toggle */}
           <button
             type="button"

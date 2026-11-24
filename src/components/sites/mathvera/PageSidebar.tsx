@@ -15,6 +15,8 @@ export interface PageSidebarProps {
   onOpenPageManager?: () => void;
   onInsertPdfPages?: (pages: ImportedPdfPage[]) => void;
   onOpenSimLauncher?: () => void;
+  onOpenQuestionCrop?: () => void;
+  onOpenClassroomTools?: () => void;
   hasActiveSim?: boolean;
   canUndo?: boolean;
   canRedo?: boolean;
@@ -42,6 +44,8 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onOpenPageManager,
   onInsertPdfPages,
   onOpenSimLauncher,
+  onOpenQuestionCrop,
+  onOpenClassroomTools,
   hasActiveSim = false,
   canUndo = false,
   canRedo = false,
@@ -719,6 +723,63 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
             <IconSimLab size={14} />
             <span>{hasActiveSim ? "Thí nghiệm ●" : "Thí nghiệm"}</span>
           </button>
+        )}
+
+        {(onOpenQuestionCrop || onOpenClassroomTools) && (
+          <div style={{ display: "flex", gap: 4, width: "100%" }}>
+            {onOpenQuestionCrop && (
+              <button
+                type="button"
+                onClick={onOpenQuestionCrop}
+                data-action="open-question-crop"
+                title="Cắt câu hỏi từ PDF hoặc ảnh chụp ghim lên bảng"
+                style={{
+                  flex: 1,
+                  background: "#eef2ff",
+                  color: "#4338ca",
+                  border: "1px solid #c7d2fe",
+                  borderRadius: 6,
+                  padding: "5px 2px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 3,
+                }}
+              >
+                <span>✂</span>
+                <span>Cắt đề</span>
+              </button>
+            )}
+            {onOpenClassroomTools && (
+              <button
+                type="button"
+                onClick={onOpenClassroomTools}
+                data-action="open-classroom-tools"
+                title="Đồng hồ đếm ngược & Gọi tên học sinh ngẫu nhiên"
+                style={{
+                  flex: 1,
+                  background: "#fdf2f8",
+                  color: "#be185d",
+                  border: "1px solid #fbcfe8",
+                  borderRadius: 6,
+                  padding: "5px 2px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 3,
+                }}
+              >
+                <span>⏱</span>
+                <span>Lớp học</span>
+              </button>
+            )}
+          </div>
         )}
 
         <button

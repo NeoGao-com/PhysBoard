@@ -157,6 +157,8 @@ import { MathFormulasDrawer } from "./MathFormulasDrawer";
 import { ChemistryFormulasDrawer } from "./ChemistryFormulasDrawer";
 import { SimLauncherModal } from "./SimLauncherModal";
 import { FullscreenSimOverlay } from "./FullscreenSimOverlay";
+import { QuestionCropModal, type CroppedQuestionResult } from "./QuestionCropModal";
+import { ClassroomToolsWidget } from "./ClassroomToolsWidget";
 import type { ActiveSimSession } from "@/lib/sim-library";
 import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportPdfModal } from "./ExportPdfModal";
@@ -675,6 +677,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [mathDrawerOpen, setMathDrawerOpen] = useState(false);
   const [chemistryDrawerOpen, setChemistryDrawerOpen] = useState(false);
   const [simLauncherOpen, setSimLauncherOpen] = useState(false);
+  const [questionCropOpen, setQuestionCropOpen] = useState(false);
+  const [classroomToolsOpen, setClassroomToolsOpen] = useState(false);
   const [activeSim, setActiveSim] = useState<ActiveSimSession | null>(null);
   const [simMinimized, setSimMinimized] = useState(false);
   const activeSimBlobUrlRef = useRef<string | null>(null);
@@ -1778,7 +1782,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
   // 3D Orbit Helpers
   const activeOrbitElement = useMemo(() => {
-    let id =
+    const id =
       orbitActiveId ??
       selectedElements.find(
         (el) => el.type === "Solid3D" || el.type === "Axes3D" || el.type === "SpaceFigure"
@@ -1786,8 +1790,12 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       null;
     if (!id) return null;
     let el = byId.get(id);
-    if (el?.type === "SpaceFigure" && (el.props as any)?.axes) {
-      const parentAxes = byId.get((el.props as any).axes);
+    const spaceAxesId =
+      el?.type === "SpaceFigure" && typeof el.props?.axes === "string"
+        ? el.props.axes
+        : null;
+    if (spaceAxesId) {
+      const parentAxes = byId.get(spaceAxesId);
       if (parentAxes && parentAxes.type === "Axes3D") {
         el = parentAxes;
       }
@@ -1910,7 +1918,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     setOrbitActiveId(null);
   }, [doc, isA4Format, scrollToPage]);
 
-  handleAddPageRef.current = handleAddPage;
+  useEffect(() => {
+    handleAddPageRef.current = handleAddPage;
+  }, [handleAddPage]);
 
   // Execute any registered command from Command Palette or Keyboard Shortcut
   const executeCommand = useCallback(
@@ -2023,6 +2033,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           break;
         case "action:unlockAll":
           handleUnlockAllLocked();
+          break;
+        case "action:cropQuestion":
+          handleSelectTool("select");
+          setQuestionCropOpen(true);
+          break;
+        case "action:classroomTools":
+          setClassroomToolsOpen((v) => !v);
           break;
       }
     },
@@ -7369,8 +7386,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           handleSelectTool("select");
           setPhysicsDrawerOpen(false);
           setMathDrawerOpen(false);
+          setChemistryDrawerOpen(false);
           setSimLauncherOpen(true);
         }}
+        onOpenQuestionCrop={() => {
+          handleSelectTool("select");
+          setQuestionCropOpen(true);
+        }}
+        onOpenClassroomTools={() => setClassroomToolsOpen((v) => !v)}
         hasActiveSim={Boolean(activeSim)}
         canUndo={canUndo}
         canRedo={canRedo}
@@ -9494,6 +9517,54 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onRestore={() => setSimMinimized(false)}
         onClose={handleCloseSimSession}
         onOpenLauncher={() => setSimLauncherOpen(true)}
+      />
+
+      {/* Quick Question Cropper from PDF / Image */}
+      <QuestionCropModal
+        open={questionCropOpen}
+        onClose={() => setQuestionCropOpen(false)}
+        onInsertCropped={(res: CroppedQuestionResult) => {
+          const center = getViewCenter();
+          const aspect = res.heightPx / Math.max(1, res.widthPx);
+          const targetW = Math.min(11, Math.max(4.5, res.widthPx / 65));
+          const targetH = targetW * aspect;
+          const created = dispatcher.dispatch({
+            type: "object.create",
+            params: {
+              type: "Image",
+              transform: {
+                x: center.x,
+                y: center.y + 1.5,
+                scale: 1,
+                rotation: 0,
+                z: 0,
+              },
+              style: res.lockOnInsert ? { locked: true } : {},
+              props: {
+                src: res.dataUrl,
+                w: targetW,
+                h: targetH,
+                locked: res.lockOnInsert,
+              },
+            },
+          });
+          if (!res.lockOnInsert && created.created?.[0]) {
+            setSelectedIds([created.created[0]]);
+          } else {
+            setSelectedIds([]);
+          }
+          setStatusHint(
+            res.lockOnInsert
+              ? "✓ Đã cắt & khoá đề bài lên bảng (nhấp đúp để mở khoá nếu cần di chuyển)"
+              : "✓ Đã cắt & ghim câu hỏi lên bảng"
+          );
+        }}
+      />
+
+      {/* Classroom Countdown Timer & Random Student Picker */}
+      <ClassroomToolsWidget
+        open={classroomToolsOpen}
+        onClose={() => setClassroomToolsOpen(false)}
       />
 
       {/* Searchable 100-item RealWorld Drawer */}

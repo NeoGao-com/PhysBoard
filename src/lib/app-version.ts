@@ -144,12 +144,27 @@ export async function downloadAndInstallUpdate(
     if (!release.windowsSetupUrl) {
       throw new Error("Không tìm thấy file cài đặt Windows (.exe) trong bản phát hành này.");
     }
-    onProgress?.(null, "Đang tải ngầm bộ cài đặt Windows (.exe)...");
-    await win.__TAURI_INTERNALS__!.invoke!("download_and_install_windows", {
-      url: release.windowsSetupUrl,
-    });
-    onProgress?.(100, "Đang mở trình cài đặt...");
-    return {};
+    onProgress?.(0, "Đang tải ngầm bộ cài đặt Windows (.exe)... 0%");
+    const onProgressEvent = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ percent?: number; downloaded?: number; total?: number }>).detail;
+      const pct = typeof detail?.percent === "number" && detail.percent >= 0 ? detail.percent : null;
+      onProgress?.(
+        pct,
+        pct !== null
+          ? `Đang tải ngầm bộ cài đặt Windows... ${pct}%`
+          : "Đang tải ngầm bộ cài đặt Windows (.exe)..."
+      );
+    };
+    window.addEventListener("physboard:update-progress", onProgressEvent);
+    try {
+      await win.__TAURI_INTERNALS__!.invoke!("download_and_install_windows", {
+        url: release.windowsSetupUrl,
+      });
+      onProgress?.(100, "Đang mở trình cài đặt...");
+      return {};
+    } finally {
+      window.removeEventListener("physboard:update-progress", onProgressEvent);
+    }
   }
 
   if (platform === "capacitor-android") {

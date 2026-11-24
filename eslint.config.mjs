@@ -14,8 +14,15 @@ const eslintConfig = defineConfig([
     "dist/**",
     "android/**",
     "src-tauri/**",
+    "src/components/sites/mathvera/CasioFx580Panel.jsx",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;

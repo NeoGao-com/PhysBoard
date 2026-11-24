@@ -716,6 +716,24 @@ export const WHITEBOARD_COMMANDS: CommandDescriptor[] = [
     description: "Chạy toàn màn hình thí nghiệm PhET Online & file .html Offline",
     keywords: "thi nghiem mo phong phet html offline toan man hinh",
   },
+  {
+    id: "action:cropQuestion",
+    label: "Cắt câu hỏi từ PDF / Ảnh chụp đề bài",
+    category: "actions",
+    icon: "✂",
+    defaultShortcut: null,
+    description: "Mở PDF/Ảnh hoặc dán Ctrl+V rồi khoanh cắt 1 câu hỏi ghim lên bảng",
+    keywords: "cat de cau hoi crop pdf anh chup bai tap",
+  },
+  {
+    id: "action:classroomTools",
+    label: "Mở Công cụ Lớp học (Đếm ngược & Gọi tên)",
+    category: "actions",
+    icon: "⏱",
+    defaultShortcut: null,
+    description: "Đồng hồ đếm ngược làm bài & Gọi tên học sinh ngẫu nhiên",
+    keywords: "dong ho dem nguoc timer goi ten ngau nhien lop hoc",
+  },
 ];
 
 export type ShortcutMap = Record<string, string | null>;

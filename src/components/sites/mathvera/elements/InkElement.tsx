@@ -17,7 +17,7 @@ export interface InkElementProps {
 
 const DEFAULT_WIDTH = 2.2;
 
-export const InkElement: React.FC<InkElementProps> = React.memo(({
+export const InkElement: React.FC<InkElementProps> = React.memo(function InkElement({
   id,
   transform,
   style,
@@ -26,7 +26,7 @@ export const InkElement: React.FC<InkElementProps> = React.memo(({
   isSelected = false,
   onPointerDown,
   pathRef,
-}) => {
+}) {
   const points = useMemo(() => props.points ?? [], [props.points]);
   const strokeColor = style.stroke ?? "#111827";
   const strokeWidth = style.width ?? DEFAULT_WIDTH;

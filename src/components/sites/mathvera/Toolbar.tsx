@@ -550,7 +550,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   }, [openMenu]);
 
   useEffect(() => {
-    setOpenMenu(null);
+    const id = requestAnimationFrame(() => setOpenMenu(null));
+    return () => cancelAnimationFrame(id);
   }, [activeTool]);
 
   const togglePortalMenu = (
