@@ -197,7 +197,7 @@ import { PolygonElement } from "./elements/PolygonElement";
 import { GeometryConstructionElement } from "./elements/GeometryConstructionElement";
 import { Solid3DElement } from "./elements/Solid3DElement";
 import { LaserSettingsModal } from "./LaserSettingsModal";
-import { SettingsModal } from "./SettingsModal";
+import { SettingsModal, type SettingsTab } from "./SettingsModal";
 import { InstructionGuideBar } from "./InstructionGuideBar";
 import { getToolGuide } from "@/lib/tool-guides";
 import {
@@ -524,6 +524,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [laserConfig, setLaserConfig] = useState<LaserConfig>(() => loadLaserConfig());
   const [laserSettingsOpen, setLaserSettingsOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined);
   const [toolbarConfig, setToolbarConfig] = useState<ToolbarVisibilityConfig>(() => loadToolbarVisibilityConfig());
   const [modularConfig, setModularConfig] = useState<ModularLayoutConfig>(() => loadModularLayoutConfig());
 
@@ -2040,6 +2041,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           break;
         case "action:classroomTools":
           setClassroomToolsOpen((v) => !v);
+          break;
+        case "action:reportBug":
+          setSettingsInitialTab("feedback");
+          setSettingsModalOpen(true);
           break;
       }
     },
@@ -7401,7 +7406,14 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onRedo={redo}
         selectedCount={selectedElements.length}
         onDeleteSelected={handleDeleteSelected}
-        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenSettings={() => {
+          setSettingsInitialTab(undefined);
+          setSettingsModalOpen(true);
+        }}
+        onOpenFeedback={() => {
+          setSettingsInitialTab("feedback");
+          setSettingsModalOpen(true);
+        }}
         onOpenBoardManager={() => {
           handleSelectTool("select");
           setBoardManagerOpen(true);
@@ -9659,7 +9671,11 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       {/* Main Settings Modal (Settings, Toolbar Customizer, Board Themes, Scales & Exports) */}
       <SettingsModal
         open={settingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
+        initialTab={settingsInitialTab}
+        onClose={() => {
+          setSettingsModalOpen(false);
+          setSettingsInitialTab(undefined);
+        }}
         modularConfig={modularConfig}
         onChangeModularConfig={handleUpdateModularConfig}
         toolbarConfig={toolbarConfig}
@@ -9947,7 +9963,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
             }
           }
         }}
-        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenSettings={() => {
+          setSettingsInitialTab(undefined);
+          setSettingsModalOpen(true);
+        }}
       />
     </div>
   );

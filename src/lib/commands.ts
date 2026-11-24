@@ -734,6 +734,15 @@ export const WHITEBOARD_COMMANDS: CommandDescriptor[] = [
     description: "Đồng hồ đếm ngược làm bài & Gọi tên học sinh ngẫu nhiên",
     keywords: "dong ho dem nguoc timer goi ten ngau nhien lop hoc",
   },
+  {
+    id: "action:reportBug",
+    label: "Báo lỗi & Gửi phản hồi cho tác giả",
+    category: "actions",
+    icon: "🐛",
+    defaultShortcut: null,
+    description: "Mở biểu mẫu báo lỗi / góp ý kèm thông số phiên bản thiết bị",
+    keywords: "bao loi phan hoi bug feedback gop y",
+  },
 ];
 
 export type ShortcutMap = Record<string, string | null>;

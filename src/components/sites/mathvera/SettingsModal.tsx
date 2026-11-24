@@ -81,9 +81,10 @@ export interface SettingsModalProps {
   // Utilities & Export
   onOpenCommandPalette?: () => void;
   onExportPdf?: () => void;
+  initialTab?: SettingsTab;
 }
 
-type SettingsTab =
+export type SettingsTab =
   | "general"
   | "modular"
   | "board"
@@ -91,7 +92,8 @@ type SettingsTab =
   | "toolbar"
   | "laser"
   | "export"
-  | "update";
+  | "update"
+  | "feedback";
 
 interface TabMeta {
   id: SettingsTab;
@@ -149,6 +151,12 @@ const TAB_DEFS: TabMeta[] = [
     icon: "🔄",
     subtitle: "Kiểm tra phiên bản mới, lịch sử cập nhật & tải về",
   },
+  {
+    id: "feedback",
+    label: "Báo lỗi & Phản hồi",
+    icon: "🐛",
+    subtitle: "Gửi báo cáo lỗi hoặc góp ý tính năng trực tiếp cho tác giả",
+  },
 ];
 
 const CARD_BOX_STYLE: React.CSSProperties = {
@@ -205,8 +213,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeDotScale,
   onOpenCommandPalette,
   onExportPdf,
+  initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "general");
+
+  useEffect(() => {
+    if (open && initialTab) {
+      const id = requestAnimationFrame(() => setActiveTab(initialTab));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [open, initialTab]);
+
+  // Feedback / Bug report state
+  const [fbCategory, setFbCategory] = useState<"bug" | "feature" | "ui">("bug");
+  const [fbTitle, setFbTitle] = useState("");
+  const [fbDesc, setFbDesc] = useState("");
+  const [fbIncludeDiag, setFbIncludeDiag] = useState(true);
+  const [fbCopied, setFbCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [busyPng, setBusyPng] = useState(false);
 
@@ -2737,6 +2760,207 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </>
             )}
+
+            {/* ==================== TAB 9: BÁO LỖI & PHẢN HỒI ==================== */}
+            {activeTab === "feedback" && (() => {
+              const catMeta = {
+                bug: { prefix: "[Bug]", label: "🐛 Báo lỗi (Bug)" },
+                feature: { prefix: "[Góp ý]", label: "💡 Góp ý tính năng" },
+                ui: { prefix: "[Giao diện]", label: "🎨 Giao diện / Hiển thị" },
+              }[fbCategory];
+
+              const platformLabel =
+                runtimePlatform === "tauri-windows"
+                  ? "Windows Desktop (Tauri)"
+                  : runtimePlatform === "capacitor-android"
+                  ? "Android App (Capacitor)"
+                  : "Web Browser";
+
+              const diagText =
+                typeof window !== "undefined"
+                  ? [
+                      `- Phiên bản: v${APP_VERSION}`,
+                      `- Nền tảng: ${platformLabel}`,
+                      `- Màn hình: ${window.innerWidth}×${window.innerHeight} (DPR ${window.devicePixelRatio || 1})`,
+                      `- Trình duyệt: ${navigator.userAgent}`,
+                    ].join("\n")
+                  : `- Phiên bản: v${APP_VERSION}`;
+
+              const issueTitle = `${catMeta.prefix} ${fbTitle.trim() || "Phản hồi từ người dùng PhysBoard"}`;
+              const issueBody = [
+                "### Mô tả chi tiết",
+                fbDesc.trim() || "(Người dùng chưa nhập mô tả)",
+                ...(fbIncludeDiag ? ["", "### Thông tin thiết bị", diagText] : []),
+              ].join("\n");
+
+              const githubIssueUrl = `https://github.com/NeoGao-com/PhysBoard/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`;
+              const mailtoUrl = `mailto:u.gao.com@gmail.com?subject=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`;
+
+              return (
+                <>
+                  <div style={CARD_BOX_STYLE}>
+                    <div style={CARD_TITLE_STYLE}>
+                      <span>🐛</span>
+                      <span>Gửi báo lỗi hoặc góp ý cải thiện PhysBoard</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.5 }}>
+                      Nếu bạn gặp lỗi trong lúc giảng dạy hoặc muốn đề xuất tính năng mới, hãy điền nhanh bên dưới và chọn cách gửi thuận tiện nhất.
+                    </div>
+
+                    {/* Category pills */}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {(["bug", "feature", "ui"] as const).map((cat) => {
+                        const active = fbCategory === cat;
+                        const label =
+                          cat === "bug"
+                            ? "🐛 Báo lỗi (Bug)"
+                            : cat === "feature"
+                            ? "💡 Góp ý tính năng"
+                            : "🎨 Giao diện / Hiển thị";
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setFbCategory(cat)}
+                            style={{
+                              padding: "6px 12px",
+                              borderRadius: 999,
+                              border: active ? "1.5px solid #2563eb" : "1px solid #cbd5e1",
+                              background: active ? "#eff6ff" : "#f8fafc",
+                              color: active ? "#1d4ed8" : "#475569",
+                              fontSize: 12.5,
+                              fontWeight: active ? 700 : 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Title input */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <label style={{ fontSize: 12.5, fontWeight: 700, color: "#1e293b" }}>
+                        Tiêu đề ngắn gọn
+                      </label>
+                      <input
+                        type="text"
+                        value={fbTitle}
+                        onChange={(e) => setFbTitle(e.target.value)}
+                        placeholder="Ví dụ: Lỗi không phóng to được hình 3D trên máy tính bảng..."
+                        style={{
+                          padding: "8px 11px",
+                          borderRadius: 8,
+                          border: "1px solid #cbd5e1",
+                          fontSize: 13,
+                          color: "#0f172a",
+                          outline: "none",
+                        }}
+                      />
+                    </div>
+
+                    {/* Description textarea */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <label style={{ fontSize: 12.5, fontWeight: 700, color: "#1e293b" }}>
+                        Mô tả chi tiết &amp; cách làm xuất hiện lỗi
+                      </label>
+                      <textarea
+                        value={fbDesc}
+                        onChange={(e) => setFbDesc(e.target.value)}
+                        rows={4}
+                        placeholder="Bạn đang thao tác gì trước khi gặp lỗi? Kết quả mong muốn là gì?"
+                        style={{
+                          padding: "8px 11px",
+                          borderRadius: 8,
+                          border: "1px solid #cbd5e1",
+                          fontSize: 13,
+                          color: "#0f172a",
+                          resize: "vertical",
+                          outline: "none",
+                          fontFamily: "inherit",
+                        }}
+                      />
+                    </div>
+
+                    {/* Diagnostics checkbox */}
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "#334155", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={fbIncludeDiag}
+                        onChange={(e) => setFbIncludeDiag(e.target.checked)}
+                        style={{ accentColor: "#2563eb" }}
+                      />
+                      <span>Tự động đính kèm phiên bản (v{APP_VERSION}) &amp; thông số thiết bị để sửa lỗi nhanh hơn</span>
+                    </label>
+
+                    {/* Action buttons */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                      <a
+                        href={githubIssueUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flex: "1 1 180px",
+                          padding: "9px 14px",
+                          borderRadius: 9,
+                          background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                          color: "#ffffff",
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          textDecoration: "none",
+                          textAlign: "center",
+                          boxShadow: "0 2px 8px rgba(37,99,235,0.25)",
+                        }}
+                      >
+                        🚀 Gửi qua GitHub Issues
+                      </a>
+
+                      <a
+                        href={mailtoUrl}
+                        style={{
+                          flex: "1 1 150px",
+                          padding: "9px 14px",
+                          borderRadius: 9,
+                          background: "#ecfdf5",
+                          border: "1px solid #6ee7b7",
+                          color: "#047857",
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          textDecoration: "none",
+                          textAlign: "center",
+                        }}
+                      >
+                        ✉ Gửi qua Email
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fullText = `${issueTitle}\n\n${issueBody}`;
+                          navigator.clipboard?.writeText(fullText).then(() => {
+                            setFbCopied(true);
+                            setTimeout(() => setFbCopied(false), 2200);
+                          }).catch(() => {});
+                        }}
+                        style={{
+                          padding: "9px 14px",
+                          borderRadius: 9,
+                          border: "1px solid #cbd5e1",
+                          background: fbCopied ? "#dcfce7" : "#f8fafc",
+                          color: fbCopied ? "#15803d" : "#1e293b",
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {fbCopied ? "✓ Đã copy báo cáo" : "📋 Copy báo cáo"}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* ===================== FOOTER ===================== */}

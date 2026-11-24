@@ -25,6 +25,7 @@ export interface PageSidebarProps {
   selectedCount?: number;
   onDeleteSelected?: () => void;
   onOpenSettings?: () => void;
+  onOpenFeedback?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenBoardManager?: () => void;
   boardConfig?: PageBoardConfig;
@@ -54,6 +55,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   selectedCount = 0,
   onDeleteSelected,
   onOpenSettings,
+  onOpenFeedback,
   onOpenCommandPalette,
   onOpenBoardManager,
   boardConfig,
@@ -666,9 +668,36 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
               }}
             >
               <IconCommand size={13} />
-              <span>Phím tắt & Lệnh</span>
+              <span>Phím tắt &amp; Lệnh</span>
             </button>
           </div>
+        )}
+
+        {onOpenFeedback && (
+          <button
+            type="button"
+            onClick={onOpenFeedback}
+            data-action="open-feedback"
+            title="Báo lỗi hoặc góp ý cho tác giả"
+            style={{
+              width: "100%",
+              background: "#fff7ed",
+              color: "#c2410c",
+              border: "1px solid #fed7aa",
+              borderRadius: 6,
+              padding: "5px 0",
+              fontSize: 11.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 5,
+            }}
+          >
+            <span>🐛</span>
+            <span>Báo lỗi / Góp ý</span>
+          </button>
         )}
 
         {/* Chèn PDF */}
