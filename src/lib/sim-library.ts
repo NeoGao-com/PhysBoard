@@ -432,6 +432,14 @@ export async function listOfflineSims(): Promise<OfflineSimMeta[]> {
       };
       req.onerror = () => reject(req.error);
       tx.oncomplete = () => db.close();
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+      tx.onabort = () => {
+        db.close();
+        reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+      };
     });
   } catch {
     return [];
@@ -463,6 +471,14 @@ export async function saveOfflineSimFile(
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
     tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+    };
   });
 
   const { blob: _omitted, ...meta } = record;
@@ -491,6 +507,14 @@ export async function getOfflineSimBlob(id: string): Promise<Blob | null> {
     };
     req.onerror = () => reject(req.error);
     tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+    };
   });
 }
 
@@ -503,6 +527,14 @@ export async function deleteOfflineSim(id: string): Promise<void> {
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
     tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+    };
   });
 }
 
@@ -526,6 +558,14 @@ export async function renameOfflineSim(id: string, nextTitle: string): Promise<v
     };
     getReq.onerror = () => reject(getReq.error);
     tx.oncomplete = () => db.close();
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+    };
   });
 }
 

@@ -302,8 +302,8 @@ export function useCanvasNavigation(
 
   // Cleanup on unmount or format switch
   useEffect(() => {
+    const session = overscrollSessionRef.current;
     return () => {
-      const session = overscrollSessionRef.current;
       if (session.rafId !== null) cancelAnimationFrame(session.rafId);
       if (session.resetTimeoutId !== null) clearTimeout(session.resetTimeoutId);
     };

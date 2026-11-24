@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { LaserConfig, LaserMode } from "@/lib/laser-config";
+import { LaserConfig } from "@/lib/laser-config";
 
 export interface LaserSettingsModalProps {
   open: boolean;
@@ -25,6 +25,18 @@ export const LaserSettingsModal: React.FC<LaserSettingsModalProps> = ({
   config,
   onChangeConfig,
 }) => {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { PageBoardConfig, BOARD_SURFACE_PRESETS } from "@/lib/board-themes";
+import { PageBoardConfig } from "@/lib/board-themes";
 import { importPdfPages, ImportedPdfPage } from "@/lib/pdf-import";
 import { IconPdf, IconTrash, IconUndo, IconRedo, IconSettings, IconCommand, IconSimLab } from "./ToolbarIcons";
 import { Folder } from "lucide-react";
@@ -60,7 +60,6 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onOpenFeatureGuide,
   onOpenCommandPalette,
   onOpenBoardManager,
-  boardConfig,
   pagePdfStatus,
   onTogglePagePdfLock,
   isOpen,

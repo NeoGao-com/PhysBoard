@@ -59,7 +59,7 @@ export const OrbitBar: React.FC<OrbitBarProps> = ({
     if (onOrbitDrag) {
       onOrbitDrag(dx, dy);
     } else {
-      const nextAz = ((azimuth - dx * 0.6 + 180) % 360) - 180;
+      const nextAz = ((((azimuth - dx * 0.6 + 180) % 360) + 360) % 360) - 180;
       const nextEl = Math.max(-85, Math.min(85, elevation + dy * 0.5));
       onChangeAzimuth(Math.round(nextAz));
       onChangeElevation(Math.round(nextEl));

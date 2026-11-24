@@ -31,9 +31,6 @@ import {
   Sun,
   Moon,
   Clock,
-  ExternalLink,
-  ChevronRight,
-  MoreVertical,
 } from "lucide-react";
 
 export interface BoardManagerModalProps {
@@ -209,9 +206,31 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
   const handlePermanentDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm("Xóa vĩnh viễn bảng này? Hành động này không thể hoàn tác.")) {
-      const next = boards.filter((b) => b.id !== id);
+      let next = boards.filter((b) => b.id !== id);
+      if (next.length === 0) {
+        next = [
+          {
+            id: DEFAULT_BOARD_ID,
+            name: "Bảng mặc định",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+        ];
+      }
       setBoards(next);
       saveBoards(next);
+      if (typeof indexedDB !== "undefined") {
+        try {
+          indexedDB.deleteDatabase(`whiteboard-v2-${sanitizeRoomId(id)}`);
+        } catch {
+          // Ignore IDB cleanup error
+        }
+      }
+      if (sanitizeRoomId(id) === sanitizeRoomId(currentRoomId)) {
+        const fallbackId = next.find((b) => !b.trashed)?.id ?? DEFAULT_BOARD_ID;
+        onSelectBoard(fallbackId);
+        onClose();
+      }
     }
   };
 

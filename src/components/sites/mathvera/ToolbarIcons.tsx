@@ -153,14 +153,6 @@ export const IconFormula: React.FC<IconProps> = ({ size = 16, color = "#4338ca",
   </svg>
 );
 
-export const IconInsert: React.FC<IconProps> = ({ size = 16, color = "#0f766e", className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" fill="#ccfbf1" stroke="#0d9488" strokeWidth={1.7} />
-    <path d="M12 7.5v9M7.5 12h9" stroke="#0f766e" strokeWidth={2.2} />
-    <path d="M19 4.2c-.6 0-1.1-.5-1.1-1.1 0 .6-.5 1.1-1.1 1.1.6 0 1.1.5 1.1 1.1 0-.6.5-1.1 1.1-1.1z" fill="#fbbf24" stroke="none" />
-  </svg>
-);
-
 export const IconPoint: React.FC<IconProps> = ({ size = 15, color = "#db2777", className, ...props }) => (
   <svg {...base(size, color, className)} {...props}>
     <circle cx="12" cy="12" r="7.8" fill="#fce7f3" stroke="#f472b6" strokeDasharray="3 2" strokeWidth={1.5} />
@@ -317,21 +309,6 @@ export const IconRedo: React.FC<IconProps> = ({ size = 15, color = "#475569", cl
   </svg>
 );
 
-export const IconSave: React.FC<IconProps> = ({ size = 15, color = "#2563eb", className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" fill="#dbeafe" stroke="#2563eb" strokeWidth={1.7} />
-    <path d="M7 3v5h9V3" fill="#ffffff" stroke="#2563eb" strokeWidth={1.5} />
-    <rect x="7" y="13" width="10" height="8" rx="1.5" fill="#93c5fd" stroke="#1d4ed8" strokeWidth={1.5} />
-  </svg>
-);
-
-export const IconOpenFile: React.FC<IconProps> = ({ size = 15, color = "#d97706", className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <path d="M3.5 19h17a1.5 1.5 0 0 0 1.5-1.5V8a1.5 1.5 0 0 0-1.5-1.5h-7.8a1.5 1.5 0 0 1-1.2-.6l-.9-1.3a1.5 1.5 0 0 0-1.2-.6H3.5A1.5 1.5 0 0 0 2 5.5v12A1.5 1.5 0 0 0 3.5 19z" fill="#fde68a" stroke="#d97706" strokeWidth={1.7} />
-    <path d="M7 11.5h10M7 14.5h6" stroke="#b45309" strokeWidth={1.5} />
-  </svg>
-);
-
 export const IconCommand: React.FC<IconProps> = ({ size = 15, color = "#6d28d9", className, ...props }) => (
   <svg {...base(size, color, className)} {...props}>
     <path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z" fill="#ede9fe" stroke="#6d28d9" strokeWidth={1.7} />
@@ -355,14 +332,6 @@ export const IconFullscreen: React.FC<IconProps & { exit?: boolean }> = ({ size 
   </svg>
 );
 
-export const IconMore: React.FC<IconProps> = ({ size = 15, color = "#4f46e5", className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <circle cx="5" cy="12" r="2.2" fill="#f472b6" stroke="none" />
-    <circle cx="12" cy="12" r="2.2" fill="#818cf8" stroke="none" />
-    <circle cx="19" cy="12" r="2.2" fill="#38bdf8" stroke="none" />
-  </svg>
-);
-
 export const IconStylusOnly: React.FC<IconProps> = ({ size = 16, color = "#0369a1", className, ...props }) => (
   <svg {...base(size, color, className)} {...props}>
     <path d="M17.5 4a2 2 0 0 0-2.8 0L6 12.7 4 19l6.3-2 8.7-8.7a2 2 0 0 0 0-2.8l-1.5-1.5z" fill="#bae6fd" stroke="#0369a1" strokeWidth={1.7} />
@@ -375,37 +344,6 @@ export const IconHandTouch: React.FC<IconProps> = ({ size = 16, color = "#db2777
   <svg {...base(size, color, className)} {...props}>
     <circle cx="11" cy="4.2" r="2.6" stroke="#f472b6" strokeDasharray="2 2" strokeWidth={1.3} />
     <path d="M11 6.5V3.8a1.8 1.8 0 0 0-3.6 0v7.2M7.4 8.5a1.8 1.8 0 0 0-3.4.6v3.9a7.5 7.5 0 0 0 7.5 7.5h2.5a6.5 6.5 0 0 0 6.5-6.5v-3.5a1.8 1.8 0 0 0-3.6 0V11M14 9.5a1.8 1.8 0 0 0-3 0" fill="#fce7f3" stroke="#be185d" strokeWidth={1.65} />
-  </svg>
-);
-
-export const IconRuler: React.FC<IconProps> = ({ size = 16, color = "#b45309", className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <path d="M3.5 7.5l4-4a2 2 0 0 1 2.8 0l10.2 10.2a2 2 0 0 1 0 2.8l-4 4a2 2 0 0 1-2.8 0L3.5 10.3a2 2 0 0 1 0-2.8z" fill="#fde68a" stroke="#b45309" strokeWidth={1.7} />
-    <path d="m6.5 10.5 2-2M9 13l3.2-3.2M12 16l2-2M14.5 18.5 18 15" stroke="#d97706" strokeWidth={1.5} />
-    <circle cx="6.2" cy="6.2" r="1.2" fill="#f472b6" stroke="none" />
-  </svg>
-);
-
-export const IconSetSquare: React.FC<IconProps> = ({ size = 16, color = "#0369a1", className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <path d="M4.5 20h15a1 1 0 0 0 .8-1.6L5.8 4.2A1 1 0 0 0 4.5 5v14a1 1 0 0 0 1 1z" fill="#bae6fd" stroke="#0369a1" strokeWidth={1.7} />
-    <path d="M7.5 17h6.5L7.5 10.5v6.5z" fill="#ffffff" stroke="#0284c7" strokeWidth={1.4} />
-  </svg>
-);
-
-export const IconProtractor: React.FC<IconProps> = ({ size = 16, color = "#6d28d9", className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <path d="M3.5 16h17a8.5 8.5 0 0 0-17 0z" fill="#ddd6fe" stroke="#6d28d9" strokeWidth={1.7} />
-    <line x1="12" y1="16" x2="12" y2="11" stroke="#7c3aed" strokeWidth={1.5} />
-    <circle cx="12" cy="16" r="1.5" fill="#f472b6" stroke="none" />
-  </svg>
-);
-
-export const IconCompassTool: React.FC<IconProps> = ({ size = 16, color = "#0f766e", className, ...props }) => (
-  <svg {...base(size, color, className)} {...props}>
-    <circle cx="12" cy="4.5" r="2.3" fill="#fde68a" stroke="#b45309" strokeWidth={1.6} />
-    <path d="M11 6.5 6 20.5M13 6.5 18 20.5" stroke="#0f766e" strokeWidth={1.9} />
-    <path d="M8.5 14a5.5 5.5 0 0 1 7 0" stroke="#14b8a6" strokeWidth={1.5} />
   </svg>
 );
 

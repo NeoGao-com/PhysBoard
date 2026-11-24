@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import * as Y from "yjs";
 import { StylePicker, StylePatch } from "./StylePicker";
 import { PlaneGeometryMenu } from "./PlaneGeometryMenu";
 import { SpaceGeometryMenu } from "./SpaceGeometryMenu";
@@ -12,12 +11,9 @@ import {
   RealWorldMenu,
   M3MenuAction,
 } from "./FunctionsAndStatsMenus";
-import { PageBar } from "./PageBar";
 import { FILL_PALETTE } from "@/lib/geometry";
 import type { ShortcutMap } from "@/lib/commands";
-import { importPdfPages, type ImportedImageResult, type ImportedPdfPage } from "@/lib/pdf-import";
 import { RealWorldArtItem } from "@/lib/realworld-art";
-import type { PageBoardConfig } from "@/lib/board-themes";
 import { WhiteboardTool, SelectionStyleState } from "@/types/whiteboard";
 import { LaserConfig } from "@/lib/laser-config";
 import { ToolbarVisibilityConfig } from "@/lib/toolbar-config";
@@ -50,7 +46,6 @@ import {
   IconPen,
   IconPencil,
   IconPhysics,
-  IconPdf,
   IconPoint,
   IconPolygon,
   IconRealWorld,
@@ -113,7 +108,6 @@ const SEGMENT_TOOL_SET = new Set<string>([
 ]);
 
 export interface ToolbarProps {
-  doc?: Y.Doc | null;
   activeTool: WhiteboardTool;
   onSelectTool: (tool: WhiteboardTool) => void;
   styleState: {
@@ -132,17 +126,8 @@ export interface ToolbarProps {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  selectedCount: number;
-  onDeleteSelected: () => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
-  page?: { current: number; count: number };
-  onPrevPage?: () => void;
-  onNextPage?: () => void;
-  onAddPage?: () => void;
-  onInsertTable?: (rows: number, cols: number) => void;
-  onInsertImage?: (img: ImportedImageResult) => void;
-  onInsertPdfPages?: (pages: ImportedPdfPage[]) => void;
   onM3Action?: (action: M3MenuAction) => void;
   onSelectQuickRealWorld?: (item: RealWorldArtItem) => void;
   onOpenRealWorldDrawer?: () => void;
@@ -154,41 +139,22 @@ export interface ToolbarProps {
   hasActiveSim?: boolean;
   onGoHome?: () => void;
   onShare?: () => void;
-  getBoardElement?: () => SVGSVGElement | HTMLElement | null;
-  labelScale?: number;
-  dotScale?: number;
-  boardConfig?: PageBoardConfig;
-  onChangeBoardConfig?: (next: PageBoardConfig) => void;
-  onApplyBoardAllPages?: (cfg: PageBoardConfig) => void;
-  onScaleGeometry?: (factor: number) => void;
-  onChangeLabelScale?: (nextScale: number) => void;
-  onChangeDotScale?: (nextScale: number) => void;
   onOpenCalculator?: () => void;
   isCalculatorOpen?: boolean;
-  onOpenCommandPalette?: () => void;
-  isA4Format?: boolean;
-  isFitLocked?: boolean;
-  onToggleFitLock?: () => void;
-  onExportPdf?: () => void;
   shortcutMap?: ShortcutMap;
   embedded?: boolean;
   penOnlyMode?: boolean;
   onTogglePenOnly?: (enabled: boolean) => void;
   inkToShape?: boolean;
   onToggleInkToShape?: (enabled: boolean) => void;
-  autoSwitchTarget?: "select" | "ink" | "off";
-  onToggleAutoSwitchTarget?: () => void;
   laserConfig?: LaserConfig;
   onChangeLaserConfig?: (cfg: LaserConfig) => void;
   onOpenLaserSettings?: () => void;
   toolbarVisibility?: ToolbarVisibilityConfig;
   modularConfig?: ModularLayoutConfig;
   onChangeModularConfig?: (cfg: ModularLayoutConfig) => void;
-  onOpenSettings?: () => void;
   isSidebarOpen?: boolean;
   isPortrait?: boolean;
-  isGuideEnabled?: boolean;
-  onToggleGuide?: () => void;
 }
 
 type OpenDropdown =
@@ -202,7 +168,6 @@ type OpenDropdown =
   | null;
 
 export const Toolbar: React.FC<ToolbarProps> = ({
-  doc,
   activeTool,
   onSelectTool,
   styleState,
@@ -214,17 +179,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   canRedo,
   onUndo,
   onRedo,
-  selectedCount,
-  onDeleteSelected,
   isFullscreen,
   onToggleFullscreen,
-  page = { current: 1, count: 1 },
-  onPrevPage,
-  onNextPage,
-  onAddPage,
-  onInsertTable,
-  onInsertImage,
-  onInsertPdfPages,
   onM3Action,
   onSelectQuickRealWorld,
   onOpenRealWorldDrawer,
@@ -236,41 +192,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   hasActiveSim = false,
   onGoHome,
   onShare,
-  getBoardElement,
-  labelScale = 1,
-  dotScale = 1.5,
-  boardConfig,
-  onChangeBoardConfig,
-  onApplyBoardAllPages,
-  onScaleGeometry,
-  onChangeLabelScale,
-  onChangeDotScale,
   onOpenCalculator,
   isCalculatorOpen,
-  onOpenCommandPalette,
-  isA4Format = false,
-  isFitLocked = false,
-  onToggleFitLock,
-  onExportPdf,
   shortcutMap,
   embedded = false,
   penOnlyMode = false,
   onTogglePenOnly,
   inkToShape = true,
   onToggleInkToShape,
-  autoSwitchTarget = "select",
-  onToggleAutoSwitchTarget,
   laserConfig,
   onChangeLaserConfig,
   onOpenLaserSettings,
   toolbarVisibility,
   modularConfig = DEFAULT_MODULAR_LAYOUT,
   onChangeModularConfig,
-  onOpenSettings,
   isSidebarOpen = false,
   isPortrait = false,
-  isGuideEnabled = true,
-  onToggleGuide,
 }) => {
   const withShortcut = (label: string, cmdId: string): string => {
     const combo = shortcutMap?.[cmdId];
@@ -290,7 +227,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     return window.localStorage.getItem("physboard_toolbar_collapsed") === "true";
   });
   const headerRef = useRef<HTMLElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {

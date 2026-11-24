@@ -3,7 +3,7 @@
 import React, { Suspense, useState, useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
 import { Whiteboard } from "@/components/sites/mathvera/Whiteboard";
-import { parseRoomFromUrl, sanitizeRoomId } from "@/lib/room";
+import { sanitizeRoomId } from "@/lib/room";
 
 const ACTIVE_BOARD_STORAGE_KEY = "physboard_active_board";
 const emptySubscribe = () => () => {};
@@ -22,7 +22,7 @@ function HomeRouter() {
   const searchParams = useSearchParams();
   const rawRoom = searchParams.get("room");
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
-  const [localRoom, setLocalRoom] = useState<string>(() => {
+  const [localRoom] = useState<string>(() => {
     return readInitialLocalBoard() || "default";
   });
 
@@ -39,17 +39,6 @@ function HomeRouter() {
       key={activeRoomId}
       roomId={activeRoomId}
       initialRoomId={activeRoomId}
-      onGoHome={() => {
-        setLocalRoom("default");
-        try {
-          window.localStorage.setItem(ACTIVE_BOARD_STORAGE_KEY, "default");
-        } catch {
-          // ignore
-        }
-        if (typeof window !== "undefined" && window.location.search) {
-          window.history.replaceState(null, "", window.location.pathname);
-        }
-      }}
     />
   );
 }

@@ -29,7 +29,7 @@ import {
   type PageBoardConfig,
 } from "@/lib/board-themes";
 import { exportPNG, downloadBlob } from "@/lib/export";
-import { SPenConfig, DEFAULT_SPEN_CONFIG, SPenButtonAction, SPenButtonBehavior } from "@/types/whiteboard";
+import { SPenConfig, DEFAULT_SPEN_CONFIG, SPenButtonAction } from "@/types/whiteboard";
 import {
   APP_VERSION,
   type AppReleaseInfo,
@@ -63,7 +63,6 @@ export interface SettingsModalProps {
   laserConfig: LaserConfig;
   onChangeLaserConfig: (cfg: LaserConfig) => void;
   // Grid
-  gridEnabled: boolean;
   onChangeGridEnabled: (val: boolean) => void;
   // Tool Instruction Guide
   isGuideEnabled?: boolean;
@@ -212,7 +211,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeSPenConfig,
   laserConfig,
   onChangeLaserConfig,
-  gridEnabled,
   onChangeGridEnabled,
   isGuideEnabled = true,
   onToggleGuide,
@@ -422,7 +420,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const handleCheckUpdate = async () => {
+  const autoCheckedUpdateRef = useRef(false);
+
+  const handleCheckUpdate = useCallback(async () => {
     setCheckingUpdate(true);
     setUpdateError(null);
     try {
@@ -440,13 +440,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     } finally {
       setCheckingUpdate(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (activeTab === "update" && !updateInfo && !checkingUpdate && !updateError) {
-      handleCheckUpdate();
+    if (activeTab === "update" && !autoCheckedUpdateRef.current) {
+      autoCheckedUpdateRef.current = true;
+      queueMicrotask(() => {
+        void handleCheckUpdate();
+      });
     }
-  }, [activeTab]);
+  }, [activeTab, handleCheckUpdate]);
 
   // Accordion state for toolbar config groups
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({

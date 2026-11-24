@@ -3,6 +3,11 @@ import { jsPDF } from "jspdf";
 import { toBlob } from "html-to-image";
 import { BoundingBox, CanvasElement } from "@/types/whiteboard";
 import { readElement } from "@/lib/dispatcher";
+import { resolveLineEndpoints } from "@/lib/geometry";
+import { solveGeometry3D } from "@/lib/geometry3d";
+import { getRealWorldItem } from "@/lib/realworld-art";
+import { getCompositeBoundingBox, hydrateInlinePoints } from "@/lib/selection";
+import { drawAdvancedElementCanvas2D } from "@/lib/export-canvas2d";
 import {
   DEFAULT_PAGE_BOARD_CONFIG,
   type PageBoardConfig,
@@ -57,11 +62,18 @@ interface PointCoord {
 }
 
 function buildPointLookup(elements: CanvasElement[]): Map<string, PointCoord> {
+  const rawSolved = solveGeometry3D(elements);
+  const hydrated = hydrateInlinePoints(elements, rawSolved.pts);
   const map = new Map<string, PointCoord>();
   for (const el of elements) {
     if (el.type === "Point" || el.type === "GeomPoint") {
-      const x = el.type === "Point" ? asNumber(el.props.x, el.transform.x) : el.transform.x;
-      const y = el.type === "Point" ? asNumber(el.props.y, el.transform.y) : el.transform.y;
+      const solvedPos = hydrated.get(el.id);
+      const x =
+        solvedPos?.x ??
+        (el.type === "Point" ? asNumber(el.props.x, el.transform.x) : el.transform.x);
+      const y =
+        solvedPos?.y ??
+        (el.type === "Point" ? asNumber(el.props.y, el.transform.y) : el.transform.y);
       map.set(el.id, {
         x,
         y,
@@ -72,113 +84,18 @@ function buildPointLookup(elements: CanvasElement[]): Map<string, PointCoord> {
   return map;
 }
 
-function expandBounds(
-  acc: { minX: number; maxX: number; minY: number; maxY: number },
-  x: number,
-  y: number
-): void {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-  if (x < acc.minX) acc.minX = x;
-  if (x > acc.maxX) acc.maxX = x;
-  if (y < acc.minY) acc.minY = y;
-  if (y > acc.maxY) acc.maxY = y;
-}
-
 /**
  * Computes math-world bounding box for visible elements on a page.
  */
 export function computePageContentBounds(elements: CanvasElement[]): BoundingBox | null {
   if (elements.length === 0) return null;
-  const pts = buildPointLookup(elements);
-  const acc = {
-    minX: Infinity,
-    maxX: -Infinity,
-    minY: Infinity,
-    maxY: -Infinity,
-  };
-
-  for (const el of elements) {
-    const tx = el.transform.x || 0;
-    const ty = el.transform.y || 0;
-    const sc = el.transform.scale || 1;
-
-    if (el.type === "Ink") {
-      const flat = asNumberArray(el.props.points);
-      for (let i = 0; i + 1 < flat.length; i += 2) {
-        expandBounds(acc, tx + flat[i] * sc, ty + flat[i + 1] * sc);
-      }
-    } else if (el.type === "Rectangle") {
-      const w = asNumber(el.props.width, 2) * sc;
-      const h = asNumber(el.props.height, 1.5) * sc;
-      expandBounds(acc, tx - w / 2, ty - h / 2);
-      expandBounds(acc, tx + w / 2, ty + h / 2);
-    } else if (el.type === "Image") {
-      const w = asNumber(el.props.w, 6) * sc;
-      const h = asNumber(el.props.h, 4) * sc;
-      expandBounds(acc, tx - w / 2, ty - h / 2);
-      expandBounds(acc, tx + w / 2, ty + h / 2);
-    } else if (el.type === "Table") {
-      const cells = Array.isArray(el.props.cells) ? el.props.cells : [];
-      const rows = Math.max(1, cells.length);
-      const cols = Math.max(1, Array.isArray(cells[0]) ? cells[0].length : 1);
-      const w = cols * 2.2 * sc;
-      const h = rows * 0.9 * sc;
-      expandBounds(acc, tx, ty - h);
-      expandBounds(acc, tx + w, ty);
-    } else if (el.type === "Point" || el.type === "GeomPoint") {
-      const p = pts.get(el.id);
-      if (p) {
-        expandBounds(acc, p.x - 0.5, p.y - 0.5);
-        expandBounds(acc, p.x + 0.5, p.y + 0.5);
-      }
-    } else if (
-      el.type === "GeomSegment" ||
-      el.type === "GeomVector" ||
-      el.type === "GeomRay" ||
-      el.type === "GeomLine"
-    ) {
-      const p1 = pts.get(asString(el.props.from));
-      const p2 = pts.get(asString(el.props.to));
-      if (p1) expandBounds(acc, p1.x, p1.y);
-      if (p2) expandBounds(acc, p2.x, p2.y);
-    } else if (el.type === "GeomPolygon") {
-      for (const vid of asStringArray(el.props.vertices)) {
-        const p = pts.get(vid);
-        if (p) expandBounds(acc, p.x, p.y);
-      }
-    } else if (el.type === "GeomCircle") {
-      const c = pts.get(asString(el.props.center));
-      const rObj = el.props.radius;
-      let r = 2;
-      if (isRecord(rObj) && rObj.kind === "value") {
-        r = asNumber(rObj.v, 2);
-      } else if (isRecord(rObj) && rObj.kind === "through" && c) {
-        const tp = pts.get(asString(rObj.point));
-        if (tp) r = Math.hypot(tp.x - c.x, tp.y - c.y);
-      }
-      if (c) {
-        expandBounds(acc, c.x - r, c.y - r);
-        expandBounds(acc, c.x + r, c.y + r);
-      }
-    } else if (el.type === "Axes2D" || el.type === "Axes3D") {
-      const size = asNumber(el.props.size, 6);
-      expandBounds(acc, tx - size, ty - size);
-      expandBounds(acc, tx + size, ty + size);
-    } else if (el.type === "TrigCircle") {
-      expandBounds(acc, tx - 3.5, ty - 3.5);
-      expandBounds(acc, tx + 3.5, ty + 3.5);
-    } else {
-      expandBounds(acc, tx - 2, ty - 1.5);
-      expandBounds(acc, tx + 2, ty + 1.5);
-    }
-  }
-
-  if (!Number.isFinite(acc.minX)) return null;
+  const rawBox = getCompositeBoundingBox(elements);
+  if (!rawBox) return null;
   const pad = 1.0;
-  const minX = acc.minX - pad;
-  const maxX = acc.maxX + pad;
-  const minY = acc.minY - pad;
-  const maxY = acc.maxY + pad;
+  const minX = rawBox.minX - pad;
+  const maxX = rawBox.maxX + pad;
+  const minY = rawBox.minY - pad;
+  const maxY = rawBox.maxY + pad;
   return {
     minX,
     maxX,
@@ -329,6 +246,12 @@ export function renderElementsToCanvas2D(
   }
 
   const pts = buildPointLookup(elements);
+  const byId = new Map(elements.map((el) => [el.id, el]));
+  const rawSolved = solveGeometry3D(elements);
+  const solved = {
+    ...rawSolved,
+    pts: hydrateInlinePoints(elements, rawSolved.pts),
+  };
   const strokeWidthScale = (scaleX + scaleY) / 2 / (isA4 ? 45 : 45);
 
   for (const el of elements) {
@@ -414,30 +337,27 @@ export function renderElementsToCanvas2D(
         ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
       }
       ctx.strokeRect(cx - w / 2, cy - h / 2, w, h);
-    } else if (el.type === "GeomSegment" || el.type === "GeomVector" || el.type === "GeomRay" || el.type === "GeomLine") {
-      const p1 = pts.get(asString(el.props.from));
-      const p2 = pts.get(asString(el.props.to));
-      if (p1 && p2) {
+    } else if (el.type === "GeomSegment") {
+      const ends = resolveLineEndpoints(el, solved.pts, byId);
+      if (ends) {
         if (el.props.dashed) ctx.setLineDash([8 * strokeWidthScale, 5 * strokeWidthScale]);
         ctx.beginPath();
-        ctx.moveTo(toX(p1.x), toY(p1.y));
-        ctx.lineTo(toX(p2.x), toY(p2.y));
+        ctx.moveTo(toX(ends[0].x), toY(ends[0].y));
+        ctx.lineTo(toX(ends[1].x), toY(ends[1].y));
         ctx.stroke();
       }
     } else if (el.type === "GeomPolygon") {
+      const inlinePts = Array.isArray(el.props.points) ? (el.props.points as Array<{ x: number; y: number }>) : null;
       const vids = asStringArray(el.props.vertices);
-      if (vids.length >= 2) {
+      const polyPts =
+        inlinePts && inlinePts.length >= 2
+          ? inlinePts.map((pt) => ({ x: pt.x + tx, y: pt.y + ty }))
+          : vids.map((vid) => pts.get(vid) ?? solved.pts.get(vid)).filter((p): p is PointCoord => Boolean(p));
+      if (polyPts.length >= 2) {
         ctx.beginPath();
-        let started = false;
-        for (const vid of vids) {
-          const p = pts.get(vid);
-          if (!p) continue;
-          if (!started) {
-            ctx.moveTo(toX(p.x), toY(p.y));
-            started = true;
-          } else {
-            ctx.lineTo(toX(p.x), toY(p.y));
-          }
+        ctx.moveTo(toX(polyPts[0].x), toY(polyPts[0].y));
+        for (let pi = 1; pi < polyPts.length; pi++) {
+          ctx.lineTo(toX(polyPts[pi].x), toY(polyPts[pi].y));
         }
         ctx.closePath();
         if (el.style?.fill) {
@@ -504,17 +424,21 @@ export function renderElementsToCanvas2D(
           }
         }
       }
-    } else if (el.type === "Axes2D") {
-      const ox = toX(tx);
-      const oy = toY(ty);
-      const span = asNumber(el.props.size, 5) * scaleX;
-      ctx.strokeStyle = theme.isDark ? "#94a3b8" : "#475569";
-      ctx.beginPath();
-      ctx.moveTo(ox - span, oy);
-      ctx.lineTo(ox + span, oy);
-      ctx.moveTo(ox, oy + span);
-      ctx.lineTo(ox, oy - span);
-      ctx.stroke();
+    } else {
+      drawAdvancedElementCanvas2D(el, {
+        ctx,
+        elements,
+        byId,
+        solved,
+        isDark: theme.isDark,
+        stroke,
+        strokeWidthScale,
+        scaleX,
+        scaleY,
+        toX,
+        toY,
+        preloadedImages,
+      });
     }
     ctx.restore();
   }
@@ -573,7 +497,9 @@ async function preloadImages(elements: CanvasElement[]): Promise<Map<string, HTM
   const map = new Map<string, HTMLImageElement>();
   if (typeof Image === "undefined") return map;
   const imageEls = elements.filter(
-    (el) => el.type === "Image" && typeof el.props?.src === "string" && el.props.src
+    (el) =>
+      (el.type === "Image" && typeof el.props?.src === "string" && el.props.src) ||
+      el.type === "RealObject"
   );
   await Promise.all(
     imageEls.map((el) => {
@@ -584,7 +510,19 @@ async function preloadImages(elements: CanvasElement[]): Promise<Map<string, HTM
           resolve();
         };
         img.onerror = () => resolve();
-        img.src = el.props.src as string;
+        if (el.type === "RealObject") {
+          if (typeof el.props?.src === "string" && el.props.src) {
+            img.src = el.props.src;
+          } else {
+            const iconId = typeof el.props?.icon === "string" ? el.props.icon : "tree";
+            const item = getRealWorldItem(iconId);
+            const [x0, y0, x1, y1] = item.box;
+            const svgDoc = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${x1 - x0} ${y1 - y0}">${item.svg}</svg>`;
+            img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgDoc)}`;
+          }
+        } else {
+          img.src = el.props.src as string;
+        }
       });
     })
   );

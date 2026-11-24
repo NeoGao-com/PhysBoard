@@ -106,6 +106,10 @@ export async function storePendingPdfPages(boardId: string, pages: unknown[]): P
         db.close();
         reject(tx.error);
       };
+      tx.onabort = () => {
+        db.close();
+        reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+      };
     });
   } catch (err) {
     console.error("storePendingPdfPages IndexedDB fallback:", err);
@@ -135,6 +139,14 @@ export async function retrievePendingPdfPages(boardId: string): Promise<unknown[
       };
       req.onerror = () => reject(req.error);
       tx.oncomplete = () => db.close();
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+      tx.onabort = () => {
+        db.close();
+        reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+      };
     });
 
     if (result && Array.isArray(result.pages) && result.pages.length > 0) {

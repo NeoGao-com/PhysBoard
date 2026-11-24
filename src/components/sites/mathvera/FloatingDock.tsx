@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ModularBlockId } from "@/lib/modular-toolbar";
 
@@ -22,10 +22,19 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
   children,
 }) => {
   const dockRef = useRef<HTMLDivElement>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      dragCleanupRef.current?.();
+      dragCleanupRef.current = null;
+    };
+  }, []);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCleanupRef.current?.();
     const startX = e.clientX;
     const startY = e.clientY;
     const initX = position.x;
@@ -46,14 +55,24 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
       }
     };
 
-    const onPointerUp = () => {
+    const cleanup = () => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+      if (dragCleanupRef.current === cleanup) {
+        dragCleanupRef.current = null;
+      }
+    };
+
+    const onPointerUp = () => {
+      cleanup();
       onMove(latestPos);
     };
 
+    dragCleanupRef.current = cleanup;
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
   };
 
   if (typeof document === "undefined") return null;

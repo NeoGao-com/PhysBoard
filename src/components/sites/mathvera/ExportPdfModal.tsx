@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import * as Y from "yjs";
 import { exportMultiPagePDF, downloadBlob } from "@/lib/export";
 import { readPageBoardConfig } from "@/lib/board-themes";
@@ -28,6 +28,22 @@ export const ExportPdfModal: React.FC<ExportPdfModalProps> = ({
   const [whitePaper, setWhitePaper] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    queueMicrotask(() => {
+      setCustomPagesText(`${currentPage}`);
+      setErrorMsg(null);
+    });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isExporting) {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, currentPage, isExporting, onClose]);
 
   const currentConfig = doc ? readPageBoardConfig(doc, currentPage) : null;
   const boardFormat = currentConfig?.format ?? "infinite";

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import * as Y from "yjs";
 import { deleteYjsPages, addYjsPage, setYjsCurrentPage } from "./PageBar";
 import { readPageBoardConfig, writePageBoardConfig } from "@/lib/board-themes";
@@ -22,6 +22,18 @@ export const PageManagerModal: React.FC<PageManagerModalProps> = ({
 }) => {
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [isMinimized, setIsMinimized] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 

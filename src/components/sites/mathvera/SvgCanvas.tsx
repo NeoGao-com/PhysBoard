@@ -57,7 +57,6 @@ export function SvgCanvas({
   gridEnabled = true,
   className = "",
   totalPages = 1,
-  currentPage = 1,
   cursorOverride,
 }: SvgCanvasProps) {
   const theme = useMemo(() => resolveBoardColors(boardConfig), [boardConfig]);
@@ -89,7 +88,7 @@ export function SvgCanvas({
       return "crosshair";
     }
     return "default";
-  }, [isPanning, isSpacePressed, currentTool]);
+  }, [cursorOverride, isPanning, isSpacePressed, currentTool]);
 
   const spacing = theme.spacingPx;
   const patternOffset = useMemo(

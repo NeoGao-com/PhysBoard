@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { ActiveSimSession } from "@/lib/sim-library";
 
 export interface FullscreenSimOverlayProps {
@@ -58,6 +58,22 @@ export const FullscreenSimOverlay: React.FC<FullscreenSimOverlayProps> = ({
   const [strokes, setStrokes] = useState<OverlayStroke[]>([]);
   const [liveStroke, setLiveStroke] = useState<OverlayStroke | null>(null);
   const drawingPointerIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!session || minimized) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (annotateMode) {
+          setAnnotateMode(false);
+        } else {
+          onMinimize();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [session, minimized, annotateMode, onMinimize]);
 
   if (!session) return null;
 

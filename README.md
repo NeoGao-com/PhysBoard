@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/logo.png" alt="PhysBoard Logo" width="116" height="116" />
-  <h1>PhysBoard v1.3.1</h1>
+  <h1>PhysBoard v1.4.0</h1>
   <p>
     <strong>Bảng trắng tương tác toàn diện dạy Toán · Vật lý · Hoá học THPT (GDPT 2018)</strong><br />
     <em>Chạy mượt mà trên Windows (<code>.exe</code>), Android (<code>.apk</code>) &amp; Trình duyệt — Hoạt động 100% Offline, không cần đăng nhập</em>

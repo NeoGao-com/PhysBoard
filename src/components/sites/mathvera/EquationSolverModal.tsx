@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import type { EquationSolution } from "@/lib/equation-solver";
 
 export interface EquationSolverModalProps {
@@ -17,6 +17,18 @@ export const EquationSolverModal: React.FC<EquationSolverModalProps> = ({
   onInsertToCanvas,
 }) => {
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !solution) return null;
 

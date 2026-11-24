@@ -53,21 +53,13 @@ import {
   getConstructMarksEnabled,
   setConstructMarksEnabled,
   getNextPointName,
-  getNextPointNames,
   incenter2D,
   intersectLineCircleAt,
   intersectLines2D,
   midpoint2D,
   orthocenter2D,
-  pointAtAngle,
   pointInPolygon2D,
-  reflectPointOverLine,
-  reflectPointOverPoint,
-  resolveCircleRadius,
-  resolveLineEndpoints,
-  resolveLineGeometry,
   rotatePointAround,
-  snapPointToObject,
   tangentPointToCircle,
   bisectorFoot2D,
   DEFAULT_DOT_SCALE,
@@ -89,15 +81,11 @@ import {
   computeFlattenedFace,
   computeUnfoldedPolyhedronNet,
   createOxyzElement,
-  projectOxyzPoint,
-  createPlaneParallelogramElements,
   createSolid3DElement,
   defaultCameraForSolid,
-  extractPolyhedronEdges,
   liftSolidTo3D,
   orbitCamera,
   resolveSolidSubSelectionAtPoint,
-  skewLineClosest,
   solveGeometry3D,
 } from "@/lib/geometry3d";
 import {
@@ -105,7 +93,6 @@ import {
   buildVarTableFromExpr,
 } from "@/lib/math-eval";
 import {
-  type ImportedImageResult,
   type ImportedPdfPage,
   importPdfPages,
   readImageFile,
@@ -117,7 +104,6 @@ import {
 import { buildShareUrl, sanitizeRoomId } from "@/lib/room";
 import {
   downloadBlob,
-  exportPDF,
   exportPNG,
 } from "@/lib/export";
 import {
@@ -128,47 +114,30 @@ import {
   type PageBoardConfig,
   adaptElementForBoard,
   adaptStrokeForBoard,
-  applyBoardConfigToAllPages,
   readPageBoardConfig,
   resolveBoardColors,
   writePageBoardConfig,
 } from "@/lib/board-themes";
-import {
-  getShortcutMap,
-  matchCommandForKeyEvent,
-  type ShortcutMap,
-} from "@/lib/commands";
+import { getShortcutMap, type ShortcutMap } from "@/lib/commands";
 import { useCanvasNavigation } from "@/hooks/useCanvasNavigation";
 import { useHistory } from "@/hooks/useHistory";
 import { useWhiteboardSync } from "@/hooks/useWhiteboardSync";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useGeometryBuilder } from "@/hooks/useGeometryBuilder";
 import { SvgCanvas } from "./SvgCanvas";
 import { Toolbar } from "./Toolbar";
-import { CommandPaletteModal } from "./CommandPaletteModal";
 import { SelectionBar } from "./SelectionBar";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { PeerCursors } from "./PeerCursors";
 import { TabLockOverlay } from "./TabLockOverlay";
 import { OfflineBanner } from "./OfflineBanner";
 import { OrbitBar } from "./OrbitBar";
-import { MathEditor, ensureMathLiveRegistered } from "./MathEditor";
-import { RealWorldDrawer } from "./RealWorldDrawer";
-import { PhysicsDrawer } from "./PhysicsDrawer";
-import { MathFormulasDrawer } from "./MathFormulasDrawer";
-import { ChemistryFormulasDrawer } from "./ChemistryFormulasDrawer";
-import { SimLauncherModal } from "./SimLauncherModal";
-import { FullscreenSimOverlay } from "./FullscreenSimOverlay";
-import {
-  QuestionCropModal,
-  type BatchCroppedQuestionsResult,
-  type CroppedQuestionResult,
-} from "./QuestionCropModal";
-import { ClassroomToolsWidget } from "./ClassroomToolsWidget";
-import { FeatureGuideModal, hasSeenFeatureGuide } from "./FeatureGuideModal";
+import { ensureMathLiveRegistered } from "./MathEditor";
+import { hasSeenFeatureGuide } from "./FeatureGuideModal";
 import type { ActiveSimSession } from "@/lib/sim-library";
-import { CalculatorWidget } from "./CalculatorWidget";
-import { ExportPdfModal } from "./ExportPdfModal";
-import { BoardManagerModal } from "./BoardManagerModal";
 import { retrievePendingPdfPages } from "@/lib/board-manager";
+import { WhiteboardOverlays } from "./WhiteboardOverlays";
+import { LaserStrokesLayer, type LaserStrokesLayerHandle } from "./LaserStrokesLayer";
 import {
   addYjsPage,
   deleteYjsPages,
@@ -176,23 +145,10 @@ import {
   useYjsPages,
 } from "./PageBar";
 import { PageSidebar } from "./PageSidebar";
-import { PageManagerModal } from "./PageManagerModal";
-import {
-  AxesPointDialog,
-  AxesVectorDialog,
-  Axes3DPointDialog,
-  Axes3DVectorDialog,
-  Axes3DFigureDialog,
+import type {
   Axes3DFigureKind,
-  BayesConfigDialog,
-  ChartConfigDialog,
-  ConicConfigDialog,
-  Curve2DConfigDialog,
   Curve2DDialogMode,
   M3MenuAction,
-  NumberLineConfigDialog,
-  PlotConfigDialog,
-  VarTableConfigDialog,
 } from "./FunctionsAndStatsMenus";
 import { InkElement } from "./elements/InkElement";
 import { PointElement } from "./elements/PointElement";
@@ -201,8 +157,7 @@ import { CircleElement } from "./elements/CircleElement";
 import { PolygonElement } from "./elements/PolygonElement";
 import { GeometryConstructionElement } from "./elements/GeometryConstructionElement";
 import { Solid3DElement } from "./elements/Solid3DElement";
-import { LaserSettingsModal } from "./LaserSettingsModal";
-import { SettingsModal, type SettingsTab } from "./SettingsModal";
+import type { SettingsTab } from "./SettingsModal";
 import { InstructionGuideBar } from "./InstructionGuideBar";
 import { getToolGuide } from "@/lib/tool-guides";
 import {
@@ -217,7 +172,6 @@ import {
 } from "@/lib/modular-toolbar";
 import {
   LaserConfig,
-  DEFAULT_LASER_CONFIG,
   loadLaserConfig,
   saveLaserConfig,
 } from "@/lib/laser-config";
@@ -255,9 +209,6 @@ import {
   RealObjectElement,
 } from "./elements/RealObjectElement";
 import {
-  EquationSolverModal,
-} from "./EquationSolverModal";
-import {
   solveEquationOrSystem,
   type EquationSolution,
 } from "@/lib/equation-solver";
@@ -265,7 +216,6 @@ import {
 export interface WhiteboardProps {
   roomId?: string;
   initialRoomId?: string;
-  onGoHome?: () => void;
 }
 
 const SOLID_TOOL_SPECS: Record<
@@ -372,30 +322,12 @@ function getA4PageAtPoint(
   return null;
 }
 
-function isEditableTarget(el: Element | null): boolean {
-  if (!el) return false;
-  const tag = el.tagName?.toLowerCase();
-  if (tag === "input" || tag === "textarea" || tag === "select" || tag === "math-field") {
-    return true;
-  }
-  if ((el as HTMLElement).isContentEditable) return true;
-  return Boolean(el.closest("math-field, [data-wb-inplace], [contenteditable='true']"));
-}
-
-function distToSeg(p: Point2D, a: Point2D, b: Point2D): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const l2 = dx * dx + dy * dy;
-  if (l2 < 1e-9) return Math.hypot(p.x - a.x, p.y - a.y);
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
-  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
-}
 
 function newElId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps) {
+export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
   const activeRoomId = sanitizeRoomId(roomId ?? initialRoomId ?? "default");
 
   // 1. Real-Time Sync, Awareness, Single-Tab Lock & Yjs Pages
@@ -468,8 +400,24 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [dotScale, setDotScale] = useState<number>(DEFAULT_DOT_SCALE);
   const [, setConstructMarksTick] = useState<number>(0);
   const [gridEnabled, setGridEnabled] = useState<boolean>(true);
-  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(false);
-  const [inkToShape, setInkToShape] = useState<boolean>(true);
+  const [penOnlyMode, setPenOnlyMode] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const saved = window.localStorage.getItem(PEN_ONLY_MODE_STORAGE_KEY);
+      return saved !== null ? saved === "true" : false;
+    } catch {
+      return false;
+    }
+  });
+  const [inkToShape, setInkToShape] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const saved = window.localStorage.getItem(INK_TO_SHAPE_STORAGE_KEY);
+      return saved !== null ? saved === "true" : true;
+    } catch {
+      return true;
+    }
+  });
   const [spenConfig, setSpenConfig] = useState<SPenConfig>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -497,16 +445,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const previousToolBeforeEraserRef = useRef<WhiteboardTool>("ink");
   const eraserDidEraseRef = useRef<boolean>(false);
 
-  const handleToggleAutoSwitchTarget = useCallback(() => {
-    setAutoSwitchTarget((prev) => {
-      const next = prev === "select" ? "ink" : prev === "ink" ? "off" : "select";
-      if (typeof window !== "undefined") {
-        localStorage.setItem("physboard_auto_switch_target", next);
-      }
-      return next;
-    });
-  }, []);
-
   const resetToolAfterCreation = useCallback(() => {
     if (autoSwitchTarget === "off") return;
     setActiveTool(autoSwitchTarget === "ink" ? "ink" : "select");
@@ -522,10 +460,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     }
   }, [autoSwitchTarget]);
 
-  // Dedicated laser pointer ephemeral strokes (not in Yjs, decaying over time)
-  const [laserStrokes, setLaserStrokes] = useState<
-    Array<{ id: string; points: number[]; createdAt: number; color?: string; width?: number }>
-  >([]);
+  // Isolated laser pointer trail ref (ephemeral strokes decay inside LaserStrokesLayer)
+  const laserLayerRef = useRef<LaserStrokesLayerHandle | null>(null);
   const [laserConfig, setLaserConfig] = useState<LaserConfig>(() => loadLaserConfig());
   const [laserSettingsOpen, setLaserSettingsOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
@@ -545,41 +481,9 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [liveLaserScreenPos, setLiveLaserScreenPos] = useState<{ x: number; y: number } | null>(null);
   const [isLaserPressed, setIsLaserPressed] = useState(false);
 
-  useEffect(() => {
-    if (activeTool !== "ink:laser") {
-      setLiveLaserScreenPos(null);
-      setIsLaserPressed(false);
-    }
-  }, [activeTool]);
-
   const handleUpdateLaserConfig = useCallback((newCfg: LaserConfig) => {
     setLaserConfig(newCfg);
     saveLaserConfig(newCfg);
-  }, []);
-
-  useEffect(() => {
-    if (laserStrokes.length === 0) return;
-    const interval = setInterval(() => {
-      const now = performance.now();
-      setLaserStrokes((prev) => prev.filter((s) => now - s.createdAt < 1500));
-    }, 16);
-    return () => clearInterval(interval);
-  }, [laserStrokes.length]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const savedPenOnly = window.localStorage.getItem(PEN_ONLY_MODE_STORAGE_KEY);
-      if (savedPenOnly !== null) {
-        setPenOnlyMode(savedPenOnly === "true");
-      }
-      const savedInkShape = window.localStorage.getItem(INK_TO_SHAPE_STORAGE_KEY);
-      if (savedInkShape !== null) {
-        setInkToShape(savedInkShape === "true");
-      }
-    } catch {
-      // ignore localStorage errors
-    }
   }, []);
 
   const handleToggleInkToShape = useCallback((enabled: boolean) => {
@@ -689,11 +593,17 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (typeof navigator !== "undefined" && navigator.webdriver) return;
     if (hasSeenFeatureGuide()) return;
     const timer = window.setTimeout(() => {
       setFeatureGuideOpen(true);
     }, 650);
-    return () => window.clearTimeout(timer);
+    const cancelAutoGuide = () => window.clearTimeout(timer);
+    window.addEventListener("pointerdown", cancelAutoGuide, { once: true, capture: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pointerdown", cancelAutoGuide, { capture: true });
+    };
   }, []);
   const [activeSim, setActiveSim] = useState<ActiveSimSession | null>(null);
   const [simMinimized, setSimMinimized] = useState(false);
@@ -737,7 +647,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   // Automatically collapse sidebar when screen orientation is portrait to preserve max drawing width
   useEffect(() => {
     if (isPortrait) {
-      setPageSidebarOpen(false);
+      queueMicrotask(() => setPageSidebarOpen(false));
     }
   }, [isPortrait]);
   const [pageManagerOpen, setPageManagerOpen] = useState(false);
@@ -1530,6 +1440,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       setPickedItems([]);
       setStatusHint(null);
       setSolidSubSel(null);
+      if (next !== "ink:laser") {
+        setLiveLaserScreenPos(null);
+        setIsLaserPressed(false);
+      }
       if (typeof next === "string" && tryApplyConstructionFromSelection(next)) {
         setActiveTool("select");
         return;
@@ -2080,171 +1994,89 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     ]
   );
 
-  const commitDraftPolygon = useCallback(() => {
-    if (draftPolygonPts.length < 3) return;
-    const polyId = newElId("poly");
-    const names = getNextPointNames(draftPolygonPts.length, pageElements);
-    const marksEnabled = getConstructMarksEnabled();
-    const embedded: EmbeddedVertex[] = draftPolygonPts.map((pt, i) => ({
-      id: `${polyId}_v${i}`,
-      name: names[i] ?? `P${i + 1}`,
-      x: pt.x,
-      y: pt.y,
-    }));
-    dispatcher.dispatch({
-      type: "object.create",
-      params: {
-        id: polyId,
-        type: "GeomPolygon",
-        style: {
-          stroke: currentStyle.stroke ?? "#2563eb",
-          fill: "rgba(37,99,235,0.06)",
-          width: currentStyle.width ?? 2,
-          dash: currentStyle.dash ?? false,
-        },
-        props: {
-          vertices: embedded.map((v) => v.id),
-          points: embedded,
-          marksEnabled,
-        },
-      },
-    });
-    setDraftPolygonPts([]);
-    resetToolAfterCreation();
-    setStatusHint(null);
-  }, [
-    draftPolygonPts,
-    pageElements,
+  const {
+    commitDraftPolygon,
+    findNearestPoint,
+    snapPointAtCursor,
+    commitTwoPointShape,
+    handleConstructionClick,
+  } = useGeometryBuilder({
     dispatcher,
+    viewport,
+    byId,
+    hydratedPts,
+    solved3D,
+    pageElements,
     currentStyle,
+    a4Opt,
+    draftPolygonPts,
+    setDraftPolygonPts,
+    pickedItems,
+    setPickedItems,
+    setStatusHint,
+    setActiveTool,
     resetToolAfterCreation,
-  ]);
+    setAngleDialog,
+  });
 
-  // Global Keyboard Shortcuts (Strict Isolation inside input, textarea, math-field, contentEditable)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isEditableTarget(document.activeElement)) return;
-      if (commandPaletteOpen) return;
-
-      const isModifier = e.metaKey || e.ctrlKey;
-      const lower = e.key.toLowerCase();
-
-      if (isModifier && (lower === "z" || e.code === "KeyZ")) {
-        e.preventDefault();
-        if (e.shiftKey) {
-          redo();
-        } else {
-          undo();
-        }
-        return;
-      }
-      if (isModifier && (lower === "y" || e.code === "KeyY")) {
-        e.preventDefault();
-        redo();
-        return;
-      }
-
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedIds.length > 0) {
-          e.preventDefault();
-          handleDeleteSelected();
-        }
-        return;
-      }
-      if (isModifier && lower === "c") {
-        e.preventDefault();
-        handleCopySelected();
-        return;
-      }
-      if (isModifier && lower === "x") {
-        e.preventDefault();
-        handleCutSelected();
-        return;
-      }
-      if (isModifier && lower === "v") {
-        e.preventDefault();
-        handlePaste();
-        return;
-      }
-      if (isModifier && lower === "a") {
-        e.preventDefault();
-        setSolidSubSel(null);
-        setSelectedIds(
-          pageElements
-            .filter(
-              (el) => !el.style?.hidden && !el.props?.locked && !el.style?.locked
-            )
-            .map((el) => el.id)
-        );
-        return;
-      }
-      if (e.key === "Enter" && activeTool === "polygon" && draftPolygonPts.length >= 3) {
-        e.preventDefault();
-        commitDraftPolygon();
-        return;
-      }
-      if (e.key === "Escape") {
-        if (document.fullscreenElement) {
-          document.exitFullscreen().catch(() => {});
-        }
-        if (mathSession) {
-          setMathSession(null);
-        } else if (shareModalOpen) {
-          setShareModalOpen(false);
-        } else if (realWorldDrawerOpen) {
-          setRealWorldDrawerOpen(false);
-        } else if (physicsDrawerOpen) {
-          setPhysicsDrawerOpen(false);
-        } else if (mathDrawerOpen) {
-          setMathDrawerOpen(false);
-        } else if (calculatorOpen) {
-          setCalculatorOpen(false);
-        } else if (draftTwoPtRef.current || draftPolygonPts.length > 0 || pickedItems.length > 0) {
-          draftTwoPtRef.current = null;
-          setDraftPreviewLine(null);
-          setDraftPolygonPts([]);
-          setPickedItems([]);
-          setStatusHint(null);
-        } else if (selectedIds.length > 0) {
-          setSelectedIds([]);
-          setOrbitActiveId(null);
-        } else if (activeTool && activeTool !== "select") {
-          handleSelectTool("select");
-        }
-        return;
-      }
-
-      // Open Command Palette quickly with Ctrl+K or '?' or '/'
-      if ((isModifier && lower === "k") || (!isModifier && !e.altKey && (e.key === "?" || e.key === "/"))) {
-        e.preventDefault();
-        setCommandPaletteOpen(true);
-        return;
-      }
-
-      // Match user-customizable shortcuts from registry
-      const matchedCmd = matchCommandForKeyEvent(e, shortcutMap);
-      if (matchedCmd) {
-        e.preventDefault();
-        executeCommand(matchedCmd.id);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
+  // Global Keyboard Shortcuts + Android Back dismissal hook
+  useKeyboardShortcuts({
     commandPaletteOpen,
+    setCommandPaletteOpen,
     activeTool,
     selectedIds,
+    setSelectedIds,
+    setOrbitActiveId,
     pageElements,
-    mathSession,
-    shareModalOpen,
-    realWorldDrawerOpen,
-    physicsDrawerOpen,
-    calculatorOpen,
-    draftPolygonPts.length,
+    hasDraftTwoPt: () => Boolean(draftTwoPtRef.current),
+    clearDraftTwoPt: () => {
+      draftTwoPtRef.current = null;
+      setDraftPreviewLine(null);
+    },
+    draftPolygonLen: draftPolygonPts.length,
+    clearDraftPolygon: () => setDraftPolygonPts([]),
     commitDraftPolygon,
-    pickedItems.length,
+    pickedItemsLen: pickedItems.length,
+    clearPickedItems: () => setPickedItems([]),
+    setStatusHint,
+    mathSessionOpen: Boolean(mathSession),
+    closeMathSession: () => setMathSession(null),
+    shareModalOpen,
+    closeShareModal: () => setShareModalOpen(false),
+    realWorldDrawerOpen,
+    closeRealWorldDrawer: () => setRealWorldDrawerOpen(false),
+    physicsDrawerOpen,
+    closePhysicsDrawer: () => setPhysicsDrawerOpen(false),
+    mathDrawerOpen,
+    closeMathDrawer: () => setMathDrawerOpen(false),
+    chemistryDrawerOpen,
+    closeChemistryDrawer: () => setChemistryDrawerOpen(false),
+    calculatorOpen,
+    closeCalculator: () => setCalculatorOpen(false),
+    classroomToolsOpen,
+    closeClassroomTools: () => setClassroomToolsOpen(false),
+    equationModalOpen,
+    closeEquationModal: () => setEquationModalOpen(false),
+    simLauncherOpen,
+    closeSimLauncher: () => setSimLauncherOpen(false),
+    activeSimVisible: Boolean(activeSim && !simMinimized),
+    minimizeActiveSim: () => setSimMinimized(true),
+    questionCropOpen,
+    closeQuestionCrop: () => setQuestionCropOpen(false),
+    exportPdfModalOpen,
+    closeExportPdfModal: () => setExportPdfModalOpen(false),
+    settingsModalOpen,
+    closeSettingsModal: () => setSettingsModalOpen(false),
+    boardManagerOpen,
+    closeBoardManager: () => setBoardManagerOpen(false),
+    pageManagerOpen,
+    closePageManager: () => setPageManagerOpen(false),
+    laserSettingsOpen,
+    closeLaserSettings: () => setLaserSettingsOpen(false),
+    featureGuideOpen,
+    closeFeatureGuide: () => setFeatureGuideOpen(false),
     shortcutMap,
+    clearSolidSubSel: () => setSolidSubSel(null),
     undo,
     redo,
     handleDeleteSelected,
@@ -2253,480 +2085,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     handlePaste,
     handleSelectTool,
     executeCommand,
-  ]);
+  });
 
-  // --- Snapping & Hit-Testing Helpers for Geometry Constructions ---
-  const findNearestPoint = useCallback(
-    (worldPos: Point2D, maxScreenPx = 24) => {
-      const thresh = maxScreenPx / (viewport.scale || 45);
-      let best: {
-        id: string;
-        pos: Point2D;
-        dist: number;
-        polygonId?: string;
-      } | null = null;
 
-      // 1. Standalone Point / GeomPoint
-      for (const el of pageElements) {
-        if (el.style?.hidden) continue;
-        if (el.type === "GeomPoint" || el.type === "Point") {
-          const p = hydratedPts.get(el.id) ?? {
-            x: el.transform.x,
-            y: el.transform.y,
-          };
-          const d = dist2D(worldPos, p);
-          if (d <= thresh && (!best || d < best.dist)) {
-            best = { id: el.id, pos: p, dist: d };
-          }
-        }
-        // 2. Embedded polygon vertices
-        if (el.type === "GeomPolygon" && Array.isArray(el.props.points)) {
-          for (const v of el.props.points as EmbeddedVertex[]) {
-            const p = { x: v.x + el.transform.x, y: v.y + el.transform.y };
-            const d = dist2D(worldPos, p);
-            if (d <= thresh && (!best || d < best.dist)) {
-              best = { id: v.id, pos: p, dist: d, polygonId: el.id };
-            }
-          }
-        }
-        // 3. 3D Solid vertices
-        if (el.type === "Solid3D" && Array.isArray(el.props.points)) {
-          const ptIds = el.props.points as string[];
-          const coords = Array.isArray(el.props.pointCoords)
-            ? (el.props.pointCoords as Point2D[])
-            : [];
-          for (let i = 0; i < ptIds.length; i++) {
-            const p =
-              hydratedPts.get(ptIds[i]) ??
-              (coords[i]
-                ? {
-                    x: coords[i].x + el.transform.x,
-                    y: coords[i].y + el.transform.y,
-                  }
-                : undefined);
-            if (!p) continue;
-            const d = dist2D(worldPos, p);
-            if (d <= thresh && (!best || d < best.dist)) {
-              best = { id: ptIds[i], pos: p, dist: d };
-            }
-          }
-        }
-      }
-      return best;
-    },
-    [pageElements, hydratedPts, viewport.scale]
-  );
-
-  const findNearestEdgeOrSegment = useCallback(
-    (worldPos: Point2D, maxScreenPx = 28) => {
-      const thresh = maxScreenPx / (viewport.scale || 45);
-      let best: {
-        id: string;
-        a: Point2D;
-        b: Point2D;
-        aId?: string;
-        bId?: string;
-        dist: number;
-        polygonId?: string;
-      } | null = null;
-
-      for (const el of pageElements) {
-        if (el.style?.hidden) continue;
-        if (
-          el.type === "GeomSegment" ||
-          el.type === "GeomLine" ||
-          el.type === "GeomRay" ||
-          el.type === "GeomVector"
-        ) {
-          const ends = resolveLineEndpoints(el, hydratedPts, byId);
-          if (ends) {
-            const d = distToSeg(worldPos, ends[0], ends[1]);
-            if (d <= thresh && (!best || d < best.dist)) {
-              best = {
-                id: el.id,
-                a: ends[0],
-                b: ends[1],
-                aId: typeof el.props.from === "string" ? el.props.from : undefined,
-                bId: typeof el.props.to === "string" ? el.props.to : undefined,
-                dist: d,
-              };
-            }
-          }
-        }
-        if (el.type === "GeomPolygon") {
-          const verts: Array<{ id: string; pt: Point2D }> = [];
-          if (Array.isArray(el.props.points)) {
-            for (const v of el.props.points as EmbeddedVertex[]) {
-              verts.push({
-                id: v.id,
-                pt: { x: v.x + el.transform.x, y: v.y + el.transform.y },
-              });
-            }
-          } else if (Array.isArray(el.props.vertices)) {
-            for (const vid of el.props.vertices as string[]) {
-              const p = hydratedPts.get(vid);
-              if (p) verts.push({ id: vid, pt: p });
-            }
-          }
-          for (let i = 0; i < verts.length; i++) {
-            const u = verts[i];
-            const v = verts[(i + 1) % verts.length];
-            const d = distToSeg(worldPos, u.pt, v.pt);
-            if (d <= thresh && (!best || d < best.dist)) {
-              best = {
-                id: `${el.id}_edge_${i}`,
-                a: u.pt,
-                b: v.pt,
-                aId: u.id,
-                bId: v.id,
-                dist: d,
-                polygonId: el.id,
-              };
-            }
-          }
-        }
-        if (el.type === "Solid3D" && Array.isArray(el.props.points)) {
-          const ptIds = el.props.points as string[];
-          const coords = Array.isArray(el.props.pointCoords)
-            ? (el.props.pointCoords as Point2D[])
-            : [];
-          const lift = solved3D.lifts.get(el.id);
-          if (lift) {
-            const edges = extractPolyhedronEdges(lift);
-            for (const [i, j] of edges) {
-              const idA = ptIds[i];
-              const idB = ptIds[j];
-              if (!idA || !idB) continue;
-              const pA =
-                hydratedPts.get(idA) ??
-                (coords[i]
-                  ? {
-                      x: coords[i].x + el.transform.x,
-                      y: coords[i].y + el.transform.y,
-                    }
-                  : undefined);
-              const pB =
-                hydratedPts.get(idB) ??
-                (coords[j]
-                  ? {
-                      x: coords[j].x + el.transform.x,
-                      y: coords[j].y + el.transform.y,
-                    }
-                  : undefined);
-              if (!pA || !pB) continue;
-              const d = distToSeg(worldPos, pA, pB);
-              if (d <= thresh && (!best || d < best.dist)) {
-                best = {
-                  id: `${el.id}_edge_${i}_${j}`,
-                  a: pA,
-                  b: pB,
-                  aId: idA,
-                  bId: idB,
-                  dist: d,
-                };
-              }
-            }
-          }
-        }
-      }
-      return best;
-    },
-    [pageElements, hydratedPts, byId, solved3D.lifts, viewport.scale]
-  );
-
-  const findNearestCircle = useCallback(
-    (worldPos: Point2D, maxScreenPx = 28) => {
-      const thresh = maxScreenPx / (viewport.scale || 45);
-      for (const el of pageElements) {
-        if (el.style?.hidden || el.type !== "GeomCircle") continue;
-        const centerId = String(el.props.center ?? "");
-        const center = hydratedPts.get(centerId);
-        if (!center) continue;
-        const r = resolveCircleRadius(
-          el.props.radius as Parameters<typeof resolveCircleRadius>[0],
-          center,
-          (id) => hydratedPts.get(id)
-        );
-        if (r === null) continue;
-        if (
-          Math.abs(dist2D(worldPos, center) - r) <= thresh ||
-          dist2D(worldPos, center) <= thresh
-        ) {
-          return { el, center, centerId, r };
-        }
-      }
-      return null;
-    },
-    [pageElements, hydratedPts, viewport.scale]
-  );
-
-  const snapPointAtCursor = useCallback(
-    (
-      worldPos: Point2D,
-      maxScreenPx = 16
-    ): { point: Point2D; constraint: PointConstraint } => {
-      const nearEdge = findNearestEdgeOrSegment(worldPos, maxScreenPx);
-      if (nearEdge) {
-        const edgeEl = byId.get(nearEdge.id);
-        if (edgeEl) {
-          const snapped = snapPointToObject(edgeEl, worldPos, hydratedPts, byId);
-          if (snapped) {
-            return { point: snapped.at, constraint: snapped.constraint };
-          }
-        }
-        const dx = nearEdge.b.x - nearEdge.a.x;
-        const dy = nearEdge.b.y - nearEdge.a.y;
-        const lenSq = dx * dx + dy * dy;
-        if (
-          lenSq > 1e-12 &&
-          nearEdge.aId &&
-          nearEdge.bId &&
-          (byId.has(nearEdge.aId) || solved3D.owner.has(nearEdge.aId)) &&
-          (byId.has(nearEdge.bId) || solved3D.owner.has(nearEdge.bId))
-        ) {
-          const t = Math.max(
-            0,
-            Math.min(
-              1,
-              ((worldPos.x - nearEdge.a.x) * dx +
-                (worldPos.y - nearEdge.a.y) * dy) /
-                lenSq
-            )
-          );
-          return {
-            point: { x: nearEdge.a.x + t * dx, y: nearEdge.a.y + t * dy },
-            constraint: { kind: "onLine", a: nearEdge.aId, b: nearEdge.bId, t },
-          };
-        }
-      }
-      const nearCirc = findNearestCircle(worldPos, maxScreenPx);
-      if (nearCirc) {
-        const snapped = snapPointToObject(
-          nearCirc.el,
-          worldPos,
-          hydratedPts,
-          byId
-        );
-        if (snapped) {
-          return { point: snapped.at, constraint: snapped.constraint };
-        }
-      }
-      return { point: worldPos, constraint: { kind: "free" } };
-    },
-    [findNearestEdgeOrSegment, findNearestCircle, byId, hydratedPts, solved3D.owner]
-  );
-
-  // Commit Two-Point Segment / Line / Ray / Vector / Circle
-  const commitTwoPointShape = useCallback(
-    (
-      tool: string,
-      p1: Point2D,
-      p2: Point2D,
-      startSnapId?: string,
-      endSnapId?: string
-    ) => {
-      const dist = dist2D(p1, p2);
-      if (dist < 4 / (viewport.scale || 45)) return;
-
-      const startSnap = startSnapId ? null : snapPointAtCursor(p1, 20);
-      const endSnap = endSnapId ? null : snapPointAtCursor(p2, 20);
-      const rawResolvedP1 = startSnap && startSnap.constraint.kind !== "free" ? startSnap.point : p1;
-      const rawResolvedP2 = endSnap && endSnap.constraint.kind !== "free" ? endSnap.point : p2;
-
-      const a4Opt = isA4Format
-        ? BOARD_FORMAT_OPTIONS.find((f) => f.id === currentBoardConfig?.format)
-        : null;
-      const clampA4 = (pt: Point2D): Point2D => {
-        if (!a4Opt) return pt;
-        const hw = a4Opt.widthWorld / 2;
-        const hh = a4Opt.heightWorld / 2;
-        return {
-          x: Math.max(-hw, Math.min(hw, pt.x)),
-          y: Math.max(-hh, Math.min(hh, pt.y)),
-        };
-      };
-      const resolvedP1 = clampA4(rawResolvedP1);
-      const resolvedP2 = clampA4(rawResolvedP2);
-
-      const createSnappedEndpoints = (needStart: boolean, needEnd: boolean) => {
-        let sId = startSnapId;
-        let eId = endSnapId;
-        const usedNames: string[] = [];
-        if (needStart && !sId && startSnap && startSnap.constraint.kind !== "free") {
-          sId = newElId("pt");
-          const sName = getNextPointName(pageElements);
-          usedNames.push(sName);
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              id: sId,
-              type: "GeomPoint",
-              transform: { x: resolvedP1.x, y: resolvedP1.y, scale: 1, rotation: 0, z: 0 },
-              style: { stroke: currentStyle.stroke ?? "#2563eb", width: 2 },
-              props: { name: sName, constraint: startSnap.constraint },
-            },
-          });
-        }
-        if (needEnd && !eId && endSnap && endSnap.constraint.kind !== "free") {
-          eId = newElId("pt");
-          let eName = getNextPointName(pageElements);
-          if (usedNames.includes(eName)) {
-            eName = getNextPointName(pageElements, ["N", "P", "Q", "M", "K"]);
-          }
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              id: eId,
-              type: "GeomPoint",
-              transform: { x: resolvedP2.x, y: resolvedP2.y, scale: 1, rotation: 0, z: 0 },
-              style: { stroke: currentStyle.stroke ?? "#2563eb", width: 2 },
-              props: { name: eName, constraint: endSnap.constraint },
-            },
-          });
-        }
-        return { sId, eId };
-      };
-
-      dispatcher.batch(() => {
-        if (tool === "circle") {
-          const id = newElId("circ");
-          const { sId, eId } = createSnappedEndpoints(true, true);
-          const centerId = sId ?? `${id}_c`;
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              id,
-              type: "GeomCircle",
-              style: {
-                stroke: currentStyle.stroke ?? "#0891b2",
-                width: currentStyle.width ?? 2,
-                dash: currentStyle.dash ?? false,
-              },
-              props: {
-                center: centerId,
-                ...(sId ? {} : { centerPt: resolvedP1 }),
-                radius: eId
-                  ? { kind: "through", point: eId }
-                  : { kind: "value", v: dist2D(resolvedP1, resolvedP2) },
-              },
-            },
-          });
-          return;
-        }
-
-        const id = newElId("seg");
-        const { sId, eId } = createSnappedEndpoints(true, true);
-        const fromId = sId ?? `${id}_a`;
-        const toId = eId ?? `${id}_b`;
-        const commonEndpoints = {
-          from: fromId,
-          to: toId,
-          ...(sId ? {} : { fromPt: resolvedP1 }),
-          ...(eId ? {} : { toPt: resolvedP2 }),
-        };
-
-        if (tool === "c:vector") {
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              id,
-              type: "GeomVector",
-              style: {
-                stroke: currentStyle.stroke ?? "#334155",
-                width: currentStyle.width ?? 2,
-                dash: currentStyle.dash ?? false,
-              },
-              props: commonEndpoints,
-            },
-          });
-        } else if (tool === "c:line") {
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              id,
-              type: "GeomLine",
-              style: {
-                stroke: currentStyle.stroke ?? "#334155",
-                width: currentStyle.width ?? 2,
-                dash: currentStyle.dash ?? false,
-              },
-              props: { def: "through", ...commonEndpoints },
-            },
-          });
-        } else if (tool === "c:ray") {
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              id,
-              type: "GeomRay",
-              style: {
-                stroke: currentStyle.stroke ?? "#334155",
-                width: currentStyle.width ?? 2,
-                dash: currentStyle.dash ?? false,
-              },
-              props: commonEndpoints,
-            },
-          });
-        } else {
-          const isDashed = tool === "c:dseg" || currentStyle.dash === true;
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              id,
-              type: "GeomSegment",
-              style: {
-                stroke: currentStyle.stroke ?? "#334155",
-                width: currentStyle.width ?? 2,
-                dash: isDashed,
-              },
-              props: {
-                ...commonEndpoints,
-                ...(isDashed ? { dashed: true } : {}),
-              },
-            },
-          });
-        }
-      });
-      resetToolAfterCreation();
-    },
-    [
-      dispatcher,
-      currentStyle,
-      viewport.scale,
-      snapPointAtCursor,
-      pageElements,
-      isA4Format,
-      currentBoardConfig,
-      resetToolAfterCreation,
-    ]
-  );
-
-  // --- Insert / M3 / Exam / RealWorld Handlers ---
-  const handleInsertTable = useCallback(
-    (rows: number, cols: number) => {
-      handleSelectTool(`table:${rows}x${cols}`);
-      setStatusHint(`Bấm lên bảng để đặt bảng ${rows} × ${cols}`);
-    },
-    [handleSelectTool]
-  );
-
-  const handleInsertImage = useCallback(
-    (img: ImportedImageResult) => {
-      const center = getViewCenter();
-      const res = dispatcher.dispatch({
-        type: "object.create",
-        params: {
-          type: "Image",
-          transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-          props: { src: img.src, w: img.w, h: img.h },
-        },
-      });
-      handleSelectTool("select");
-      if (res.created?.[0]) setSelectedIds([res.created[0]]);
-    },
-    [dispatcher, getViewCenter, handleSelectTool]
-  );
-
+  // --- PDF Import Handler ---
   const handleInsertPdfPages = useCallback(
     (pages: ImportedPdfPage[]) => {
       if (pages.length === 0) return;
@@ -2826,7 +2188,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       };
       (window as unknown as { __testTriggerOverscrollAddPage?: () => void }).__testTriggerOverscrollAddPage = handleAddPage;
     }
-  }, [handleInsertPdfPages, doc, currentPage, currentBoardConfig]);
+  }, [handleInsertPdfPages, doc, currentPage, currentBoardConfig, handleAddPage]);
 
   // Check pending PDF import from BoardManager
   useEffect(() => {
@@ -3163,1254 +2525,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
     setEquationModalOpen(true);
   }, []);
 
-  // --- Construction Tool Click Handler ---
-  const handleConstructionClick = useCallback(
-    (tool: string, worldPos: Point2D): boolean => {
-      const nearPt = findNearestPoint(worldPos, 28);
-      const nearEdge = findNearestEdgeOrSegment(worldPos, 28);
-      const nearCirc = findNearestCircle(worldPos, 28);
-
-      // 1. Altitude / Median / Bisector (2-click vertex + opposite edge, OR 3-click A, B, C)
-      if (
-        tool === "c:altitude" ||
-        tool === "c:median" ||
-        tool === "c:bisector"
-      ) {
-        const kind =
-          tool === "c:altitude"
-            ? "altitude"
-            : tool === "c:median"
-              ? "median"
-              : "bisector";
-        const defaultName =
-          tool === "c:altitude" ? "H" : tool === "c:median" ? "M" : "D";
-
-        if (pickedItems.length === 0) {
-          const pPos = nearPt?.pos ?? worldPos;
-          setPickedItems([
-            {
-              kind: "point",
-              id: nearPt?.id,
-              pos: pPos,
-              polygonId: nearPt?.polygonId,
-            },
-          ]);
-          setStatusHint("Chọn cạnh đối diện hoặc 2 đỉnh của cạnh đối diện");
-          return true;
-        }
-
-        const first = pickedItems[0];
-        if (pickedItems.length === 1) {
-          // Ignore edges incident to `first.pos` so clicking near another vertex picks the opposite side
-          const validNearEdge =
-            nearEdge &&
-            dist2D(nearEdge.a, first.pos) > 1e-3 &&
-            dist2D(nearEdge.b, first.pos) > 1e-3
-              ? nearEdge
-              : null;
-          let sideA: Point2D | undefined = validNearEdge?.a;
-          let sideB: Point2D | undefined = validNearEdge?.b;
-          let sideAId = validNearEdge?.aId;
-          let sideBId = validNearEdge?.bId;
-
-          if ((!sideA || !sideB) && first.polygonId) {
-            const poly = byId.get(first.polygonId);
-            if (poly && Array.isArray(poly.props.points)) {
-              const vs = poly.props.points as EmbeddedVertex[];
-              const others = vs.filter((v) => v.id !== first.id);
-              if (others.length === 2) {
-                sideA = {
-                  x: others[0].x + poly.transform.x,
-                  y: others[0].y + poly.transform.y,
-                };
-                sideB = {
-                  x: others[1].x + poly.transform.x,
-                  y: others[1].y + poly.transform.y,
-                };
-                sideAId = others[0].id;
-                sideBId = others[1].id;
-              }
-            }
-          }
-
-          const fromTriangleOpp = Boolean(first.polygonId && sideA && sideB);
-          if (sideA && sideB && (fromTriangleOpp || !nearPt || Boolean(validNearEdge))) {
-            const foot =
-              kind === "altitude"
-                ? footOfPerpendicular(first.pos, sideA, sideB)
-                : kind === "median"
-                  ? midpoint2D(sideA, sideB)
-                  : bisectorFoot2D(first.pos, sideA, sideB);
-            if (foot) {
-              const label = getNextPointName(pageElements, [
-                defaultName,
-                "K",
-                "I",
-                "E",
-                "F",
-              ]);
-              dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  type: "GeomConstruction",
-                  style: {
-                    stroke:
-                      kind === "altitude"
-                        ? "#dc2626"
-                        : kind === "median"
-                          ? "#16a34a"
-                          : "#2563eb",
-                    width: 2,
-                  },
-                  props: {
-                    kind,
-                    fromPt: first.pos,
-                    toPt: foot,
-                    sideAPt: sideA,
-                    sideBPt: sideB,
-                    ...(first.id ? { from: first.id } : {}),
-                    ...(sideAId ? { sideA: sideAId } : {}),
-                    ...(sideBId ? { sideB: sideBId } : {}),
-                    label,
-                  },
-                },
-              });
-              setPickedItems([]);
-              setStatusHint(null);
-              setActiveTool("select");
-              return true;
-            }
-          }
-
-          setPickedItems([
-            ...pickedItems,
-            { kind: "point", id: nearPt?.id, pos: nearPt?.pos ?? worldPos },
-          ]);
-          setStatusHint("Chọn điểm thứ hai của cạnh đối diện");
-          return true;
-        }
-
-        const second = pickedItems[1];
-        const thirdPos = nearPt?.pos ?? worldPos;
-        const thirdId = nearPt?.id;
-        const foot =
-          kind === "altitude"
-            ? footOfPerpendicular(first.pos, second.pos, thirdPos)
-            : kind === "median"
-              ? midpoint2D(second.pos, thirdPos)
-              : bisectorFoot2D(first.pos, second.pos, thirdPos);
-        if (foot) {
-          const label = getNextPointName(pageElements, [
-            defaultName,
-            "K",
-            "I",
-            "E",
-            "F",
-          ]);
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomConstruction",
-              style: {
-                stroke:
-                  kind === "altitude"
-                    ? "#dc2626"
-                    : kind === "median"
-                      ? "#16a34a"
-                      : "#2563eb",
-                width: 2,
-              },
-              props: {
-                kind,
-                fromPt: first.pos,
-                toPt: foot,
-                sideAPt: second.pos,
-                sideBPt: thirdPos,
-                ...(first.id ? { from: first.id } : {}),
-                ...(second.id ? { sideA: second.id } : {}),
-                ...(thirdId ? { sideB: thirdId } : {}),
-                label,
-              },
-            },
-          });
-        }
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 2. Triangle centers (Centroid G, Orthocenter H, Circumcircle, Incircle)
-      if (
-        tool === "c:centroid" ||
-        tool === "c:ortho" ||
-        tool === "c:circum" ||
-        tool === "c:incircle"
-      ) {
-        // Check if clicking inside an existing 3-vertex polygon on 1st click
-        if (pickedItems.length === 0 && !nearPt) {
-          for (const el of pageElements) {
-            if (el.type !== "GeomPolygon") continue;
-            const verts: Point2D[] = Array.isArray(el.props.points)
-              ? (el.props.points as EmbeddedVertex[]).map((v) => ({
-                  x: v.x + el.transform.x,
-                  y: v.y + el.transform.y,
-                }))
-              : [];
-            if (verts.length === 3 && pointInPolygon2D(verts, worldPos)) {
-              const [a, b, c] = verts;
-              const center =
-                tool === "c:centroid"
-                  ? centroid2D(a, b, c)
-                  : tool === "c:ortho"
-                    ? orthocenter2D(a, b, c)
-                    : tool === "c:circum"
-                      ? circumcenter2D(a, b, c)
-                      : incenter2D(a, b, c);
-              if (center) {
-                dispatcher.batch(() => {
-                  const ptName =
-                    tool === "c:centroid"
-                      ? "G"
-                      : tool === "c:ortho"
-                        ? "H"
-                        : tool === "c:circum"
-                          ? "O"
-                          : "I";
-                  const ptId = newElId("pt");
-                  dispatcher.dispatch({
-                    type: "object.create",
-                    params: {
-                      id: ptId,
-                      type: "GeomPoint",
-                      transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-                      props: { name: ptName, constraint: { kind: "free" } },
-                    },
-                  });
-                  if (tool === "c:circum" || tool === "c:incircle") {
-                    const r =
-                      tool === "c:circum"
-                        ? dist2D(center, a)
-                        : (() => {
-                            const f = footOfPerpendicular(center, a, b);
-                            return f ? dist2D(center, f) : 1;
-                          })();
-                    dispatcher.dispatch({
-                      type: "object.create",
-                      params: {
-                        type: "GeomCircle",
-                        style: { stroke: "#0891b2", width: 2 },
-                        props: { center: ptId, radius: { kind: "value", v: r } },
-                      },
-                    });
-                  }
-                });
-                setPickedItems([]);
-                setStatusHint(null);
-                setActiveTool("select");
-                return true;
-              }
-            }
-          }
-        }
-
-        // Check 3D solid centroid if 3 picks belong to a 3D solid
-        const ptPos = nearPt?.pos ?? worldPos;
-        const nextPicked = [
-          ...pickedItems,
-          { kind: "point" as const, id: nearPt?.id, pos: ptPos },
-        ];
-        if (nextPicked.length < 3) {
-          setPickedItems(nextPicked);
-          setStatusHint(`Chọn đỉnh thứ ${nextPicked.length + 1} của tam giác`);
-          return true;
-        }
-        const [pA, pB, pC] = nextPicked;
-        if (
-          tool === "c:centroid" &&
-          pA.id &&
-          pB.id &&
-          pC.id &&
-          solved3D.owner.has(pA.id)
-        ) {
-          const built = buildSpatialConstructionElements(
-            "c:centroid",
-            [pA.id, pB.id, pC.id],
-            pageElements,
-            solved3D
-          );
-          dispatcher.batch(() => {
-            for (const el of built.elements) {
-              dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  id: el.id,
-                  type: el.type,
-                  transform: el.transform,
-                  style: el.style,
-                  props: el.props,
-                },
-              });
-            }
-          });
-          setPickedItems([]);
-          setStatusHint(null);
-          setActiveTool("select");
-          return true;
-        }
-
-        const center =
-          tool === "c:centroid"
-            ? centroid2D(pA.pos, pB.pos, pC.pos)
-            : tool === "c:ortho"
-              ? orthocenter2D(pA.pos, pB.pos, pC.pos)
-              : tool === "c:circum"
-                ? circumcenter2D(pA.pos, pB.pos, pC.pos)
-                : incenter2D(pA.pos, pB.pos, pC.pos);
-        if (center) {
-          const ptName =
-            tool === "c:centroid"
-              ? "G"
-              : tool === "c:ortho"
-                ? "H"
-                : tool === "c:circum"
-                  ? "O"
-                  : "I";
-          const ptId = newElId("pt");
-          dispatcher.batch(() => {
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: ptId,
-                type: "GeomPoint",
-                transform: { x: center.x, y: center.y, scale: 1, rotation: 0, z: 0 },
-                props: { name: ptName, constraint: { kind: "free" } },
-              },
-            });
-            if (tool === "c:circum" || tool === "c:incircle") {
-              const r =
-                tool === "c:circum"
-                  ? dist2D(center, pA.pos)
-                  : (() => {
-                      const f = footOfPerpendicular(center, pA.pos, pB.pos);
-                      return f ? dist2D(center, f) : 1;
-                    })();
-              dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  type: "GeomCircle",
-                  style: { stroke: "#0891b2", width: 2 },
-                  props: { center: ptId, radius: { kind: "value", v: r } },
-                },
-              });
-            }
-          });
-        }
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 3. Midpoint / Perpendicular Bisector
-      if (tool === "c:midpoint" || tool === "c:perpbis") {
-        if (pickedItems.length === 0 && nearEdge && !nearPt) {
-          const mid = midpoint2D(nearEdge.a, nearEdge.b);
-          if (tool === "c:midpoint") {
-            const name = getNextPointName(pageElements, ["M", "N", "P", "Q"]);
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "GeomPoint",
-                transform: { x: mid.x, y: mid.y, scale: 1, rotation: 0, z: 0 },
-                props: {
-                  name,
-                  constraint:
-                    nearEdge.aId &&
-                    nearEdge.bId &&
-                    (byId.has(nearEdge.aId) || solved3D.owner.has(nearEdge.aId)) &&
-                    (byId.has(nearEdge.bId) || solved3D.owner.has(nearEdge.bId))
-                      ? { kind: "midpointOf", a: nearEdge.aId, b: nearEdge.bId }
-                      : { kind: "free" },
-                },
-              },
-            });
-          } else {
-            const dx = nearEdge.b.x - nearEdge.a.x;
-            const dy = nearEdge.b.y - nearEdge.a.y;
-            const len = Math.hypot(dx, dy) || 1;
-            const span = Math.max(1.2, Math.min(len * 0.65, 5.5));
-            const nx = -dy / len;
-            const ny = dx / len;
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "GeomConstruction",
-                props: {
-                  kind: "perpBisector",
-                  ...(nearEdge.aId && nearEdge.bId
-                    ? { sideA: nearEdge.aId, sideB: nearEdge.bId }
-                    : {}),
-                  fromPt: { x: mid.x - nx * span, y: mid.y - ny * span },
-                  toPt: { x: mid.x + nx * span, y: mid.y + ny * span },
-                  sideAPt: nearEdge.a,
-                  sideBPt: nearEdge.b,
-                },
-              },
-            });
-          }
-          setStatusHint(null);
-          setActiveTool("select");
-          return true;
-        }
-        const nextPicked = [
-          ...pickedItems,
-          { kind: "point" as const, id: nearPt?.id, pos: nearPt?.pos ?? worldPos },
-        ];
-        if (nextPicked.length < 2) {
-          setPickedItems(nextPicked);
-          setStatusHint("Chọn điểm thứ hai");
-          return true;
-        }
-        const [p1, p2] = nextPicked;
-        const mid = midpoint2D(p1.pos, p2.pos);
-        if (tool === "c:midpoint") {
-          const name = getNextPointName(pageElements, ["M", "N", "P", "Q"]);
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomPoint",
-              transform: { x: mid.x, y: mid.y, scale: 1, rotation: 0, z: 0 },
-              props: {
-                name,
-                constraint:
-                  p1.id &&
-                  p2.id &&
-                  (byId.has(p1.id) || solved3D.owner.has(p1.id)) &&
-                  (byId.has(p2.id) || solved3D.owner.has(p2.id))
-                    ? { kind: "midpointOf", a: p1.id, b: p2.id }
-                    : { kind: "free" },
-              },
-            },
-          });
-        } else {
-          const dx = p2.pos.x - p1.pos.x;
-          const dy = p2.pos.y - p1.pos.y;
-          const len = Math.hypot(dx, dy) || 1;
-          const span = Math.max(1.2, Math.min(len * 0.65, 5.5));
-          const nx = -dy / len;
-          const ny = dx / len;
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomConstruction",
-              props: {
-                kind: "perpBisector",
-                ...(p1.id && p2.id ? { sideA: p1.id, sideB: p2.id } : {}),
-                fromPt: { x: mid.x - nx * span, y: mid.y - ny * span },
-                toPt: { x: mid.x + nx * span, y: mid.y + ny * span },
-                sideAPt: p1.pos,
-                sideBPt: p2.pos,
-              },
-            },
-          });
-        }
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 4. Point on line / circle (`c:onedge`)
-      if (tool === "c:onedge") {
-        const snapped = snapPointAtCursor(worldPos, 30);
-        const pos = snapped.point;
-        const name = getNextPointName(pageElements, [
-          "M",
-          "N",
-          "P",
-          "Q",
-          "K",
-          "H",
-          "E",
-          "F",
-          "I",
-          "J",
-        ]);
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            type: "GeomPoint",
-            transform: { x: pos.x, y: pos.y, scale: 1, rotation: 0, z: 0 },
-            props: { name, constraint: snapped.constraint },
-          },
-        });
-        return true;
-      }
-
-      // 5. Perpendicular / Parallel
-      if (tool === "c:perp" || tool === "c:parallel" || tool === "c:perp3d") {
-        if (pickedItems.length === 0) {
-          if (nearEdge && !nearPt) {
-            setPickedItems([
-              {
-                kind: "segment",
-                id: nearEdge.id,
-                pos: worldPos,
-                segA: nearEdge.a,
-                segB: nearEdge.b,
-                segAId: nearEdge.aId,
-                segBId: nearEdge.bId,
-              },
-            ]);
-            setStatusHint("Chọn điểm đi qua");
-            return true;
-          }
-          if (nearPt) {
-            setPickedItems([
-              { kind: "point", id: nearPt.id, pos: nearPt.pos },
-            ]);
-            setStatusHint("Chọn đường thẳng hoặc đoạn thẳng");
-            return true;
-          }
-          return true;
-        }
-        const first = pickedItems[0];
-        const seg =
-          first.kind === "segment"
-            ? first
-            : nearEdge
-              ? {
-                  segA: nearEdge.a,
-                  segB: nearEdge.b,
-                  segAId: nearEdge.aId,
-                  segBId: nearEdge.bId,
-                }
-              : null;
-        const ptId = first.kind === "point" ? first.id : nearPt?.id;
-        const pt = first.kind === "point" ? first.pos : (nearPt?.pos ?? worldPos);
-        if (seg?.segA && seg?.segB) {
-          const p3P = ptId ? solved3D.p3.get(ptId) : undefined;
-          const p3A = seg.segAId ? solved3D.p3.get(seg.segAId) : undefined;
-          const p3B = seg.segBId ? solved3D.p3.get(seg.segBId) : undefined;
-          if (
-            tool === "c:perp3d" &&
-            ptId &&
-            seg.segAId &&
-            seg.segBId &&
-            p3P &&
-            p3A &&
-            p3B
-          ) {
-            const dx3 = p3B.x - p3A.x;
-            const dy3 = p3B.y - p3A.y;
-            const dz3 = p3B.z - p3A.z;
-            const lenSq3 = dx3 * dx3 + dy3 * dy3 + dz3 * dz3;
-            if (lenSq3 > 1e-9) {
-              const t =
-                ((p3P.x - p3A.x) * dx3 +
-                  (p3P.y - p3A.y) * dy3 +
-                  (p3P.z - p3A.z) * dz3) /
-                lenSq3;
-              const foot2D = {
-                x: seg.segA.x + t * (seg.segB.x - seg.segA.x),
-                y: seg.segA.y + t * (seg.segB.y - seg.segA.y),
-              };
-              const footId = newElId("pt");
-              const footName = getNextPointName(pageElements, ["H", "K", "M", "N"]);
-              dispatcher.batch(() => {
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: footId,
-                    type: "GeomPoint",
-                    transform: { x: foot2D.x, y: foot2D.y, scale: 1, rotation: 0, z: 0 },
-                    props: {
-                      name: footName,
-                      constraint: {
-                        kind: "foot",
-                        p: ptId,
-                        a: seg.segAId!,
-                        b: seg.segBId!,
-                      },
-                    },
-                  },
-                });
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    type: "GeomSegment",
-                    style: { stroke: "#0f766e", width: 2, dash: true },
-                    props: { from: ptId, to: footId },
-                  },
-                });
-              });
-              setPickedItems([]);
-              setStatusHint(null);
-              setActiveTool("select");
-              return true;
-            }
-          }
-          const dx = seg.segB.x - seg.segA.x;
-          const dy = seg.segB.y - seg.segA.y;
-          const isPerp = tool === "c:perp" || tool === "c:perp3d";
-          const vx = isPerp ? -dy : dx;
-          const vy = isPerp ? dx : dy;
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomConstruction",
-              props: {
-                kind: isPerp ? "perp" : "parallel",
-                ...(ptId && seg.segAId && seg.segBId
-                  ? { from: ptId, sideA: seg.segAId, sideB: seg.segBId }
-                  : {}),
-                fromPt: { x: pt.x - vx * 0.7, y: pt.y - vy * 0.7 },
-                toPt: { x: pt.x + vx * 0.7, y: pt.y + vy * 0.7 },
-                sideAPt: seg.segA,
-                sideBPt: seg.segB,
-              },
-            },
-          });
-        }
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 6. Intersection (`c:intersect`)
-      if (tool === "c:intersect") {
-        const hitSeg = nearEdge && byId.get(nearEdge.id);
-        const pickedTarget = nearCirc
-          ? { kind: "circle" as const, id: nearCirc.el.id, pos: worldPos }
-          : nearEdge
-            ? {
-                kind: "segment" as const,
-                id: hitSeg?.id ?? nearEdge.id,
-                pos: worldPos,
-                segA: nearEdge.a,
-                segB: nearEdge.b,
-                segAId: nearEdge.aId,
-                segBId: nearEdge.bId,
-              }
-            : null;
-        if (!pickedTarget) return true;
-        if (pickedItems.length === 0) {
-          setPickedItems([pickedTarget]);
-          setStatusHint("Chọn đường hoặc đường tròn thứ hai");
-          return true;
-        }
-        const first = pickedItems[0];
-        const l1 =
-          first.kind === "segment" && first.segA && first.segB
-            ? {
-                px: first.segA.x,
-                py: first.segA.y,
-                dx: first.segB.x - first.segA.x,
-                dy: first.segB.y - first.segA.y,
-              }
-            : first.id
-              ? resolveLineGeometry(byId.get(first.id), (id) => hydratedPts.get(id), byId)
-              : null;
-        const l2 =
-          pickedTarget.kind === "segment" && pickedTarget.segA && pickedTarget.segB
-            ? {
-                px: pickedTarget.segA.x,
-                py: pickedTarget.segA.y,
-                dx: pickedTarget.segB.x - pickedTarget.segA.x,
-                dy: pickedTarget.segB.y - pickedTarget.segA.y,
-              }
-            : pickedTarget.id
-              ? resolveLineGeometry(byId.get(pickedTarget.id), (id) => hydratedPts.get(id), byId)
-              : null;
-
-        const firstEl = first.id ? byId.get(first.id) : undefined;
-        const secondEl = pickedTarget.id ? byId.get(pickedTarget.id) : undefined;
-        const a1Id =
-          first.segAId ??
-          (typeof firstEl?.props.from === "string" ? firstEl.props.from : undefined);
-        const b1Id =
-          first.segBId ??
-          (typeof firstEl?.props.to === "string" ? firstEl.props.to : undefined);
-        const a2Id =
-          pickedTarget.segAId ??
-          (typeof secondEl?.props.from === "string" ? secondEl.props.from : undefined);
-        const b2Id =
-          pickedTarget.segBId ??
-          (typeof secondEl?.props.to === "string" ? secondEl.props.to : undefined);
-        const p3A1 = a1Id ? solved3D.p3.get(a1Id) : undefined;
-        const p3B1 = b1Id ? solved3D.p3.get(b1Id) : undefined;
-        const p3A2 = a2Id ? solved3D.p3.get(a2Id) : undefined;
-        const p3B2 = b2Id ? solved3D.p3.get(b2Id) : undefined;
-        const skew =
-          l1 && l2 && p3A1 && p3B1 && p3A2 && p3B2
-            ? skewLineClosest(p3A1, p3B1, p3A2, p3B2)
-            : null;
-        if (skew && skew.normalizedGap > 0.04) {
-          setPickedItems([]);
-          setStatusHint("Hai đường thẳng chéo nhau trong không gian — không đồng phẳng!");
-          setActiveTool("select");
-          return true;
-        }
-
-        let inter: Point2D | null = null;
-        if (l1 && l2) {
-          inter = intersectLines2D(l1, l2);
-        } else if (l1 && nearCirc) {
-          inter = intersectLineCircleAt(l1, { cx: nearCirc.center.x, cy: nearCirc.center.y, r: nearCirc.r }, 0);
-        } else if (l2 && first.kind === "circle" && first.id) {
-          const cEl = byId.get(first.id);
-          const cPt = cEl ? hydratedPts.get(String(cEl.props.center ?? "")) : undefined;
-          const r = cPt && cEl ? resolveCircleRadius(cEl.props.radius as Parameters<typeof resolveCircleRadius>[0], cPt, (id) => hydratedPts.get(id)) : null;
-          if (cPt && r !== null) {
-            inter = intersectLineCircleAt(l2, { cx: cPt.x, cy: cPt.y, r }, 0);
-          }
-        }
-        if (inter) {
-          const name = getNextPointName(pageElements, ["I", "K", "M", "N"]);
-          const constraint: PointConstraint =
-            l1 && l2 && firstEl && secondEl
-              ? { kind: "intersection", a: firstEl.id, b: secondEl.id }
-              : skew &&
-                  a1Id &&
-                  b1Id &&
-                  (byId.has(a1Id) || solved3D.owner.has(a1Id)) &&
-                  (byId.has(b1Id) || solved3D.owner.has(b1Id))
-                ? { kind: "onLine", a: a1Id, b: b1Id, t: skew.t }
-                : { kind: "free" };
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomPoint",
-              transform: { x: inter.x, y: inter.y, scale: 1, rotation: 0, z: 0 },
-              props: { name, constraint },
-            },
-          });
-        }
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 7. Tangent (`c:tangent`)
-      if (tool === "c:tangent") {
-        if (pickedItems.length === 0) {
-          if (nearCirc && (!nearPt || dist2D(nearPt.pos, nearCirc.center) < nearCirc.r * 0.6)) {
-            setPickedItems([
-              { kind: "circle", id: nearCirc.el.id, pos: nearCirc.center },
-            ]);
-            setStatusHint("Chọn điểm nằm ngoài hoặc trên đường tròn");
-          } else if (nearPt) {
-            setPickedItems([{ kind: "point", id: nearPt.id, pos: nearPt.pos }]);
-            setStatusHint("Chọn đường tròn");
-          } else if (nearCirc) {
-            setPickedItems([
-              { kind: "circle", id: nearCirc.el.id, pos: nearCirc.center },
-            ]);
-            setStatusHint("Chọn điểm nằm ngoài hoặc trên đường tròn");
-          }
-          return true;
-        }
-        const first = pickedItems[0];
-        const circ = nearCirc ?? (first.kind === "circle" && first.id ? (() => {
-          const cEl = byId.get(first.id);
-          const cPt = cEl ? hydratedPts.get(String(cEl.props.center ?? "")) : undefined;
-          const r = cEl && cPt ? resolveCircleRadius(cEl.props.radius as Parameters<typeof resolveCircleRadius>[0], cPt, (id) => hydratedPts.get(id)) : null;
-          return cEl && cPt && r !== null ? { el: cEl, center: cPt, centerId: String(cEl.props.center), r } : null;
-        })() : null);
-
-        let ptId = first.kind === "point" ? first.id : nearPt?.id;
-        let pt = first.kind === "point" ? first.pos : (nearPt?.pos ?? worldPos);
-        if (circ) {
-          if (first.kind === "circle" && !nearPt) {
-            const onRim = snapPointAtCursor(worldPos, 24);
-            pt = onRim.constraint.kind !== "free" ? onRim.point : worldPos;
-          }
-          const d = dist2D(pt, circ.center);
-          if (d < circ.r - 0.08) {
-            setStatusHint(
-              "Điểm nằm trong đường tròn — không kẻ được tiếp tuyến."
-            );
-            setPickedItems([]);
-            return true;
-          }
-          dispatcher.batch(() => {
-            if (!ptId) {
-              ptId = newElId("pt");
-              const pName = getNextPointName(pageElements, ["M", "N", "P", "A"]);
-              const onRim = Math.abs(d - circ.r) <= 0.08;
-              const angle = Math.atan2(pt.y - circ.center.y, pt.x - circ.center.x);
-              dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  id: ptId,
-                  type: "GeomPoint",
-                  transform: { x: pt.x, y: pt.y, scale: 1, rotation: 0, z: 0 },
-                  props: {
-                    name: pName,
-                    constraint: onRim
-                      ? { kind: "onObject", target: circ.el.id, t: angle }
-                      : { kind: "free" },
-                  },
-                },
-              });
-            }
-            if (Math.abs(d - circ.r) <= 0.08) {
-              const ux = (pt.x - circ.center.x) / (d || 1);
-              const uy = (pt.y - circ.center.y) / (d || 1);
-              const touch = { x: circ.center.x + ux * circ.r, y: circ.center.y + uy * circ.r };
-              const span = Math.max(1.8, circ.r * 1.35);
-              dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  type: "GeomConstruction",
-                  props: {
-                    kind: "tangent",
-                    from: ptId,
-                    circle: circ.el.id,
-                    fromPt: { x: touch.x + uy * span, y: touch.y - ux * span },
-                    toPt: { x: touch.x - uy * span, y: touch.y + ux * span },
-                    sideAPt: circ.center,
-                    sideBPt: touch,
-                  },
-                },
-              });
-            } else {
-              for (const side of [0, 1] as const) {
-                const tPt = tangentPointToCircle(
-                  pt,
-                  { cx: circ.center.x, cy: circ.center.y, r: circ.r },
-                  side
-                );
-                if (!tPt) continue;
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    type: "GeomConstruction",
-                    props: {
-                      kind: "tangent",
-                      from: ptId,
-                      circle: circ.el.id,
-                      tangentSide: side,
-                      fromPt: pt,
-                      toPt: tPt,
-                      sideAPt: circ.center,
-                      sideBPt: tPt,
-                    },
-                  },
-                });
-              }
-            }
-          });
-        }
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 8. Diameter (`c:diameter`)
-      if (tool === "c:diameter") {
-        const nextPicked = [
-          ...pickedItems,
-          { kind: "point" as const, id: nearPt?.id, pos: nearPt?.pos ?? worldPos },
-        ];
-        if (nextPicked.length < 2) {
-          setPickedItems(nextPicked);
-          setStatusHint("Chọn điểm trên đường tròn");
-          return true;
-        }
-        const [center, onPt] = nextPicked;
-        const other = reflectPointOverPoint(onPt.pos, center.pos);
-        const id = newElId("diam");
-        dispatcher.dispatch({
-          type: "object.create",
-          params: {
-            id,
-            type: "GeomSegment",
-            props: {
-              from: `${id}_a`,
-              to: `${id}_b`,
-              fromPt: onPt.pos,
-              toPt: other,
-            },
-          },
-        });
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 9. Reflection (`c:reflect`)
-      if (tool === "c:reflect") {
-        if (pickedItems.length === 0) {
-          setPickedItems([
-            { kind: "point", id: nearPt?.id, pos: nearPt?.pos ?? worldPos },
-          ]);
-          setStatusHint("Chọn tâm đối xứng hoặc đường đối xứng");
-          return true;
-        }
-        const src = pickedItems[0];
-        let mirrored: Point2D | null = null;
-        if (nearEdge && !nearPt) {
-          mirrored = reflectPointOverLine(src.pos, nearEdge.a, nearEdge.b);
-        } else {
-          mirrored = reflectPointOverPoint(src.pos, nearPt?.pos ?? worldPos);
-        }
-        if (mirrored) {
-          const name = getNextPointName(pageElements);
-          dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomPoint",
-              transform: { x: mirrored.x, y: mirrored.y, scale: 1, rotation: 0, z: 0 },
-              props: { name, constraint: { kind: "free" } },
-            },
-          });
-        }
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 10. Angle by degree (`c:angleval`)
-      if (tool === "c:angleval") {
-        const ptPos = nearPt?.pos ?? worldPos;
-        const next = [
-          ...pickedItems,
-          { kind: "point" as const, id: nearPt?.id, pos: ptPos },
-        ];
-        if (next.length < 2) {
-          setPickedItems(next);
-          setStatusHint("Chọn đỉnh của góc");
-          return true;
-        }
-        setAngleDialog({
-          vertexId: next[1].id ?? newElId("angv"),
-          armId: next[0].id ?? newElId("anga"),
-          vertexPos: next[1].pos,
-          armPos: next[0].pos,
-        });
-        setPickedItems([]);
-        setStatusHint(null);
-        setActiveTool("select");
-        return true;
-      }
-
-      // 11. 3D Face Extraction (`c:flatten`: 1st click near solid face + 2nd click placement, OR 3 vertex clicks)
-      if (tool === "c:flatten") {
-        if (pickedItems.length === 0) {
-          // Check if user clicked on a 3D solid (even interior) -> detect top/front 3 vertices
-          if (!nearPt) {
-            for (const el of pageElements) {
-              if (el.type !== "Solid3D") continue;
-              const ptIds = Array.isArray(el.props.points) ? (el.props.points as string[]) : [];
-              const kind = (el.props.kind ?? "pyramid") as Solid3DKind;
-              const pts2d = ptIds.map((id) => hydratedPts.get(id)).filter((p): p is Point2D => Boolean(p));
-              const lift = solved3D.lifts.get(el.id) ?? (pts2d.length === ptIds.length ? liftSolidTo3D(kind, pts2d) : null);
-              if (lift) {
-                const hitFace = lift.faces.find((face) => {
-                  const poly = face.map((idx) => pts2d[idx]).filter(Boolean);
-                  return poly.length >= 3 && pointInPolygon2D(poly, worldPos);
-                }) ?? lift.faces[0];
-                if (hitFace && hitFace.length >= 3) {
-                  setPickedItems([
-                    {
-                      kind: "solidFace",
-                      id: el.id,
-                      pos: worldPos,
-                      faceIds: hitFace.slice(0, 3).map((idx) => ptIds[idx]),
-                    },
-                  ]);
-                  setStatusHint("Bấm vào vị trí bên cạnh để đặt hình phẳng thật");
-                  return true;
-                }
-              }
-            }
-          }
-          if (nearPt) {
-            setPickedItems([{ kind: "point", id: nearPt.id, pos: nearPt.pos }]);
-            setStatusHint("Chọn thêm 2 đỉnh của mặt cần tách");
-          }
-          return true;
-        }
-
-        const first = pickedItems[0];
-        if (first.kind === "solidFace" && first.faceIds && first.faceIds.length >= 3) {
-          const flat = computeFlattenedFace(
-            [first.faceIds[0], first.faceIds[1], first.faceIds[2]],
-            solved3D,
-            pageElements,
-            worldPos
-          );
-          if (flat) {
-            const polyEl = flat.polygonElement;
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: polyEl.id,
-                type: polyEl.type,
-                transform: polyEl.transform,
-                style: polyEl.style,
-                props: polyEl.props,
-              },
-            });
-          }
-          setPickedItems([]);
-          setStatusHint(null);
-          setActiveTool("select");
-          return true;
-        }
-
-        if (nearPt) {
-          const next = [...pickedItems, { kind: "point" as const, id: nearPt.id, pos: nearPt.pos }];
-          if (next.length < 3) {
-            setPickedItems(next);
-            setStatusHint("Chọn đỉnh thứ 3 của mặt");
-            return true;
-          }
-          const faceIds = next.map((n) => n.id).filter((id): id is string => Boolean(id));
-          if (faceIds.length === 3) {
-            const flat = computeFlattenedFace(
-              [faceIds[0], faceIds[1], faceIds[2]],
-              solved3D,
-              pageElements
-            );
-            if (flat) {
-              const polyEl = flat.polygonElement;
-              dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  id: polyEl.id,
-                  type: polyEl.type,
-                  transform: polyEl.transform,
-                  style: polyEl.style,
-                  props: polyEl.props,
-                },
-              });
-            }
-          }
-          setPickedItems([]);
-          setStatusHint(null);
-          setActiveTool("select");
-          return true;
-        }
-        return true;
-      }
-
-      // 11b. 3D Net Unfolding (`c:unfold`: Click any Solid3D to unfold all faces into 2D printable net)
-      if (tool === "c:unfold") {
-        let hitSolid: CanvasElement | undefined;
-        if (nearPt?.id) {
-          const ownerId = solved3D.owner.get(nearPt.id);
-          if (ownerId) hitSolid = byId.get(ownerId);
-        }
-        if (!hitSolid) {
-          for (const el of pageElements) {
-            if (el.type !== "Solid3D") continue;
-            const ptIds = Array.isArray(el.props.points) ? (el.props.points as string[]) : [];
-            const kind = (el.props.kind ?? "pyramid") as Solid3DKind;
-            const pts2d = ptIds.map((id) => hydratedPts.get(id)).filter((p): p is Point2D => Boolean(p));
-            const lift = pts2d.length === ptIds.length ? liftSolidTo3D(kind, pts2d) : null;
-            if (lift) {
-              const inside = lift.faces.some((face) => {
-                const poly = face.map((idx) => pts2d[idx]).filter(Boolean);
-                return poly.length >= 3 && pointInPolygon2D(poly, worldPos);
-              });
-              if (inside) {
-                hitSolid = el;
-                break;
-              }
-            }
-          }
-        }
-
-        if (hitSolid) {
-          const netRes = computeUnfoldedPolyhedronNet(hitSolid.id, solved3D, pageElements);
-          if (netRes && netRes.polygons.length > 0) {
-            dispatcher.batch(() => {
-              netRes.polygons.forEach((polyEl) => {
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: polyEl.id,
-                    type: polyEl.type,
-                    transform: polyEl.transform,
-                    style: polyEl.style,
-                    props: polyEl.props,
-                  },
-                });
-              });
-              netRes.points?.forEach((ptEl) => {
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: ptEl.id,
-                    type: ptEl.type,
-                    transform: ptEl.transform,
-                    style: ptEl.style,
-                    props: ptEl.props,
-                  },
-                });
-              });
-            });
-            const ptsCount = netRes.points?.length ?? 0;
-            setStatusHint(
-              `✓ Đã trải phẳng ${netRes.polygons.length} mặt của khối${ptsCount > 0 ? ` cùng ${ptsCount} điểm đặc biệt` : ""}`
-            );
-          } else {
-            setStatusHint("Không thể trải phẳng khối này (chỉ hỗ trợ hình chóp, lăng trụ, hộp chữ nhật, lập phương)");
-          }
-        } else {
-          setStatusHint("Vui lòng bấm vào một khối 3D để trải phẳng");
-        }
-        setActiveTool("select");
-        return true;
-      }
-
-      // 12. 3D Cross-Section (`c:section`), Circumsphere (`c:circumsphere`), & Spatial Measurements
-      if (tool === "plane") {
-        const createdEls = createPlaneParallelogramElements(worldPos, pageElements);
-        dispatcher.batch(() => {
-          for (const el of createdEls) {
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: el.id,
-                type: el.type,
-                transform: el.transform,
-                style: el.style,
-                props: el.props,
-              },
-            });
-          }
-        });
-        setActiveTool("select");
-        return true;
-      }
-
-      if (
-        tool === "c:section" ||
-        tool === "c:circumsphere" ||
-        tool === "c:lineplane" ||
-        tool === "c:giaotuyen" ||
-        tool === "c:footplane" ||
-        tool === "c:distplane" ||
-        tool === "c:commonperp" ||
-        tool === "c:measure" ||
-        tool === "c:anglelp" ||
-        tool === "c:angleplanes" ||
-        tool === "c:boxrule"
-      ) {
-        if (!nearPt?.id) return true;
-        const nextIds = [
-          ...pickedItems.map((p) => p.id).filter((x): x is string => Boolean(x)),
-          nearPt.id,
-        ];
-        const needed =
-          tool === "c:circumsphere"
-            ? 1
-            : tool === "c:section" || tool === "c:measure"
-              ? 3
-              : tool === "c:footplane" ||
-                  tool === "c:distplane" ||
-                  tool === "c:commonperp" ||
-                  tool === "c:boxrule" ||
-                  tool === "c:anglelp"
-                ? 4
-                : tool === "c:lineplane"
-                  ? 5
-                  : 6;
-
-        if (nextIds.length < needed) {
-          setPickedItems([
-            ...pickedItems,
-            { kind: "point", id: nearPt.id, pos: nearPt.pos },
-          ]);
-          setStatusHint(`Đã chọn ${nextIds.length}/${needed} điểm`);
-          return true;
-        }
-
-        if (tool === "c:section") {
-          const ownerId = nextIds
-            .map((id) => {
-              if (solved3D.owner.get(id)) return solved3D.owner.get(id);
-              for (const el of pageElements) {
-                if (el.type === "Solid3D" && Array.isArray(el.props.points) && (el.props.points as string[]).includes(id)) {
-                  return el.id;
-                }
-              }
-              return undefined;
-            })
-            .find((id): id is string => Boolean(id));
-          const solidEl = ownerId ? byId.get(ownerId) : undefined;
-          if (!solidEl || solidEl.type !== "Solid3D") {
-            setStatusHint(
-              "Vui lòng chọn 3 điểm thuộc hoặc nằm trên các cạnh/mặt của một khối 3D."
-            );
-          } else {
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: newElId("sec"),
-                type: "RoundSection",
-                style: { stroke: "#e8590c", fill: "rgba(240,140,0,0.35)", width: 2 },
-                props: { solid: solidEl.id, points: [nextIds[0], nextIds[1], nextIds[2]] },
-              },
-            });
-            setStatusHint(null);
-          }
-        } else {
-          const built = buildSpatialConstructionElements(
-            tool,
-            nextIds,
-            pageElements,
-            solved3D
-          );
-          if (built.error) {
-            setStatusHint(built.error);
-          } else {
-            dispatcher.batch(() => {
-              for (const el of built.elements) {
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: el.id,
-                    type: el.type,
-                    transform: el.transform,
-                    style: el.style,
-                    props: el.props,
-                  },
-                });
-              }
-            });
-            setStatusHint(null);
-          }
-        }
-        setPickedItems([]);
-        setActiveTool("select");
-        return true;
-      }
-
-      return false;
-    },
-    [
-      findNearestPoint,
-      findNearestEdgeOrSegment,
-      findNearestCircle,
-      snapPointAtCursor,
-      pickedItems,
-      byId,
-      pageElements,
-      dispatcher,
-      hydratedPts,
-      solved3D,
-    ]
-  );
 
   // --- Transform Handles & Element Pointer Handlers ---
   const handleHandlePointerDown = useCallback(
@@ -5544,7 +3658,10 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       handleConstructionClick,
       penOnlyMode,
       isA4Format,
-      currentBoardConfig,
+      a4Opt,
+      byId,
+      pageCount,
+      resetToolAfterCreation,
       spenConfig,
       laserConfig,
     ]
@@ -6126,16 +4243,13 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           if (activeLive.nib === "laser") {
             // Dedicated laser pointer: fade out completely after 1.5s, not persisting in Yjs
             const strokeId = newElId("laser");
-            setLaserStrokes((prev) => [
-              ...prev,
-              {
-                id: strokeId,
-                points: [...pts],
-                createdAt: performance.now(),
-                color: laserConfig.color,
-                width: laserConfig.trailWidth,
-              },
-            ]);
+            laserLayerRef.current?.addStroke({
+              id: strokeId,
+              points: [...pts],
+              createdAt: performance.now(),
+              color: laserConfig.color,
+              width: laserConfig.trailWidth,
+            });
           } else if (
             inkToShape &&
             (activeLive.nib === undefined ||
@@ -6429,7 +4543,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         }
       }
     },
-    [navPointerCancel, dispatcher, liveStroke, spenConfig]
+    [navPointerCancel, dispatcher, liveStroke, spenConfig, activeTool, laserConfig.mode]
   );
 
   // Drag-and-drop image or PDF file onto canvas
@@ -6987,6 +5101,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       handleUpdatePlotParam,
       handleChangeSliderValue,
       handleUpdateElementProps,
+      handleConvertCountingToTree,
     ]
   );
 
@@ -7102,28 +5217,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               vectorEffect="non-scaling-stroke"
             />
           )}
-          {/* Ephemeral fading Laser Pointer strokes in SVG overlay so they don't count as board elements */}
-          {laserStrokes.map((ls) => {
-            const age = performance.now() - ls.createdAt;
-            const opacity = Math.max(0, 1 - age / 1500);
-            return (
-              <g key={ls.id} style={{ opacity, pointerEvents: "none" }} data-laser-stroke="true">
-                <InkElement
-                  id={ls.id}
-                  transform={{ x: 0, y: 0, scale: 1, rotation: 0, z: 99999 }}
-                  style={{
-                    stroke: ls.color || "#ef4444",
-                    width: ls.width || 4.5,
-                  }}
-                  props={{
-                    points: ls.points,
-                    nib: "laser",
-                  }}
-                  scale={viewport.scale}
-                />
-              </g>
-            );
-          })}
+          {/* Isolated ephemeral fading Laser Pointer strokes */}
+          <LaserStrokesLayer ref={laserLayerRef} scale={viewport.scale} />
         </>
       }
       cursorOverride={activeTool === "ink:laser" && laserConfig.mode === "dot" ? "none" : undefined}
@@ -7223,7 +5318,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
 
   const renderToolbar = (embedded = false) => (
     <Toolbar
-      doc={doc}
       embedded={embedded}
       activeTool={activeTool}
       onSelectTool={handleSelectTool}
@@ -7246,20 +5340,8 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
       canRedo={canRedo}
       onUndo={undo}
       onRedo={redo}
-      selectedCount={selectedElements.length}
-      onDeleteSelected={handleDeleteSelected}
       isFullscreen={isFullscreen}
       onToggleFullscreen={handleToggleFullscreen}
-      isA4Format={isA4Format}
-      isFitLocked={isFitLocked}
-      onToggleFitLock={toggleFitLock}
-      page={{ current: currentPage, count: pageCount }}
-      onPrevPage={handlePrevPage}
-      onNextPage={handleNextPage}
-      onAddPage={handleAddPage}
-      onInsertTable={handleInsertTable}
-      onInsertImage={handleInsertImage}
-      onInsertPdfPages={handleInsertPdfPages}
       onM3Action={handleM3Action}
       onSelectQuickRealWorld={(item: RealWorldArtItem) => {
         recordRecentRealWorldId(item.id);
@@ -7316,41 +5398,19 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         setShareCopied(true);
         setShareModalOpen(true);
       }}
-      getBoardElement={() => containerRef.current}
-      labelScale={labelScale}
-      dotScale={dotScale}
-      boardConfig={currentBoardConfig}
-      onChangeBoardConfig={(next: PageBoardConfig) => {
-        writePageBoardConfig(doc, currentPage, next);
-        if (next.pattern !== "none") setGridEnabled(true);
-      }}
-      onApplyBoardAllPages={(cfg: PageBoardConfig) => {
-        applyBoardConfigToAllPages(doc, pageCount, cfg);
-        setStatusHint("✓ Đã áp dụng loại bảng cho tất cả các trang");
-      }}
-      onScaleGeometry={(factor) => dispatcher.scaleGeometry(factor)}
-      onChangeLabelScale={setLabelScale}
-      onChangeDotScale={setDotScale}
-      onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-      onExportPdf={() => setExportPdfModalOpen(true)}
       shortcutMap={shortcutMap}
       penOnlyMode={penOnlyMode}
       onTogglePenOnly={handleTogglePenOnly}
       inkToShape={inkToShape}
       onToggleInkToShape={handleToggleInkToShape}
-      autoSwitchTarget={autoSwitchTarget}
-      onToggleAutoSwitchTarget={handleToggleAutoSwitchTarget}
       laserConfig={laserConfig}
       onChangeLaserConfig={handleUpdateLaserConfig}
       onOpenLaserSettings={() => setLaserSettingsOpen(true)}
       toolbarVisibility={toolbarConfig}
       modularConfig={modularConfig}
       onChangeModularConfig={handleUpdateModularConfig}
-      onOpenSettings={() => setSettingsModalOpen(true)}
       isSidebarOpen={pageSidebarOpen}
       isPortrait={isPortrait}
-      isGuideEnabled={guideEnabled}
-      onToggleGuide={toggleGuide}
     />
   );
 
@@ -8709,1374 +6769,144 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         />
       )}
 
-      {/* MathLive Inline Formula Editor */}
-      {mathSession && (
-        <MathEditor
-          initialLatex={mathSession.initialLatex}
-          worldPos={mathSession.worldPos}
-          viewport={viewport}
-          defaultKeyboardOpen={true}
-          onCommit={(latex) => {
-            if (mathSession.elementId) {
-              const existing = byId.get(mathSession.elementId);
-              if (existing) {
-                dispatcher.dispatch({
-                  type: "object.update",
-                  params: {
-                    id: existing.id,
-                    props: { ...existing.props, latex },
-                  },
-                });
-              }
-            } else {
-              const res = dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  type: "MathText",
-                  transform: {
-                    x: mathSession.worldPos.x,
-                    y: mathSession.worldPos.y,
-                    scale: 1,
-                    rotation: 0,
-                    z: 0,
-                  },
-                  style: { stroke: currentStyle.stroke ?? "#0f172a" },
-                  props: { latex },
-                },
-              });
-              if (res.created?.[0]) setSelectedIds([res.created[0]]);
-            }
-            setMathSession(null);
-            resetToolAfterCreation();
-          }}
-          onCancel={() => {
-            setMathSession(null);
-            resetToolAfterCreation();
-          }}
-          onSolveEquation={(latex) => {
-            handleSolveMathLatex(latex);
-          }}
-          onPlotFunction={(latex) => {
-            const clean = latex.replace(/^[yY]\s*=\s*/, "").replace(/^f\(x\)\s*=\s*/, "").trim();
-            handleSubmitPlot(clean || latex, []);
-            setStatusHint("Đã vẽ đồ thị hàm số sang hệ trục Oxy");
-          }}
-          onBuildVarTable={(latex) => {
-            const clean = latex.replace(/^[yY]\s*=\s*/, "").replace(/^f\(x\)\s*=\s*/, "").trim();
-            const exprToUse = clean || "x^2 - 2x";
-            const res = buildVarTableFromExpr(exprToUse);
-            if ("error" in res) {
-              setStatusHint(res.error);
-              return;
-            }
-            const center = getViewCenter();
-            const vtRes = dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "VarTable",
-                transform: { x: center.x, y: center.y - 1, scale: 1, rotation: 0, z: 0 },
-                style: { stroke: "#0f172a", width: 1.5 },
-                props: { table: res, formulaLatex: exprToUse },
-              },
-            });
-            if (vtRes.created?.[0]) setSelectedIds([vtRes.created[0]]);
-            setStatusHint("Đã tạo bảng biến thiên tự động");
-          }}
-          onShadeIntegral={(latex) => {
-            const clean = latex.replace(/^[yY]\s*=\s*/, "").replace(/^f\(x\)\s*=\s*/, "").trim();
-            handleSubmitPlot(clean || latex, [], [-2, 2]);
-            // Find created plot and set shade domain
-            setTimeout(() => {
-              const created = pageElements.find(
-                (el) => el.type === "Plot" && (el.props.exprLatex === clean || el.props.exprLatex === latex)
-              );
-              if (created) {
-                dispatcher.dispatch({
-                  type: "object.update",
-                  params: {
-                    id: created.id,
-                    props: { ...created.props, shade: [0, 2] },
-                  },
-                });
-              }
-            }, 50);
-            setStatusHint("Đã vẽ hàm số và tô miền tích phân [0, 2]");
-          }}
-        />
-      )}
-
-      {/* Equation / System of Equations Solver Modal */}
-      <EquationSolverModal
-        isOpen={equationModalOpen}
-        onClose={() => setEquationModalOpen(false)}
-        solution={equationSolution}
-        onInsertToCanvas={(latex) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "MathText",
-              transform: {
-                x: center.x,
-                y: center.y - 1,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              style: { stroke: "#2563eb" },
-              props: { latex },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          handleSelectTool("select");
-          setStatusHint("Đã chèn nghiệm phương trình lên bảng");
-        }}
-      />
-
-      {/* M3 Config Dialogs */}
-      <PlotConfigDialog
-        open={plotDialogOpen}
-        onSubmit={handleSubmitPlot}
-        onCancel={() => setPlotDialogOpen(false)}
-      />
-
-      <AxesPointDialog
-        open={axesPointDialogOpen}
-        defaultName={getNextPointName(pageElements, ["M", "N", "P", "Q", "A", "B"])}
-        onSubmit={(name, x, y) => {
-          const axesId = ensureAxes2D();
-          const axesEl = pageElements.find((e) => e.id === axesId);
-          const sc = axesEl?.transform.scale || 1;
-          const wx = (axesEl?.transform.x ?? 0) + sc * x;
-          const wy = (axesEl?.transform.y ?? 0) + sc * y;
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomPoint",
-              transform: { x: wx, y: wy, scale: 1, rotation: 0, z: 0 },
-              style: { stroke: "#2563eb", fill: "#2563eb" },
-              props: {
-                name: `${name}(${x}; ${y})`,
-                constraint: { kind: "oxy", axes: axesId, x, y },
-              },
-            },
-          });
-          if (!selectedAxes2D && res.created?.[0]) setSelectedIds([res.created[0]]);
-          setAxesPointDialogOpen(false);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setAxesPointDialogOpen(false)}
-      />
-
-      {pointRenameSession && (
-        <div
-          data-export-skip="true"
-          data-testid="point-rename-dialog"
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) setPointRenameSession(null);
-          }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 10050,
-            background: "rgba(15, 23, 42, 0.28)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSubmitPointRename(pointRenameSession.items);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.stopPropagation();
-                setPointRenameSession(null);
-              }
-            }}
-            style={{
-              width: "100%",
-              maxWidth: 360,
-              background: "#ffffff",
-              borderRadius: 14,
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
-              padding: 18,
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              fontFamily: "system-ui, -apple-system, sans-serif",
-            }}
-          >
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
-              {pointRenameSession.items.length === 1
-                ? "Đổi tên điểm"
-                : `Đổi tên ${pointRenameSession.items.length} điểm`}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                maxHeight: 280,
-                overflowY: "auto",
-              }}
-            >
-              {pointRenameSession.items.map((item, idx) => (
-                <label
-                  key={item.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    fontSize: 13.5,
-                    color: "#334155",
-                    fontWeight: 600,
-                  }}
-                >
-                  {pointRenameSession.items.length > 1 && (
-                    <span style={{ minWidth: 68, color: "#64748b" }}>
-                      {item.originalName ? `Điểm ${item.originalName}:` : `Điểm #${idx + 1}:`}
-                    </span>
-                  )}
-                  <input
-                    data-testid={
-                      idx === 0 ? "point-rename-input" : `point-rename-input-${idx}`
-                    }
-                    type="text"
-                    autoFocus={idx === 0}
-                    onFocus={(e) => e.currentTarget.select()}
-                    value={item.draftName}
-                    placeholder="Nhập tên điểm (vd: A, M, A')"
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setPointRenameSession((prev) =>
-                        prev
-                          ? {
-                              items: prev.items.map((it) =>
-                                it.id === item.id ? { ...it, draftName: val } : it
-                              ),
-                            }
-                          : null
-                      );
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: "8px 10px",
-                      borderRadius: 8,
-                      border: "1px solid #cbd5e1",
-                      fontSize: 14,
-                      color: "#0f172a",
-                      outline: "none",
-                    }}
-                  />
-                </label>
-              ))}
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
-              <button
-                type="button"
-                data-action="point-rename-cancel"
-                onClick={() => setPointRenameSession(null)}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: 8,
-                  border: "1px solid #cbd5e1",
-                  background: "#ffffff",
-                  color: "#475569",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Huỷ
-              </button>
-              <button
-                type="submit"
-                data-action="point-rename-save"
-                style={{
-                  padding: "7px 16px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: "#2563eb",
-                  color: "#ffffff",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                Lưu tên
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      <AxesVectorDialog
-        open={axesVectorDialogOpen}
-        onSubmit={(vx, vy, x0, y0) => {
-          const axesId = ensureAxes2D();
-          const axesEl = pageElements.find((e) => e.id === axesId);
-          const sc = axesEl?.transform.scale || 1;
-          const axX = axesEl?.transform.x ?? 0;
-          const axY = axesEl?.transform.y ?? 0;
-          const pAId = newElId("pt");
-          const pBId = newElId("pt");
-          let vecId = "";
-          dispatcher.batch(() => {
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: pAId,
-                type: "GeomPoint",
-                transform: { x: axX + sc * x0, y: axY + sc * y0, scale: 1, rotation: 0, z: 0 },
-                props: {
-                  name: "",
-                  dot: "none",
-                  constraint: { kind: "oxy", axes: axesId, x: x0, y: y0 },
-                },
-              },
-            });
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: pBId,
-                type: "GeomPoint",
-                transform: {
-                  x: axX + sc * (x0 + vx),
-                  y: axY + sc * (y0 + vy),
-                  scale: 1,
-                  rotation: 0,
-                  z: 0,
-                },
-                props: {
-                  name: `(${vx}; ${vy})`,
-                  dot: "none",
-                  constraint: { kind: "oxy", axes: axesId, x: x0 + vx, y: y0 + vy },
-                },
-              },
-            });
-            const vRes = dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "GeomVector",
-                style: { stroke: "#2563eb", width: 2.2 },
-                props: { from: pAId, to: pBId },
-              },
-            });
-            vecId = vRes.created?.[0] ?? "";
-          });
-          if (!selectedAxes2D && vecId) setSelectedIds([vecId]);
-          setAxesVectorDialogOpen(false);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setAxesVectorDialogOpen(false)}
-      />
-
-      <Axes3DPointDialog
-        open={axes3DPointDialogOpen}
-        defaultName={getNextPointName(pageElements, ["M", "N", "P", "Q", "A", "B", "C"])}
-        onSubmit={(name, x, y, z) => {
-          const axesId = ensureAxes3D();
-          const axesEl = pageElements.find((e) => e.id === axesId);
-          const tr = axesEl?.transform ?? { x: 0, y: 0, scale: 1 };
-          const p2 = projectOxyzPoint(tr, { x, y, z });
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "GeomPoint",
-              transform: { x: p2.x, y: p2.y, scale: 1, rotation: 0, z: 0 },
-              style: { stroke: "#2563eb", fill: "#2563eb" },
-              props: {
-                name: `${name}(${x}; ${y}; ${z})`,
-                constraint: { kind: "oxyz", axes: axesId, x, y, z },
-              },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          setAxes3DPointDialogOpen(false);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setAxes3DPointDialogOpen(false)}
-      />
-
-      <Axes3DVectorDialog
-        open={axes3DVectorDialogOpen}
-        onSubmit={(vx, vy, vz, x0, y0, z0) => {
-          const axesId = ensureAxes3D();
-          const axesEl = pageElements.find((e) => e.id === axesId);
-          const tr = axesEl?.transform ?? { x: 0, y: 0, scale: 1 };
-          const pA2 = projectOxyzPoint(tr, { x: x0, y: y0, z: z0 });
-          const pB2 = projectOxyzPoint(tr, { x: x0 + vx, y: y0 + vy, z: z0 + vz });
-          const pAId = newElId("pt");
-          const pBId = newElId("pt");
-          let vecId = "";
-          dispatcher.batch(() => {
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: pAId,
-                type: "GeomPoint",
-                transform: { x: pA2.x, y: pA2.y, scale: 1, rotation: 0, z: 0 },
-                props: {
-                  name: "",
-                  dot: "none",
-                  constraint: { kind: "oxyz", axes: axesId, x: x0, y: y0, z: z0 },
-                },
-              },
-            });
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                id: pBId,
-                type: "GeomPoint",
-                transform: { x: pB2.x, y: pB2.y, scale: 1, rotation: 0, z: 0 },
-                props: {
-                  name: `u⃗(${vx}; ${vy}; ${vz})`,
-                  dot: "none",
-                  constraint: { kind: "oxyz", axes: axesId, x: x0 + vx, y: y0 + vy, z: z0 + vz },
-                },
-              },
-            });
-            const vRes = dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "GeomVector",
-                style: { stroke: "#0891b2", width: 2.2 },
-                props: { from: pAId, to: pBId },
-              },
-            });
-            vecId = vRes.created?.[0] ?? "";
-          });
-          if (vecId) setSelectedIds([vecId]);
-          setAxes3DVectorDialogOpen(false);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setAxes3DVectorDialogOpen(false)}
-      />
-
-      <Axes3DFigureDialog
-        open={axes3DFigureDialogKind !== null}
-        kind={axes3DFigureDialogKind ?? "plane"}
-        onSubmit={(def, name, color) => {
-          const axesId = ensureAxes3D();
-          const axesEl = pageElements.find((e) => e.id === axesId);
-          const tr = axesEl?.transform ?? { x: 0, y: 0, scale: 1, rotation: 0, z: 0 };
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "SpaceFigure",
-              transform: { ...tr },
-              style: { stroke: color ?? "#7c3aed", width: 2 },
-              props: {
-                axes: axesId,
-                def,
-                name,
-                color,
-              },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          setAxes3DFigureDialogKind(null);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setAxes3DFigureDialogKind(null)}
-      />
-
-      <Curve2DConfigDialog
-        open={curve2dDialogMode !== null}
-        mode={curve2dDialogMode ?? "equation"}
-        onSubmit={(def, color) => {
-          const axesId = ensureAxes2D();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "Curve2D",
-              style: { stroke: color, width: 2 },
-              props: { axes: axesId, color, def },
-            },
-          });
-          if (!selectedAxes2D && res.created?.[0]) setSelectedIds([res.created[0]]);
-          setCurve2dDialogMode(null);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setCurve2dDialogMode(null)}
-      />
-
-      <ConicConfigDialog
-        open={conicDialogKind !== null}
-        kind={conicDialogKind ?? "ellipse"}
-        onSubmit={(kind, a, b) => {
-          const axesId = ensureAxes2D();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "Conic",
-              style: { stroke: "#9333ea", width: 2.2 },
-              props: { kind, a, b, axes: axesId },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          setConicDialogKind(null);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setConicDialogKind(null)}
-      />
-
-      <VarTableConfigDialog
-        open={varTableDialogMode !== null}
-        mode={varTableDialogMode ?? "variation"}
-        onSubmit={(propsObj) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "VarTable",
-              transform: {
-                x: center.x - 3,
-                y: center.y + 1.5,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              props: propsObj,
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          setVarTableDialogMode(null);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setVarTableDialogMode(null)}
-      />
-
-      {doc && (
-        <PageManagerModal
-          open={pageManagerOpen}
-          onClose={() => setPageManagerOpen(false)}
-          doc={doc}
-          currentPage={currentPage}
-          totalPages={pageCount}
-        />
-      )}
-
-      <ChartConfigDialog
-        open={chartDialogOpen}
-        onSubmit={(propsObj) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "Chart",
-              transform: {
-                x: center.x - 3,
-                y: center.y + 2,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              props: propsObj,
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          setChartDialogOpen(false);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setChartDialogOpen(false)}
-      />
-
-      <BayesConfigDialog
-        open={bayesDialogOpen}
-        onSubmit={(root, formulaLatex) => {
-          const center = getViewCenter();
-          dispatcher.batch(() => {
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "TreeDiagram",
-                transform: {
-                  x: center.x - 3,
-                  y: center.y + 2,
-                  scale: 1,
-                  rotation: 0,
-                  z: 0,
-                },
-                props: { root },
-              },
-            });
-            dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "MathText",
-                transform: {
-                  x: center.x - 3,
-                  y: center.y - 2.2,
-                  scale: 1,
-                  rotation: 0,
-                  z: 0,
-                },
-                props: { latex: formulaLatex },
-              },
-            });
-          });
-          setBayesDialogOpen(false);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setBayesDialogOpen(false)}
-      />
-
-      <NumberLineConfigDialog
-        open={numberLineDialogOpen}
-        onSubmit={(setExpr) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "NumberLine",
-              transform: {
-                x: center.x - 4,
-                y: center.y + 1,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              props: { set: setExpr },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          setNumberLineDialogOpen(false);
-          handleSelectTool("select");
-        }}
-        onCancel={() => setNumberLineDialogOpen(false)}
-      />
-
-      {/* Angle Degree Popover for c:angleval */}
-      {angleDialog && (
-        <div
-          data-wb-angle-input="true"
-          style={{
-            position: "fixed",
-            top: 64,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 90,
-            background: "#ffffff",
-            border: "1px solid #cbd5e1",
-            borderRadius: 12,
-            padding: 12,
-            boxShadow: "0 10px 28px rgba(15,23,42,0.16)",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 13,
-          }}
-        >
-          <span>Số đo góc (°):</span>
-          <input
-            autoFocus
-            value={angleDegInput}
-            onChange={(e) => setAngleDegInput(e.target.value)}
-            style={{
-              width: 68,
-              border: "1px solid #cbd5e1",
-              borderRadius: 6,
-              padding: "4px 8px",
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const deg = Number(angleDegInput) || 60;
-              const endPt = pointAtAngle(
-                angleDialog.vertexPos,
-                angleDialog.armPos,
-                deg
-              );
-              if (!endPt) return;
-              const segId = newElId("angray");
-              const endId = `${segId}_b`;
-              dispatcher.batch(() => {
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: endId,
-                    type: "GeomPoint",
-                    transform: { x: endPt.x, y: endPt.y, scale: 1, rotation: 0, z: 0 },
-                    props: {
-                      name: getNextPointName(pageElements),
-                      constraint: { kind: "free" },
-                    },
-                  },
-                });
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: segId,
-                    type: "GeomRay",
-                    props: {
-                      from: angleDialog.vertexId,
-                      to: endId,
-                      fromPt: angleDialog.vertexPos,
-                    },
-                  },
-                });
-              });
-              setAngleDialog(null);
-            }}
-            style={{
-              border: "none",
-              background: "#2563eb",
-              color: "#ffffff",
-              borderRadius: 7,
-              padding: "5px 12px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Dựng
-          </button>
-          <button
-            type="button"
-            onClick={() => setAngleDialog(null)}
-            style={{
-              border: "1px solid #cbd5e1",
-              background: "#ffffff",
-              borderRadius: 7,
-              padding: "5px 10px",
-              cursor: "pointer",
-            }}
-          >
-            Huỷ
-          </button>
-        </div>
-      )}
-
-      {/* Physics Simulation & Teaching Drawer */}
-      <PhysicsDrawer
-        open={physicsDrawerOpen}
-        onClose={() => setPhysicsDrawerOpen(false)}
-        onInsertFormulaLatex={(latex) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "MathText",
-              transform: {
-                x: center.x,
-                y: center.y,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              style: { stroke: currentStyle.stroke ?? "#0f172a" },
-              props: { latex },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          handleSelectTool("select");
-        }}
-      />
-
-      {/* Math Formulas Drawer */}
-      <MathFormulasDrawer
-        open={mathDrawerOpen}
-        onClose={() => setMathDrawerOpen(false)}
-        onInsertFormulaLatex={(latex) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "MathText",
-              transform: {
-                x: center.x,
-                y: center.y,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              style: { stroke: currentStyle.stroke ?? "#0f172a" },
-              props: { latex },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          handleSelectTool("select");
-        }}
-      />
-
-      {/* Chemistry Formulas Drawer */}
-      <ChemistryFormulasDrawer
-        open={chemistryDrawerOpen}
-        onClose={() => setChemistryDrawerOpen(false)}
-        onInsertFormulaLatex={(latex) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "MathText",
-              transform: {
-                x: center.x,
-                y: center.y,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              style: { stroke: currentStyle.stroke ?? "#0f172a" },
-              props: { latex },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          handleSelectTool("select");
-        }}
-      />
-
-      {/* Fullscreen PhET Online & Offline HTML Simulation System */}
-      <SimLauncherModal
-        open={simLauncherOpen}
-        onClose={() => setSimLauncherOpen(false)}
-        activeSim={activeSim}
-        onResumeActive={() => setSimMinimized(false)}
-        onLaunchSession={handleLaunchSimSession}
-      />
-
-      <FullscreenSimOverlay
-        session={activeSim}
-        minimized={simMinimized}
-        onMinimize={() => setSimMinimized(true)}
-        onRestore={() => setSimMinimized(false)}
-        onClose={handleCloseSimSession}
-        onOpenLauncher={() => setSimLauncherOpen(true)}
-      />
-
-      {/* Quick Question Cropper from PDF / Image */}
-      <QuestionCropModal
-        open={questionCropOpen}
-        onClose={() => setQuestionCropOpen(false)}
-        onInsertCropped={(res: CroppedQuestionResult) => {
-          const center = getViewCenter();
-          const aspect = res.heightPx / Math.max(1, res.widthPx);
-
-          if (isA4Format) {
-            const pageW = a4Opt?.widthWorld ?? 17;
-            const pageH = a4Opt?.heightWorld ?? 24.04;
-            const pageGap = 0.8;
-            const pageStep = pageH + pageGap;
-            const marginX = 0.9;
-            const marginTop = 0.85;
-            const marginBottom = 0.85;
-            const maxPrintableW = Math.max(4, pageW - marginX * 2);
-            const maxPrintableH = Math.max(4, pageH - marginTop - marginBottom);
-
-            let targetW = Math.min(maxPrintableW, Math.max(4.5, res.widthPx / 65));
-            let targetH = targetW * aspect;
-            if (targetH > maxPrintableH) {
-              const shrink = maxPrintableH / targetH;
-              targetW *= shrink;
-              targetH = maxPrintableH;
-            }
-
-            let topSvg = Math.max(marginTop, -(center.y + 1.5) - targetH / 2);
-            let targetPage = Math.max(1, Math.floor(topSvg / pageStep) + 1);
-            const pageTopSvg = (targetPage - 1) * pageStep + marginTop;
-            const pageBottomSvg = (targetPage - 1) * pageStep + pageH - marginBottom;
-            if (topSvg < pageTopSvg) {
-              topSvg = pageTopSvg;
-            }
-            if (topSvg + targetH > pageBottomSvg) {
-              targetPage += 1;
-              topSvg = (targetPage - 1) * pageStep + marginTop;
-            }
-
-            const prevCurrent = currentPage;
-            let curCount = pageCount;
-            while (curCount < targetPage) {
-              addYjsPage(doc);
-              curCount++;
-            }
-            if (targetPage > pageCount) {
-              setYjsCurrentPage(doc, prevCurrent);
-            }
-
-            const cy = -(topSvg + targetH / 2);
-            const created = dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "Image",
-                transform: {
-                  x: 0,
-                  y: cy,
-                  scale: 1,
-                  rotation: 0,
-                  z: 0,
-                },
-                style: res.lockOnInsert ? { locked: true } : {},
-                props: {
-                  src: res.dataUrl,
-                  w: targetW,
-                  h: targetH,
-                  locked: res.lockOnInsert,
-                },
-              },
-            });
-            if (!res.lockOnInsert && created.created?.[0]) {
-              setSelectedIds([created.created[0]]);
-            } else {
-              setSelectedIds([]);
-            }
-            setStatusHint(
-              res.lockOnInsert
-                ? "✓ Đã cắt & khoá đề bài lên trang A4 (tự tránh vạch ngắt trang)"
-                : "✓ Đã cắt & ghim câu hỏi lên trang A4"
-            );
-            return;
-          }
-
-          const targetW = Math.min(11, Math.max(4.5, res.widthPx / 65));
-          const targetH = targetW * aspect;
-          const created = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "Image",
-              transform: {
-                x: center.x,
-                y: center.y + 1.5,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              style: res.lockOnInsert ? { locked: true } : {},
-              props: {
-                src: res.dataUrl,
-                w: targetW,
-                h: targetH,
-                locked: res.lockOnInsert,
-              },
-            },
-          });
-          if (!res.lockOnInsert && created.created?.[0]) {
-            setSelectedIds([created.created[0]]);
-          } else {
-            setSelectedIds([]);
-          }
-          setStatusHint(
-            res.lockOnInsert
-              ? "✓ Đã cắt & khoá đề bài lên bảng (nhấp đúp để mở khoá nếu cần di chuyển)"
-              : "✓ Đã cắt & ghim câu hỏi lên bảng"
-          );
-        }}
-        onInsertBatchCropped={(batch: BatchCroppedQuestionsResult) => {
-          if (batch.items.length === 0) return;
-          const center = getViewCenter();
-          const maxWidthPx = Math.max(1, ...batch.items.map((it) => it.widthPx));
-          const createdIds: string[] = [];
-
-          if (isA4Format) {
-            const pageW = a4Opt?.widthWorld ?? 17;
-            const pageH = a4Opt?.heightWorld ?? 24.04;
-            const pageGap = 0.8;
-            const pageStep = pageH + pageGap;
-            const marginX = 0.9;
-            const marginTop = 0.85;
-            const marginBottom = 0.85;
-            const maxPrintableW = Math.max(4, pageW - marginX * 2);
-            const maxPrintableH = Math.max(4, pageH - marginTop - marginBottom);
-
-            const pxPerWorld = Math.max(65, maxWidthPx / Math.min(13.2, maxPrintableW));
-            const maxTargetW = Math.min(maxPrintableW, maxWidthPx / pxPerWorld);
-            const leftX = Math.max(-pageW / 2 + marginX, -maxTargetW / 2);
-
-            const startPage = Math.max(1, Math.floor(Math.max(0, -center.y) / pageStep) + 1);
-            let cursorTopSvg = Math.max(
-              (startPage - 1) * pageStep + marginTop,
-              -center.y - 6.0
-            );
-            let maxPageUsed = startPage;
-
-            for (const item of batch.items) {
-              let targetW = item.widthPx / pxPerWorld;
-              let targetH = item.heightPx / pxPerWorld;
-              if (targetW > maxPrintableW) {
-                const shrink = maxPrintableW / targetW;
-                targetW = maxPrintableW;
-                targetH *= shrink;
-              }
-              if (targetH > maxPrintableH) {
-                const shrink = maxPrintableH / targetH;
-                targetW *= shrink;
-                targetH = maxPrintableH;
-              }
-
-              let curPage = Math.max(1, Math.floor(Math.max(0, cursorTopSvg) / pageStep) + 1);
-              const pageTopSvg = (curPage - 1) * pageStep + marginTop;
-              const pageBottomSvg = (curPage - 1) * pageStep + pageH - marginBottom;
-
-              if (cursorTopSvg < pageTopSvg) {
-                cursorTopSvg = pageTopSvg;
-              }
-              if (cursorTopSvg + targetH > pageBottomSvg) {
-                curPage += 1;
-                cursorTopSvg = (curPage - 1) * pageStep + marginTop;
-              }
-
-              maxPageUsed = Math.max(maxPageUsed, curPage);
-              const cx = Math.min(
-                pageW / 2 - marginX - targetW / 2,
-                leftX + targetW / 2
-              );
-              const cy = -(cursorTopSvg + targetH / 2);
-              cursorTopSvg += targetH + batch.gapWorld;
-
-              const created = dispatcher.dispatch({
-                type: "object.create",
-                params: {
-                  type: "Image",
-                  transform: {
-                    x: cx,
-                    y: cy,
-                    scale: 1,
-                    rotation: 0,
-                    z: 0,
-                  },
-                  style: batch.lockOnInsert ? { locked: true } : {},
-                  props: {
-                    src: item.dataUrl,
-                    w: targetW,
-                    h: targetH,
-                    locked: batch.lockOnInsert,
-                  },
-                },
-              });
-              if (created.created?.[0]) {
-                createdIds.push(created.created[0]);
-              }
-            }
-
-            const prevCurrent = currentPage;
-            let curCount = pageCount;
-            while (curCount < maxPageUsed) {
-              addYjsPage(doc);
-              curCount++;
-            }
-            if (maxPageUsed > pageCount) {
-              setYjsCurrentPage(doc, prevCurrent);
-            }
-
-            if (!batch.lockOnInsert && createdIds.length > 0) {
-              setSelectedIds(createdIds);
-            } else {
-              setSelectedIds([]);
-            }
-            setStatusHint(
-              `✓ Đã chèn ${createdIds.length} câu hỏi qua ${maxPageUsed} trang A4 (tự nhảy trang, không đè vạch cắt)`
-            );
-            return;
-          }
-
-          const pxPerWorld = Math.max(65, maxWidthPx / 10.5);
-          const maxTargetW = maxWidthPx / pxPerWorld;
-          const leftX = center.x - maxTargetW / 2;
-          let cursorTopY = center.y + 4.5;
-
-          for (const item of batch.items) {
-            const targetW = item.widthPx / pxPerWorld;
-            const targetH = item.heightPx / pxPerWorld;
-            const cx = leftX + targetW / 2;
-            const cy = cursorTopY - targetH / 2;
-            cursorTopY -= targetH + batch.gapWorld;
-
-            const created = dispatcher.dispatch({
-              type: "object.create",
-              params: {
-                type: "Image",
-                transform: {
-                  x: cx,
-                  y: cy,
-                  scale: 1,
-                  rotation: 0,
-                  z: 0,
-                },
-                style: batch.lockOnInsert ? { locked: true } : {},
-                props: {
-                  src: item.dataUrl,
-                  w: targetW,
-                  h: targetH,
-                  locked: batch.lockOnInsert,
-                },
-              },
-            });
-            if (created.created?.[0]) {
-              createdIds.push(created.created[0]);
-            }
-          }
-
-          if (!batch.lockOnInsert && createdIds.length > 0) {
-            setSelectedIds(createdIds);
-          } else {
-            setSelectedIds([]);
-          }
-          setStatusHint(
-            `✓ Đã tự động cắt & chèn ${createdIds.length} câu hỏi lên bảng (có khoảng trống để viết lời giải)`
-          );
-        }}
-      />
-
-      {/* Classroom Countdown Timer & Random Student Picker */}
-      <ClassroomToolsWidget
-        open={classroomToolsOpen}
-        onClose={() => setClassroomToolsOpen(false)}
-      />
-
-      {/* First-Launch Onboarding & Interactive Feature Guide (Cách 2 Video Demos) */}
-      <FeatureGuideModal
-        open={featureGuideOpen}
-        onClose={() => setFeatureGuideOpen(false)}
-      />
-
-      {/* Searchable 100-item RealWorld Drawer */}
-      <RealWorldDrawer
-        open={realWorldDrawerOpen}
-        onClose={() => setRealWorldDrawerOpen(false)}
-        onSelectIcon={(item) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "RealObject",
-              transform: {
-                x: center.x,
-                y: center.y - 1.5,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              props: { icon: item.id, from: "", to: "", width: 1 },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          handleSelectTool("select");
-        }}
-        onSelectPicture={({ src, ratio }) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "RealObject",
-              transform: {
-                x: center.x,
-                y: center.y - 1.5,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              props: { icon: "custom", src, ratio, from: "", to: "", width: 1 },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          handleSelectTool("select");
-        }}
-      />
-
-      {/* Floating Scientific & Casio Calculator Widget */}
-      <CalculatorWidget
-        open={calculatorOpen}
-        onClose={() => setCalculatorOpen(false)}
-        onInsertLatex={(latex) => {
-          const center = getViewCenter();
-          const res = dispatcher.dispatch({
-            type: "object.create",
-            params: {
-              type: "MathText",
-              transform: {
-                x: center.x,
-                y: center.y,
-                scale: 1,
-                rotation: 0,
-                z: 0,
-              },
-              style: { stroke: currentStyle.stroke ?? "#0f172a" },
-              props: { latex },
-            },
-          });
-          if (res.created?.[0]) setSelectedIds([res.created[0]]);
-          handleSelectTool("select");
-          setStatusHint(`✓ Đã chèn công thức "${latex}" vào bảng`);
-        }}
-      />
-
-      {/* PDF Export Modal with Page Range & Filename Selection */}
-      <ExportPdfModal
-        open={exportPdfModalOpen}
+      <WhiteboardOverlays
+        activeRoomId={activeRoomId}
         doc={doc}
+        dispatcher={dispatcher}
         currentPage={currentPage}
-        totalPages={pageCount}
+        pageCount={pageCount}
+        pageElements={pageElements}
+        byId={byId}
+        selectedElements={selectedElements}
+        selectedAxes2D={selectedAxes2D}
+        viewport={viewport}
+        currentStyle={currentStyle}
+        isA4Format={isA4Format}
+        currentBoardConfig={currentBoardConfig}
         getBoardElement={() => containerRef.current}
-        onClose={() => setExportPdfModalOpen(false)}
-      />
-
-      {/* Laser Pointer Settings Modal */}
-      <LaserSettingsModal
-        open={laserSettingsOpen}
-        onClose={() => setLaserSettingsOpen(false)}
-        config={laserConfig}
-        onChangeConfig={handleUpdateLaserConfig}
-      />
-
-      {/* Main Settings Modal (Settings, Toolbar Customizer, Board Themes, Scales & Exports) */}
-      <SettingsModal
-        open={settingsModalOpen}
-        initialTab={settingsInitialTab}
-        onClose={() => {
-          setSettingsModalOpen(false);
-          setSettingsInitialTab(undefined);
-        }}
+        getViewCenter={getViewCenter}
+        setSelectedIds={setSelectedIds}
+        handleSelectTool={handleSelectTool}
+        resetToolAfterCreation={resetToolAfterCreation}
+        setStatusHint={setStatusHint}
+        mathSession={mathSession}
+        setMathSession={setMathSession}
+        handleSolveMathLatex={handleSolveMathLatex}
+        equationModalOpen={equationModalOpen}
+        setEquationModalOpen={setEquationModalOpen}
+        equationSolution={equationSolution}
+        ensureAxes2D={ensureAxes2D}
+        ensureAxes3D={ensureAxes3D}
+        handleSubmitPlot={handleSubmitPlot}
+        plotDialogOpen={plotDialogOpen}
+        setPlotDialogOpen={setPlotDialogOpen}
+        axesPointDialogOpen={axesPointDialogOpen}
+        setAxesPointDialogOpen={setAxesPointDialogOpen}
+        axesVectorDialogOpen={axesVectorDialogOpen}
+        setAxesVectorDialogOpen={setAxesVectorDialogOpen}
+        axes3DPointDialogOpen={axes3DPointDialogOpen}
+        setAxes3DPointDialogOpen={setAxes3DPointDialogOpen}
+        axes3DVectorDialogOpen={axes3DVectorDialogOpen}
+        setAxes3DVectorDialogOpen={setAxes3DVectorDialogOpen}
+        axes3DFigureDialogKind={axes3DFigureDialogKind}
+        setAxes3DFigureDialogKind={setAxes3DFigureDialogKind}
+        curve2dDialogMode={curve2dDialogMode}
+        setCurve2dDialogMode={setCurve2dDialogMode}
+        conicDialogKind={conicDialogKind}
+        setConicDialogKind={setConicDialogKind}
+        varTableDialogMode={varTableDialogMode}
+        setVarTableDialogMode={setVarTableDialogMode}
+        chartDialogOpen={chartDialogOpen}
+        setChartDialogOpen={setChartDialogOpen}
+        bayesDialogOpen={bayesDialogOpen}
+        setBayesDialogOpen={setBayesDialogOpen}
+        numberLineDialogOpen={numberLineDialogOpen}
+        setNumberLineDialogOpen={setNumberLineDialogOpen}
+        pointRenameSession={pointRenameSession}
+        setPointRenameSession={setPointRenameSession}
+        handleSubmitPointRename={handleSubmitPointRename}
+        angleDialog={angleDialog}
+        setAngleDialog={setAngleDialog}
+        angleDegInput={angleDegInput}
+        setAngleDegInput={setAngleDegInput}
+        physicsDrawerOpen={physicsDrawerOpen}
+        setPhysicsDrawerOpen={setPhysicsDrawerOpen}
+        mathDrawerOpen={mathDrawerOpen}
+        setMathDrawerOpen={setMathDrawerOpen}
+        chemistryDrawerOpen={chemistryDrawerOpen}
+        setChemistryDrawerOpen={setChemistryDrawerOpen}
+        realWorldDrawerOpen={realWorldDrawerOpen}
+        setRealWorldDrawerOpen={setRealWorldDrawerOpen}
+        calculatorOpen={calculatorOpen}
+        setCalculatorOpen={setCalculatorOpen}
+        classroomToolsOpen={classroomToolsOpen}
+        setClassroomToolsOpen={setClassroomToolsOpen}
+        featureGuideOpen={featureGuideOpen}
+        setFeatureGuideOpen={setFeatureGuideOpen}
+        simLauncherOpen={simLauncherOpen}
+        setSimLauncherOpen={setSimLauncherOpen}
+        activeSim={activeSim}
+        simMinimized={simMinimized}
+        setSimMinimized={setSimMinimized}
+        onLaunchSimSession={handleLaunchSimSession}
+        onCloseSimSession={handleCloseSimSession}
+        questionCropOpen={questionCropOpen}
+        setQuestionCropOpen={setQuestionCropOpen}
+        pageManagerOpen={pageManagerOpen}
+        setPageManagerOpen={setPageManagerOpen}
+        exportPdfModalOpen={exportPdfModalOpen}
+        setExportPdfModalOpen={setExportPdfModalOpen}
+        laserSettingsOpen={laserSettingsOpen}
+        setLaserSettingsOpen={setLaserSettingsOpen}
+        laserConfig={laserConfig}
+        onUpdateLaserConfig={handleUpdateLaserConfig}
+        settingsModalOpen={settingsModalOpen}
+        settingsInitialTab={settingsInitialTab}
+        closeSettingsModal={() => setSettingsModalOpen(false)}
         modularConfig={modularConfig}
-        onChangeModularConfig={handleUpdateModularConfig}
+        onUpdateModularConfig={handleUpdateModularConfig}
         toolbarConfig={toolbarConfig}
-        onChangeToolbarConfig={handleUpdateToolbarConfig}
+        onUpdateToolbarConfig={handleUpdateToolbarConfig}
         autoSwitchTarget={autoSwitchTarget}
         onChangeAutoSwitchTarget={(target) => {
           setAutoSwitchTarget(target);
           if (typeof window !== "undefined") {
-            localStorage.setItem("physboard_auto_switch_target", target);
+            try {
+              localStorage.setItem("physboard_auto_switch_target", target);
+            } catch {
+              // Ignore
+            }
           }
         }}
         inkToShape={inkToShape}
-        onChangeInkToShape={(val) => setInkToShape(val)}
+        onChangeInkToShape={handleToggleInkToShape}
         penOnlyMode={penOnlyMode}
-        onChangePenOnlyMode={(val) => setPenOnlyMode(val)}
+        onChangePenOnlyMode={handleTogglePenOnly}
         spenConfig={spenConfig}
-        onChangeSPenConfig={handleUpdateSPenConfig}
-        laserConfig={laserConfig}
-        onChangeLaserConfig={handleUpdateLaserConfig}
-        gridEnabled={gridEnabled}
-        onChangeGridEnabled={(val) => setGridEnabled(val)}
-        isGuideEnabled={guideEnabled}
+        onUpdateSPenConfig={handleUpdateSPenConfig}
+        onChangeGridEnabled={setGridEnabled}
+        guideEnabled={guideEnabled}
         onToggleGuide={toggleGuide}
-        doc={doc}
-        page={currentPage}
-        totalPages={pageCount}
-        getBoardElement={() => containerRef.current}
-        boardConfig={currentBoardConfig}
-        onChangeBoardConfig={(next: PageBoardConfig) => {
-          writePageBoardConfig(doc, currentPage, next);
-          if (next.pattern !== "none") setGridEnabled(true);
-        }}
-        onApplyBoardAllPages={(cfg: PageBoardConfig) => {
-          applyBoardConfigToAllPages(doc, pageCount, cfg);
-          setStatusHint("✓ Đã áp dụng loại bảng cho tất cả các trang");
-        }}
-        onScaleGeometry={(factor) => dispatcher.scaleGeometry(factor)}
         labelScale={labelScale}
         onChangeLabelScale={setLabelScale}
         dotScale={dotScale}
         onChangeDotScale={setDotScale}
-        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
-        onExportPdf={() => setExportPdfModalOpen(true)}
-      />
-
-      {/* Share URL Modal */}
-      {shareModalOpen && (
-        <div
-          data-wb-share-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 6000,
-            background: "rgba(15, 23, 42, 0.45)",
-            display: "grid",
-            placeItems: "center",
-            padding: 16,
-          }}
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) setShareModalOpen(false);
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Chia sẻ bảng"
-            style={{
-              width: "min(460px, 100%)",
-              background: "#ffffff",
-              borderRadius: 14,
-              padding: 18,
-              boxShadow: "0 20px 50px rgba(15, 23, 42, 0.25)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
-              Chia sẻ liên kết phòng học
-            </div>
-            <input
-              type="text"
-              readOnly
-              data-wb-share-url="true"
-              data-testid="share-link"
-              value={buildShareUrl(activeRoomId)}
-              onClick={(e) => e.currentTarget.select()}
-              style={{
-                width: "100%",
-                height: 36,
-                padding: "0 10px",
-                borderRadius: 8,
-                border: "1px solid #cbd5e1",
-                fontSize: 13,
-                color: "#0f172a",
-                background: "#f8fafc",
-                boxSizing: "border-box",
-              }}
-            />
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard
-                    ?.writeText(buildShareUrl(activeRoomId))
-                    .catch(() => {});
-                  setShareCopied(true);
-                }}
-                style={{
-                  border: "none",
-                  background: "#2563eb",
-                  color: "#ffffff",
-                  borderRadius: 8,
-                  padding: "7px 14px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {shareCopied ? "✓ Đã sao chép" : "📋 Sao chép liên kết"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShareModalOpen(false)}
-                style={{
-                  border: "1px solid #cbd5e1",
-                  background: "#ffffff",
-                  color: "#334155",
-                  borderRadius: 8,
-                  padding: "7px 14px",
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Command Palette & Keyboard Shortcut Manager */}
-      <CommandPaletteModal
-        isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
+        shareModalOpen={shareModalOpen}
+        setShareModalOpen={setShareModalOpen}
+        shareCopied={shareCopied}
+        setShareCopied={setShareCopied}
+        commandPaletteOpen={commandPaletteOpen}
+        setCommandPaletteOpen={setCommandPaletteOpen}
         shortcutMap={shortcutMap}
-        onShortcutMapChange={setShortcutMap}
-        onExecuteCommand={executeCommand}
-        selectedCount={selectedElements.length}
+        onChangeShortcutMap={setShortcutMap}
+        executeCommand={executeCommand}
+        boardManagerOpen={boardManagerOpen}
+        setBoardManagerOpen={setBoardManagerOpen}
+        onInsertPdfPages={handleInsertPdfPages}
+        openSettingsModal={(tab) => {
+          setSettingsInitialTab(tab);
+          setSettingsModalOpen(true);
+        }}
       />
 
       {/* Live Coordinate & Zoom HUD */}
@@ -10197,29 +7027,6 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           )}
         </div>
 
-      {/* Board & Folder Manager Modal (Samsung Notes inspired) */}
-      <BoardManagerModal
-        open={boardManagerOpen}
-        onClose={() => setBoardManagerOpen(false)}
-        currentRoomId={activeRoomId}
-        onInsertPdfIntoCurrentBoard={(pages) => {
-          handleInsertPdfPages(pages);
-        }}
-        onSelectBoard={(newBoardId) => {
-          if (newBoardId !== activeRoomId) {
-            if (typeof window !== "undefined") {
-              const url = new URL(window.location.href);
-              url.searchParams.set("room", newBoardId);
-              window.history.pushState(null, "", url.toString());
-              window.location.href = url.toString();
-            }
-          }
-        }}
-        onOpenSettings={() => {
-          setSettingsInitialTab(undefined);
-          setSettingsModalOpen(true);
-        }}
-      />
     </div>
   );
 }
