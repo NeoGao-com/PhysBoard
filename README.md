@@ -20,8 +20,7 @@
     </a>
   </p>
 
-  <br />
-  <img src="docs/screenshots/01-overview-whiteboard.png" alt="Giao diện tổng quan bảng trắng PhysBoard" width="100%" />
+
 </div>
 
 ---
