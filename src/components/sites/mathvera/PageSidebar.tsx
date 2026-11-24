@@ -26,6 +26,7 @@ export interface PageSidebarProps {
   onDeleteSelected?: () => void;
   onOpenSettings?: () => void;
   onOpenFeedback?: () => void;
+  onOpenFeatureGuide?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenBoardManager?: () => void;
   boardConfig?: PageBoardConfig;
@@ -56,6 +57,7 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
   onDeleteSelected,
   onOpenSettings,
   onOpenFeedback,
+  onOpenFeatureGuide,
   onOpenCommandPalette,
   onOpenBoardManager,
   boardConfig,
@@ -673,31 +675,61 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           </div>
         )}
 
-        {onOpenFeedback && (
-          <button
-            type="button"
-            onClick={onOpenFeedback}
-            data-action="open-feedback"
-            title="Báo lỗi hoặc góp ý cho tác giả"
-            style={{
-              width: "100%",
-              background: "#fff7ed",
-              color: "#c2410c",
-              border: "1px solid #fed7aa",
-              borderRadius: 6,
-              padding: "5px 0",
-              fontSize: 11.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-            }}
-          >
-            <span>🐛</span>
-            <span>Báo lỗi / Góp ý</span>
-          </button>
+        {(onOpenFeedback || onOpenFeatureGuide) && (
+          <div style={{ display: "flex", gap: 4, width: "100%" }}>
+            {onOpenFeatureGuide && (
+              <button
+                type="button"
+                onClick={onOpenFeatureGuide}
+                data-action="open-feature-guide"
+                title="Xem mẫu giới thiệu tính năng (Cách 1 & Cách 2)"
+                style={{
+                  flex: 1,
+                  background: "#f0fdf4",
+                  color: "#15803d",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: 6,
+                  padding: "5px 2px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 3,
+                }}
+              >
+                <span>🎓</span>
+                <span>Hướng dẫn</span>
+              </button>
+            )}
+            {onOpenFeedback && (
+              <button
+                type="button"
+                onClick={onOpenFeedback}
+                data-action="open-feedback"
+                title="Báo lỗi hoặc góp ý cho tác giả"
+                style={{
+                  flex: 1,
+                  background: "#fff7ed",
+                  color: "#c2410c",
+                  border: "1px solid #fed7aa",
+                  borderRadius: 6,
+                  padding: "5px 2px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 3,
+                }}
+              >
+                <span>🐛</span>
+                <span>Báo lỗi</span>
+              </button>
+            )}
+          </div>
         )}
 
         {/* Chèn PDF */}

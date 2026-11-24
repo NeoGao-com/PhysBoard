@@ -56,6 +56,21 @@ export const ClassroomToolsWidget: React.FC<ClassroomToolsWidgetProps> = ({
   const [durationSec, setDurationSec] = useState(300); // 5 min default
   const [remainingSec, setRemainingSec] = useState(300);
   const [running, setRunning] = useState(false);
+  const [customMinInput, setCustomMinInput] = useState("5");
+  const [customSecInput, setCustomSecInput] = useState("00");
+
+  const applyCustomDuration = (rawMin: string, rawSec: string) => {
+    const m = Math.max(0, Math.min(180, parseInt(rawMin || "0", 10) || 0));
+    const s = Math.max(0, Math.min(59, parseInt(rawSec || "0", 10) || 0));
+    const total = Math.max(1, Math.min(180 * 60, m * 60 + s));
+    const normM = Math.floor(total / 60);
+    const normS = total % 60;
+    setRunning(false);
+    setDurationSec(total);
+    setRemainingSec(total);
+    setCustomMinInput(String(normM));
+    setCustomSecInput(String(normS).padStart(2, "0"));
+  };
 
   // Random student picker state
   const [studentsRaw, setStudentsRaw] = useState<string>(() => loadSavedStudents());
@@ -270,6 +285,7 @@ export const ClassroomToolsWidget: React.FC<ClassroomToolsWidgetProps> = ({
               }}
             >
               <div
+                data-testid="timer-display"
                 style={{
                   fontSize: 38,
                   fontWeight: 800,
@@ -314,6 +330,8 @@ export const ClassroomToolsWidget: React.FC<ClassroomToolsWidgetProps> = ({
                     setRunning(false);
                     setDurationSec(m * 60);
                     setRemainingSec(m * 60);
+                    setCustomMinInput(String(m));
+                    setCustomSecInput("00");
                   }}
                   style={{
                     padding: "4px 9px",
@@ -329,6 +347,90 @@ export const ClassroomToolsWidget: React.FC<ClassroomToolsWidgetProps> = ({
                   {m}p
                 </button>
               ))}
+            </div>
+
+            {/* Custom time input (minutes : seconds) */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 5,
+                padding: "5px 8px",
+                borderRadius: 10,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>Tuỳ chỉnh:</span>
+              <input
+                type="number"
+                data-testid="timer-custom-min"
+                min={0}
+                max={180}
+                aria-label="Số phút"
+                value={customMinInput}
+                onChange={(e) => setCustomMinInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") applyCustomDuration(customMinInput, customSecInput);
+                }}
+                style={{
+                  width: 44,
+                  height: 26,
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  textAlign: "center",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: "#0f172a",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              />
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: "#475569" }}>p :</span>
+              <input
+                type="number"
+                data-testid="timer-custom-sec"
+                min={0}
+                max={59}
+                aria-label="Số giây"
+                value={customSecInput}
+                onChange={(e) => setCustomSecInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") applyCustomDuration(customMinInput, customSecInput);
+                }}
+                style={{
+                  width: 44,
+                  height: 26,
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  background: "#ffffff",
+                  textAlign: "center",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: "#0f172a",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              />
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: "#475569" }}>s</span>
+              <button
+                type="button"
+                data-testid="timer-custom-apply"
+                onClick={() => applyCustomDuration(customMinInput, customSecInput)}
+                style={{
+                  height: 26,
+                  padding: "0 9px",
+                  borderRadius: 6,
+                  border: "1px solid #c7d2fe",
+                  background: "#eef2ff",
+                  color: "#4338ca",
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                Đặt
+              </button>
             </div>
 
             {/* Controls */}

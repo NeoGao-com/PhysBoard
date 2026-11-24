@@ -1,7 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import * as Y from "yjs";
+import {
+  Camera,
+  Copy,
+  Download,
+  ImagePlus,
+  X as CloseSmallIcon,
+} from "lucide-react";
 import {
   ToolbarVisibilityConfig,
   DEFAULT_TOOLBAR_VISIBILITY,
@@ -94,6 +101,15 @@ export type SettingsTab =
   | "export"
   | "update"
   | "feedback";
+
+interface FeedbackAttachment {
+  id: string;
+  name: string;
+  dataUrl: string;
+  sizeBytes: number;
+}
+
+const MAX_FEEDBACK_IMAGES = 4;
 
 interface TabMeta {
   id: SettingsTab;
@@ -230,8 +246,152 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [fbDesc, setFbDesc] = useState("");
   const [fbIncludeDiag, setFbIncludeDiag] = useState(true);
   const [fbCopied, setFbCopied] = useState(false);
+  const [fbImages, setFbImages] = useState<FeedbackAttachment[]>([]);
+  const [fbCapturingBoard, setFbCapturingBoard] = useState(false);
+  const [fbNotice, setFbNotice] = useState<string | null>(null);
+  const fbFileInputRef = useRef<HTMLInputElement | null>(null);
+  const fbNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [busyPng, setBusyPng] = useState(false);
+
+  const showFbNotice = useCallback((msg: string) => {
+    setFbNotice(msg);
+    if (fbNoticeTimerRef.current) {
+      clearTimeout(fbNoticeTimerRef.current);
+    }
+    fbNoticeTimerRef.current = setTimeout(() => {
+      setFbNotice(null);
+      fbNoticeTimerRef.current = null;
+    }, 4500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (fbNoticeTimerRef.current) clearTimeout(fbNoticeTimerRef.current);
+    };
+  }, []);
+
+  const addFeedbackImageFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+      if (list.length === 0) {
+        showFbNotice("Vui lòng chọn file ảnh (PNG, JPG, WebP...).");
+        return;
+      }
+
+      const loaded: FeedbackAttachment[] = await Promise.all(
+        list.slice(0, MAX_FEEDBACK_IMAGES).map(
+          (file) =>
+            new Promise<FeedbackAttachment>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () =>
+                resolve({
+                  id: `fb_img_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+                  name: file.name || `anh-loi-${Date.now()}.png`,
+                  dataUrl: String(reader.result || ""),
+                  sizeBytes: file.size,
+                });
+              reader.onerror = () => reject(new Error("Không đọc được file ảnh"));
+              reader.readAsDataURL(file);
+            })
+        )
+      ).catch(() => []);
+
+      if (loaded.length === 0) return;
+
+      let dropped = false;
+      setFbImages((prev) => {
+        const room = Math.max(0, MAX_FEEDBACK_IMAGES - prev.length);
+        if (loaded.length > room) dropped = true;
+        return [...prev, ...loaded.slice(0, room)];
+      });
+
+      if (dropped) {
+        showFbNotice(`Chỉ đính kèm tối đa ${MAX_FEEDBACK_IMAGES} ảnh cho mỗi báo lỗi.`);
+      } else {
+        showFbNotice(`✓ Đã đính kèm ${loaded.length} ảnh minh hoạ.`);
+      }
+    },
+    [showFbNotice]
+  );
+
+  const handleCaptureBoardForFeedback = async () => {
+    const el = getBoardElement ? getBoardElement() : null;
+    if (!el || !doc) {
+      showFbNotice("Không tìm thấy bảng vẽ để chụp ảnh màn hình.");
+      return;
+    }
+    if (fbImages.length >= MAX_FEEDBACK_IMAGES) {
+      showFbNotice(`Đã đủ tối đa ${MAX_FEEDBACK_IMAGES} ảnh đính kèm.`);
+      return;
+    }
+    setFbCapturingBoard(true);
+    try {
+      const blob = await exportPNG(el, doc, page);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Lỗi chuyển đổi ảnh PNG"));
+        reader.readAsDataURL(blob);
+      });
+      setFbImages((prev) => [
+        ...prev.slice(0, MAX_FEEDBACK_IMAGES - 1),
+        {
+          id: `fb_board_${Date.now().toString(36)}`,
+          name: `bang-trang-t${page}.png`,
+          dataUrl,
+          sizeBytes: blob.size,
+        },
+      ]);
+      showFbNotice(`✓ Đã chụp ảnh Trang ${page} đính kèm vào báo lỗi.`);
+    } catch (err) {
+      showFbNotice(
+        err instanceof Error ? `Không thể chụp bảng: ${err.message}` : "Không thể chụp bảng."
+      );
+    } finally {
+      setFbCapturingBoard(false);
+    }
+  };
+
+  const copyDataUrlImageToClipboard = useCallback(async (dataUrl: string): Promise<boolean> => {
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => reject(new Error("Không nạp được ảnh"));
+        im.src = dataUrl;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, img.naturalWidth || 800);
+      canvas.height = Math.max(1, img.naturalHeight || 600);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return false;
+      ctx.drawImage(img, 0, 0);
+      const pngBlob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), "image/png")
+      );
+      if (!pngBlob || typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+        return false;
+      }
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const downloadFeedbackImage = (item: FeedbackAttachment) => {
+    try {
+      const [header, b64] = item.dataUrl.split(",");
+      const mime = header?.match(/:(.*?);/)?.[1] || "image/png";
+      const bin = atob(b64 || "");
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      downloadBlob(new Blob([arr], { type: mime }), item.name);
+    } catch {
+      showFbNotice("Không thể tải ảnh này.");
+    }
+  };
 
   // Check for updates state
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -320,6 +480,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [open, onClose]);
+
+  // Support Ctrl+V image paste directly into the Feedback / Bug Report tab
+  useEffect(() => {
+    if (!open || activeTab !== "feedback") return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const pastedImages: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) pastedImages.push(f);
+        }
+      }
+      if (pastedImages.length > 0) {
+        e.preventDefault();
+        void addFeedbackImageFiles(pastedImages);
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [open, activeTab, addFeedbackImageFiles]);
 
   if (!open) return null;
 
@@ -2787,9 +2969,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   : `- Phiên bản: v${APP_VERSION}`;
 
               const issueTitle = `${catMeta.prefix} ${fbTitle.trim() || "Phản hồi từ người dùng PhysBoard"}`;
+              const attachSection =
+                fbImages.length > 0
+                  ? [
+                      "",
+                      `### Ảnh chụp minh hoạ (${fbImages.length} ảnh)`,
+                      ...fbImages.map(
+                        (img, idx) =>
+                          `- ${idx + 1}. \`${img.name}\` (${Math.max(1, Math.round(img.sizeBytes / 1024))} KB)`
+                      ),
+                      "*(Dán Ctrl+V hoặc kéo thả ảnh từ máy / Clipboard vào khung bên dưới)*",
+                    ]
+                  : [];
+
               const issueBody = [
                 "### Mô tả chi tiết",
                 fbDesc.trim() || "(Người dùng chưa nhập mô tả)",
+                ...attachSection,
                 ...(fbIncludeDiag ? ["", "### Thông tin thiết bị", diagText] : []),
               ].join("\n");
 
@@ -2804,7 +3000,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <span>Gửi báo lỗi hoặc góp ý cải thiện PhysBoard</span>
                     </div>
                     <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.5 }}>
-                      Nếu bạn gặp lỗi trong lúc giảng dạy hoặc muốn đề xuất tính năng mới, hãy điền nhanh bên dưới và chọn cách gửi thuận tiện nhất.
+                      Nếu bạn gặp lỗi trong lúc giảng dạy hoặc muốn đề xuất tính năng mới, hãy điền nhanh bên dưới và đính kèm ảnh chụp nếu có.
                     </div>
 
                     {/* Category pills */}
@@ -2868,7 +3064,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <textarea
                         value={fbDesc}
                         onChange={(e) => setFbDesc(e.target.value)}
-                        rows={4}
+                        rows={3}
                         placeholder="Bạn đang thao tác gì trước khi gặp lỗi? Kết quả mong muốn là gì?"
                         style={{
                           padding: "8px 11px",
@@ -2881,6 +3077,280 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           fontFamily: "inherit",
                         }}
                       />
+                    </div>
+
+                    {/* Image Attachments Section */}
+                    <div
+                      data-testid="feedback-attachments-section"
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (e.dataTransfer.files?.length) {
+                          void addFeedbackImageFiles(e.dataTransfer.files);
+                        }
+                      }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                        padding: 10,
+                        borderRadius: 10,
+                        border: "1.5px dashed #cbd5e1",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 12.5, fontWeight: 700, color: "#1e293b" }}>
+                          Ảnh chụp minh hoạ lỗi ({fbImages.length}/{MAX_FEEDBACK_IMAGES})
+                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                          <input
+                            ref={fbFileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            data-testid="feedback-file-input"
+                            style={{ display: "none" }}
+                            onChange={(e) => {
+                              if (e.target.files?.length) {
+                                void addFeedbackImageFiles(e.target.files);
+                              }
+                              e.target.value = "";
+                            }}
+                          />
+                          <button
+                            type="button"
+                            data-testid="feedback-upload-btn"
+                            disabled={fbImages.length >= MAX_FEEDBACK_IMAGES}
+                            onClick={() => fbFileInputRef.current?.click()}
+                            style={{
+                              height: 30,
+                              padding: "0 10px",
+                              borderRadius: 7,
+                              border: "1px solid #cbd5e1",
+                              background: "#ffffff",
+                              color: fbImages.length >= MAX_FEEDBACK_IMAGES ? "#94a3b8" : "#0f172a",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: fbImages.length >= MAX_FEEDBACK_IMAGES ? "not-allowed" : "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            <ImagePlus size={14} color="#2563eb" />
+                            <span>Chọn ảnh từ máy</span>
+                          </button>
+
+                          {getBoardElement && (
+                            <button
+                              type="button"
+                              data-testid="feedback-capture-board-btn"
+                              disabled={fbCapturingBoard || fbImages.length >= MAX_FEEDBACK_IMAGES}
+                              onClick={() => void handleCaptureBoardForFeedback()}
+                              style={{
+                                height: 30,
+                                padding: "0 10px",
+                                borderRadius: 7,
+                                border: "1px solid #bfdbfe",
+                                background: "#eff6ff",
+                                color:
+                                  fbCapturingBoard || fbImages.length >= MAX_FEEDBACK_IMAGES
+                                    ? "#94a3b8"
+                                    : "#1d4ed8",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor:
+                                  fbCapturingBoard || fbImages.length >= MAX_FEEDBACK_IMAGES
+                                    ? "not-allowed"
+                                    : "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                              }}
+                            >
+                              <Camera size={14} />
+                              <span>{fbCapturingBoard ? "Đang chụp..." : "Chụp bảng hiện tại"}</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {fbImages.length === 0 ? (
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          Bấm <strong>Chọn ảnh từ máy</strong>, chụp nhanh bảng vẽ, kéo thả ảnh vào đây, hoặc nhấn{" "}
+                          <kbd
+                            style={{
+                              padding: "1px 5px",
+                              borderRadius: 4,
+                              background: "#ffffff",
+                              border: "1px solid #cbd5e1",
+                              fontSize: 11,
+                            }}
+                          >
+                            Ctrl+V
+                          </kbd>{" "}
+                          để dán ảnh chụp màn hình.
+                        </div>
+                      ) : (
+                        <div
+                          data-testid="feedback-attachments-grid"
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+                            gap: 8,
+                          }}
+                        >
+                          {fbImages.map((imgItem) => (
+                            <div
+                              key={imgItem.id}
+                              data-testid="feedback-attachment-item"
+                              style={{
+                                position: "relative",
+                                borderRadius: 8,
+                                border: "1px solid #cbd5e1",
+                                background: "#ffffff",
+                                padding: 6,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 5,
+                              }}
+                            >
+                              <button
+                                type="button"
+                                data-testid="feedback-remove-img-btn"
+                                title="Xoá ảnh này"
+                                onClick={() =>
+                                  setFbImages((prev) => prev.filter((it) => it.id !== imgItem.id))
+                                }
+                                style={{
+                                  position: "absolute",
+                                  top: 8,
+                                  right: 8,
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: 6,
+                                  border: "none",
+                                  background: "rgba(15, 23, 42, 0.72)",
+                                  color: "#ffffff",
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <CloseSmallIcon size={12} />
+                              </button>
+
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={imgItem.dataUrl}
+                                alt={imgItem.name}
+                                style={{
+                                  width: "100%",
+                                  height: 76,
+                                  objectFit: "cover",
+                                  borderRadius: 6,
+                                  background: "#f1f5f9",
+                                  border: "1px solid #e2e8f0",
+                                }}
+                              />
+
+                              <div
+                                title={imgItem.name}
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: "#334155",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {imgItem.name} ({Math.max(1, Math.round(imgItem.sizeBytes / 1024))} KB)
+                              </div>
+
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <button
+                                  type="button"
+                                  data-testid="feedback-copy-img-btn"
+                                  onClick={() => {
+                                    void copyDataUrlImageToClipboard(imgItem.dataUrl).then((ok) => {
+                                      showFbNotice(
+                                        ok
+                                          ? `✓ Đã copy "${imgItem.name}" vào Clipboard — nhấn Ctrl+V để dán vào GitHub / Email.`
+                                          : "Trình duyệt chưa cấp quyền copy ảnh — hãy dùng nút Tải về bên cạnh."
+                                      );
+                                    });
+                                  }}
+                                  style={{
+                                    flex: 1,
+                                    height: 24,
+                                    borderRadius: 5,
+                                    border: "1px solid #cbd5e1",
+                                    background: "#f8fafc",
+                                    color: "#1e293b",
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: 4,
+                                  }}
+                                >
+                                  <Copy size={11} />
+                                  <span>Copy ảnh</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Tải ảnh về máy"
+                                  onClick={() => downloadFeedbackImage(imgItem)}
+                                  style={{
+                                    width: 26,
+                                    height: 24,
+                                    borderRadius: 5,
+                                    border: "1px solid #cbd5e1",
+                                    background: "#f8fafc",
+                                    color: "#334155",
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <Download size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {fbNotice && (
+                        <div
+                          data-testid="feedback-notice"
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 7,
+                            background: "#eff6ff",
+                            border: "1px solid #bfdbfe",
+                            color: "#1d4ed8",
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {fbNotice}
+                        </div>
+                      )}
                     </div>
 
                     {/* Diagnostics checkbox */}
@@ -2897,20 +3367,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     {/* Action buttons */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
                       <a
+                        data-testid="feedback-github-link"
                         href={githubIssueUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => {
+                          if (fbImages.length > 0) {
+                            void copyDataUrlImageToClipboard(fbImages[0].dataUrl).then((ok) => {
+                              showFbNotice(
+                                ok
+                                  ? "Đã tự động copy ảnh đầu tiên vào Clipboard — sang trang GitHub Issues bạn chỉ cần nhấn Ctrl+V để dán ảnh!"
+                                  : "Sang trang GitHub Issues hãy kéo thả hoặc dùng nút Tải về ảnh ở trên để đính kèm."
+                              );
+                            });
+                          }
+                        }}
                         style={{
                           flex: "1 1 180px",
                           padding: "9px 14px",
                           borderRadius: 9,
-                          background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                          background: "#2563eb",
                           color: "#ffffff",
                           fontSize: 12.5,
                           fontWeight: 700,
                           textDecoration: "none",
                           textAlign: "center",
-                          boxShadow: "0 2px 8px rgba(37,99,235,0.25)",
+                          boxShadow: "0 2px 8px rgba(37,99,235,0.22)",
                         }}
                       >
                         🚀 Gửi qua GitHub Issues
@@ -2918,6 +3400,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                       <a
                         href={mailtoUrl}
+                        onClick={() => {
+                          if (fbImages.length > 0) {
+                            showFbNotice(
+                              "Email không tự đính kèm file qua liên kết — hãy dùng nút Tải về hoặc Copy ảnh ở trên để dán vào thư."
+                            );
+                          }
+                        }}
                         style={{
                           flex: "1 1 150px",
                           padding: "9px 14px",

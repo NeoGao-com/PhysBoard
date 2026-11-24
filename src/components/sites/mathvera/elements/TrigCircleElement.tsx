@@ -73,6 +73,9 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
   const storedAngle =
     typeof element.props?.angle === "number" ? element.props.angle : Math.PI / 6;
   const unit: "rad" | "deg" = element.props?.unit === "deg" ? "deg" : "rad";
+  const showOxSweep = Boolean(element.props?.showOxSweep);
+  const sweepStartAngle =
+    typeof element.props?.sweepStartAngle === "number" ? element.props.sweepStartAngle : 0;
   const show = (element.props?.show as Record<string, boolean> | undefined) ?? {
     sin: true,
     cos: true,
@@ -136,6 +139,152 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
       arcArrowPoints: `${endX.toFixed(4)},${endY.toFixed(4)} ${p1x.toFixed(4)},${p1y.toFixed(4)} ${p2x.toFixed(4)},${p2y.toFixed(4)}`,
     };
   }, [liveAngle, R]);
+
+  // Piecewise swept trajectory along horizontal Ox axis from sweepStartAngle -> liveAngle
+  const oxSweepData = useMemo(() => {
+    if (!showOxSweep) return null;
+
+    const a0 = sweepStartAngle;
+    const a1 = liveAngle;
+    const delta = a1 - a0;
+    const breakpoints: number[] = [a0];
+
+    if (delta > 1e-6) {
+      const kFirst = Math.floor(a0 / Math.PI) + 1;
+      const kLast = Math.ceil(a1 / Math.PI) - 1;
+      const count = Math.min(24, Math.max(0, kLast - kFirst + 1));
+      for (let i = 0; i < count; i++) {
+        breakpoints.push((kFirst + i) * Math.PI);
+      }
+    } else if (delta < -1e-6) {
+      const kFirst = Math.ceil(a0 / Math.PI) - 1;
+      const kLast = Math.floor(a1 / Math.PI) + 1;
+      const count = Math.min(24, Math.max(0, kFirst - kLast + 1));
+      for (let i = 0; i < count; i++) {
+        breakpoints.push((kFirst - i) * Math.PI);
+      }
+    }
+    breakpoints.push(a1);
+
+    const xs = breakpoints.map((t) => R * Math.cos(t));
+    const coss = breakpoints.map((t) => Math.cos(t));
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minCos = Math.min(...coss);
+    const maxCos = Math.max(...coss);
+
+    let totalDistanceR = 0;
+    const segments: Array<{
+      x1: number;
+      x2: number;
+      dir: number;
+      y: number;
+      layer: number;
+    }> = [];
+
+    for (let i = 0; i < breakpoints.length - 1; i++) {
+      const c1 = Math.cos(breakpoints[i]);
+      const c2 = Math.cos(breakpoints[i + 1]);
+      const d = Math.abs(c2 - c1);
+      if (d < 1e-5) continue;
+      const layer = segments.length;
+      const yOff = 0.16 + Math.min(layer, 7) * 0.14;
+      totalDistanceR += d;
+      segments.push({
+        x1: R * c1,
+        x2: R * c2,
+        dir: c2 >= c1 ? 1 : -1,
+        y: yOff,
+        layer,
+      });
+    }
+
+    const startX = R * Math.cos(a0);
+    const startYCircle = -R * Math.sin(a0);
+    let foldedPath = "";
+    const arrowPoints: string[] = [];
+
+    const pushArrow = (tipX: number, y: number, dir: number, sz = 0.085) => {
+      const backX = tipX - dir * sz;
+      const halfH = sz * 0.56;
+      arrowPoints.push(
+        `${tipX.toFixed(4)},${y.toFixed(4)} ${backX.toFixed(4)},${(y - halfH).toFixed(4)} ${backX.toFixed(4)},${(y + halfH).toFixed(4)}`
+      );
+    };
+
+    if (segments.length > 0) {
+      const cmds: string[] = [`M${segments[0].x1.toFixed(4)},${segments[0].y.toFixed(4)}`];
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        if (i > 0) {
+          const prev = segments[i - 1];
+          const dy = seg.y - prev.y;
+          if (dy > 1e-4) {
+            const ry = dy / 2;
+            const rx = 0.095;
+            const sweepFlag = seg.x1 >= 0 ? 1 : 0;
+            cmds.push(
+              `A${rx.toFixed(4)},${ry.toFixed(4)} 0 0,${sweepFlag} ${seg.x1.toFixed(4)},${seg.y.toFixed(4)}`
+            );
+          } else {
+            cmds.push(`L${seg.x1.toFixed(4)},${seg.y.toFixed(4)}`);
+          }
+        }
+        cmds.push(`L${seg.x2.toFixed(4)},${seg.y.toFixed(4)}`);
+
+        if (Math.abs(seg.x2 - seg.x1) >= 0.42) {
+          pushArrow((seg.x1 + seg.x2) * 0.5, seg.y, seg.dir, 0.082);
+        }
+      }
+      const lastSeg = segments[segments.length - 1];
+      if (Math.abs(lastSeg.x2 - lastSeg.x1) >= 0.14) {
+        pushArrow(lastSeg.x2, lastSeg.y, lastSeg.dir, 0.095);
+      }
+      foldedPath = cmds.join(" ");
+    }
+
+    // Highlighted arc on the circle circumference
+    let sweptCircleArcPath = "";
+    const absDelta = Math.abs(delta);
+    if (absDelta >= 2 * Math.PI - 1e-4) {
+      sweptCircleArcPath = `M${R.toFixed(4)},0 A${R.toFixed(4)},${R.toFixed(4)} 0 1,0 ${(-R).toFixed(4)},0 A${R.toFixed(4)},${R.toFixed(4)} 0 1,0 ${R.toFixed(4)},0`;
+    } else if (absDelta > 1e-4) {
+      const ex = R * Math.cos(a1);
+      const ey = -R * Math.sin(a1);
+      const largeArc = absDelta > Math.PI ? 1 : 0;
+      const sweep = delta >= 0 ? 0 : 1;
+      sweptCircleArcPath = `M${startX.toFixed(4)},${startYCircle.toFixed(4)} A${R.toFixed(4)},${R.toFixed(4)} 0 ${largeArc},${sweep} ${ex.toFixed(4)},${ey.toFixed(4)}`;
+    }
+
+    const fmtUnitVal = (v: number) => {
+      const clean = Math.abs(v) < 0.005 ? 0 : v;
+      return clean.toFixed(2).replace(/\.?0+$/, "");
+    };
+
+    const distanceText =
+      totalDistanceR < 0.005
+        ? "0"
+        : Math.abs(totalDistanceR - Math.round(totalDistanceR)) < 0.005
+          ? `${Math.round(totalDistanceR)}R`
+          : `${totalDistanceR.toFixed(2)}R`;
+
+    return {
+      minX,
+      maxX,
+      spanLabel: `[${fmtUnitVal(minCos)} ; ${fmtUnitVal(maxCos)}]`,
+      totalDistanceR,
+      distanceText,
+      startX,
+      startYCircle,
+      startRibbonY: segments[0]?.y ?? 0.16,
+      endX: segments[segments.length - 1]?.x2 ?? startX,
+      endRibbonY: segments[segments.length - 1]?.y ?? 0.16,
+      foldedPath,
+      arrowPoints,
+      sweptCircleArcPath,
+      hasTravel: segments.length > 0,
+    };
+  }, [showOxSweep, sweepStartAngle, liveAngle, R]);
 
   const handlePointMDown = (e: React.PointerEvent<SVGCircleElement>) => {
     e.stopPropagation();
@@ -354,6 +503,97 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
         </>
       )}
 
+      {/* Swept path of point M projected on Ox axis */}
+      {showOxSweep && oxSweepData && (
+        <g data-wb-ox-sweep="true" pointerEvents="none">
+          {/* Highlighted circular arc traversed from sweepStartAngle to liveAngle */}
+          {oxSweepData.sweptCircleArcPath && (
+            <path
+              d={oxSweepData.sweptCircleArcPath}
+              fill="none"
+              stroke="#0d9488"
+              strokeWidth={3.4}
+              strokeOpacity={0.62}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+
+          {/* Direct covered band directly along Ox axis (y = 0) */}
+          {oxSweepData.maxX - oxSweepData.minX > 1e-4 && (
+            <line
+              x1={oxSweepData.minX}
+              y1={0}
+              x2={oxSweepData.maxX}
+              y2={0}
+              stroke="#0d9488"
+              strokeWidth={7}
+              strokeOpacity={0.32}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+
+          {/* Drop line from start point M0 on circle down to start on Ox */}
+          {oxSweepData.hasTravel && (
+            <>
+              <line
+                x1={oxSweepData.startX}
+                y1={oxSweepData.startYCircle}
+                x2={oxSweepData.startX}
+                y2={oxSweepData.startRibbonY}
+                stroke="#0d9488"
+                strokeWidth={1.1}
+                strokeDasharray="3 2"
+                strokeOpacity={0.65}
+                vectorEffect="non-scaling-stroke"
+              />
+              <circle
+                cx={oxSweepData.startX}
+                cy={oxSweepData.startYCircle}
+                r={0.085}
+                fill="#ffffff"
+                stroke="#0d9488"
+                strokeWidth={2}
+                vectorEffect="non-scaling-stroke"
+              />
+              <circle cx={oxSweepData.startX} cy={oxSweepData.startRibbonY} r={0.065} fill="#0d9488" />
+            </>
+          )}
+
+          {/* Folded/stepped Ox trajectory ribbon below Ox with turnaround U-bends & directional arrows */}
+          {oxSweepData.foldedPath && (
+            <path
+              data-wb-ox-sweep-path="true"
+              d={oxSweepData.foldedPath}
+              fill="none"
+              stroke="#0d9488"
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {oxSweepData.arrowPoints.map((pts, idx) => (
+            <polygon key={idx} points={pts} fill="#0d9488" />
+          ))}
+
+          {/* Current Ox projection marker */}
+          <line
+            x1={mx}
+            y1={0}
+            x2={oxSweepData.endX}
+            y2={oxSweepData.endRibbonY}
+            stroke="#0d9488"
+            strokeWidth={1.1}
+            strokeDasharray="2 2"
+            strokeOpacity={0.65}
+            vectorEffect="non-scaling-stroke"
+          />
+          <circle cx={mx} cy={0} r={0.085} fill="#0d9488" stroke="#ffffff" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+        </g>
+      )}
+
       {/* Radius OM */}
       <line
         x1={0}
@@ -458,7 +698,7 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
 
       {/* Live Trig Readout Panel */}
       <g transform={`translate(${axisExtent + 0.35} ${-R}) scale(${invScale})`}>
-        <foreignObject x={0} y={0} width={360} height={330} style={{ overflow: "visible" }}>
+        <foreignObject x={0} y={0} width={380} height={420} style={{ overflow: "visible" }}>
           <div
             data-wb-trig-values="true"
             className="wb-trig-readout"
@@ -476,10 +716,10 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
               fontFamily: "system-ui, sans-serif",
               pointerEvents: "auto",
               width: "max-content",
-              minWidth: 252,
+              minWidth: 268,
             }}
           >
-            {/* Header with Unit Toggle (Rad / Độ) */}
+            {/* Header with Ox Sweep Toggle & Unit Toggle (Rad / Độ) */}
             <div
               style={{
                 display: "flex",
@@ -493,15 +733,40 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
               <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
                 Góc lượng giác
               </span>
-              <div
-                style={{
-                  display: "inline-flex",
-                  borderRadius: 6,
-                  border: "1px solid #cbd5e1",
-                  overflow: "hidden",
-                  background: "#f8fafc",
-                }}
-              >
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <button
+                  type="button"
+                  data-trig-action="toggle-ox-sweep"
+                  aria-pressed={showOxSweep}
+                  title="Vẽ đường đã quét qua trên trục Ox (cos)"
+                  onClick={() =>
+                    onUpdateProps?.(element.id, {
+                      showOxSweep: !showOxSweep,
+                    })
+                  }
+                  style={{
+                    padding: "2px 7px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: showOxSweep ? "1px solid #0d9488" : "1px solid #cbd5e1",
+                    background: showOxSweep ? "#ccfbf1" : "#f8fafc",
+                    color: showOxSweep ? "#0f766e" : "#475569",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  〰 Quét Ox
+                </button>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    borderRadius: 6,
+                    border: "1px solid #cbd5e1",
+                    overflow: "hidden",
+                    background: "#f8fafc",
+                  }}
+                >
                 <button
                   type="button"
                   data-trig-unit="rad"
@@ -536,6 +801,7 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
                 >
                   Độ (°)
                 </button>
+                </div>
               </div>
             </div>
 
@@ -675,6 +941,80 @@ export const TrigCircleElement: React.FC<TrigCircleElementProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Swept Path on Ox Readout & Origin Controls */}
+            {showOxSweep && oxSweepData && (
+              <div
+                data-wb-trig-ox-sweep="true"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                  padding: "5px 7px",
+                  borderRadius: 7,
+                  background: "#f0fdfa",
+                  border: "1px solid #99f6e4",
+                  fontSize: 11.5,
+                  color: "#115e59",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                  <span style={{ fontWeight: 700 }}>
+                    Quãng đường Ox: S = {oxSweepData.distanceText}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#0f766e" }}>
+                    {oxSweepData.spanLabel}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button
+                    type="button"
+                    data-trig-action="set-ox-origin"
+                    title="Đặt mốc bắt đầu quét tại vị trí M hiện tại"
+                    onClick={() =>
+                      onUpdateProps?.(element.id, {
+                        sweepStartAngle: Number(liveAngle.toFixed(8)),
+                      })
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "2px 6px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      borderRadius: 5,
+                      border: "1px solid #5eead4",
+                      background: "#ffffff",
+                      color: "#0f766e",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Đặt mốc tại M
+                  </button>
+                  <button
+                    type="button"
+                    data-trig-action="reset-ox-origin"
+                    title="Đặt lại mốc quét về góc 0"
+                    onClick={() =>
+                      onUpdateProps?.(element.id, {
+                        sweepStartAngle: 0,
+                      })
+                    }
+                    style={{
+                      padding: "2px 7px",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      borderRadius: 5,
+                      border: "1px solid #5eead4",
+                      background: "#ffffff",
+                      color: "#115e59",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Về mốc 0
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div style={{ color: "#1565C0" }}>
               <KaTeXFormula latex={`\\cos\\alpha = ${readout.cosLatex}`} />

@@ -157,8 +157,13 @@ import { MathFormulasDrawer } from "./MathFormulasDrawer";
 import { ChemistryFormulasDrawer } from "./ChemistryFormulasDrawer";
 import { SimLauncherModal } from "./SimLauncherModal";
 import { FullscreenSimOverlay } from "./FullscreenSimOverlay";
-import { QuestionCropModal, type CroppedQuestionResult } from "./QuestionCropModal";
+import {
+  QuestionCropModal,
+  type BatchCroppedQuestionsResult,
+  type CroppedQuestionResult,
+} from "./QuestionCropModal";
 import { ClassroomToolsWidget } from "./ClassroomToolsWidget";
+import { FeatureGuideModal, hasSeenFeatureGuide } from "./FeatureGuideModal";
 import type { ActiveSimSession } from "@/lib/sim-library";
 import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportPdfModal } from "./ExportPdfModal";
@@ -680,6 +685,16 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
   const [simLauncherOpen, setSimLauncherOpen] = useState(false);
   const [questionCropOpen, setQuestionCropOpen] = useState(false);
   const [classroomToolsOpen, setClassroomToolsOpen] = useState(false);
+  const [featureGuideOpen, setFeatureGuideOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (hasSeenFeatureGuide()) return;
+    const timer = window.setTimeout(() => {
+      setFeatureGuideOpen(true);
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [activeSim, setActiveSim] = useState<ActiveSimSession | null>(null);
   const [simMinimized, setSimMinimized] = useState(false);
   const activeSimBlobUrlRef = useRef<string | null>(null);
@@ -7414,6 +7429,7 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
           setSettingsInitialTab("feedback");
           setSettingsModalOpen(true);
         }}
+        onOpenFeatureGuide={() => setFeatureGuideOpen(true)}
         onOpenBoardManager={() => {
           handleSelectTool("select");
           setBoardManagerOpen(true);
@@ -9538,6 +9554,82 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
         onInsertCropped={(res: CroppedQuestionResult) => {
           const center = getViewCenter();
           const aspect = res.heightPx / Math.max(1, res.widthPx);
+
+          if (isA4Format) {
+            const pageW = a4Opt?.widthWorld ?? 17;
+            const pageH = a4Opt?.heightWorld ?? 24.04;
+            const pageGap = 0.8;
+            const pageStep = pageH + pageGap;
+            const marginX = 0.9;
+            const marginTop = 0.85;
+            const marginBottom = 0.85;
+            const maxPrintableW = Math.max(4, pageW - marginX * 2);
+            const maxPrintableH = Math.max(4, pageH - marginTop - marginBottom);
+
+            let targetW = Math.min(maxPrintableW, Math.max(4.5, res.widthPx / 65));
+            let targetH = targetW * aspect;
+            if (targetH > maxPrintableH) {
+              const shrink = maxPrintableH / targetH;
+              targetW *= shrink;
+              targetH = maxPrintableH;
+            }
+
+            let topSvg = Math.max(marginTop, -(center.y + 1.5) - targetH / 2);
+            let targetPage = Math.max(1, Math.floor(topSvg / pageStep) + 1);
+            const pageTopSvg = (targetPage - 1) * pageStep + marginTop;
+            const pageBottomSvg = (targetPage - 1) * pageStep + pageH - marginBottom;
+            if (topSvg < pageTopSvg) {
+              topSvg = pageTopSvg;
+            }
+            if (topSvg + targetH > pageBottomSvg) {
+              targetPage += 1;
+              topSvg = (targetPage - 1) * pageStep + marginTop;
+            }
+
+            const prevCurrent = currentPage;
+            let curCount = pageCount;
+            while (curCount < targetPage) {
+              addYjsPage(doc);
+              curCount++;
+            }
+            if (targetPage > pageCount) {
+              setYjsCurrentPage(doc, prevCurrent);
+            }
+
+            const cy = -(topSvg + targetH / 2);
+            const created = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "Image",
+                transform: {
+                  x: 0,
+                  y: cy,
+                  scale: 1,
+                  rotation: 0,
+                  z: 0,
+                },
+                style: res.lockOnInsert ? { locked: true } : {},
+                props: {
+                  src: res.dataUrl,
+                  w: targetW,
+                  h: targetH,
+                  locked: res.lockOnInsert,
+                },
+              },
+            });
+            if (!res.lockOnInsert && created.created?.[0]) {
+              setSelectedIds([created.created[0]]);
+            } else {
+              setSelectedIds([]);
+            }
+            setStatusHint(
+              res.lockOnInsert
+                ? "✓ Đã cắt & khoá đề bài lên trang A4 (tự tránh vạch ngắt trang)"
+                : "✓ Đã cắt & ghim câu hỏi lên trang A4"
+            );
+            return;
+          }
+
           const targetW = Math.min(11, Math.max(4.5, res.widthPx / 65));
           const targetH = targetW * aspect;
           const created = dispatcher.dispatch({
@@ -9571,12 +9663,172 @@ export function Whiteboard({ roomId, initialRoomId, onGoHome }: WhiteboardProps)
               : "✓ Đã cắt & ghim câu hỏi lên bảng"
           );
         }}
+        onInsertBatchCropped={(batch: BatchCroppedQuestionsResult) => {
+          if (batch.items.length === 0) return;
+          const center = getViewCenter();
+          const maxWidthPx = Math.max(1, ...batch.items.map((it) => it.widthPx));
+          const createdIds: string[] = [];
+
+          if (isA4Format) {
+            const pageW = a4Opt?.widthWorld ?? 17;
+            const pageH = a4Opt?.heightWorld ?? 24.04;
+            const pageGap = 0.8;
+            const pageStep = pageH + pageGap;
+            const marginX = 0.9;
+            const marginTop = 0.85;
+            const marginBottom = 0.85;
+            const maxPrintableW = Math.max(4, pageW - marginX * 2);
+            const maxPrintableH = Math.max(4, pageH - marginTop - marginBottom);
+
+            const pxPerWorld = Math.max(65, maxWidthPx / Math.min(13.2, maxPrintableW));
+            const maxTargetW = Math.min(maxPrintableW, maxWidthPx / pxPerWorld);
+            const leftX = Math.max(-pageW / 2 + marginX, -maxTargetW / 2);
+
+            const startPage = Math.max(1, Math.floor(Math.max(0, -center.y) / pageStep) + 1);
+            let cursorTopSvg = Math.max(
+              (startPage - 1) * pageStep + marginTop,
+              -center.y - 6.0
+            );
+            let maxPageUsed = startPage;
+
+            for (const item of batch.items) {
+              let targetW = item.widthPx / pxPerWorld;
+              let targetH = item.heightPx / pxPerWorld;
+              if (targetW > maxPrintableW) {
+                const shrink = maxPrintableW / targetW;
+                targetW = maxPrintableW;
+                targetH *= shrink;
+              }
+              if (targetH > maxPrintableH) {
+                const shrink = maxPrintableH / targetH;
+                targetW *= shrink;
+                targetH = maxPrintableH;
+              }
+
+              let curPage = Math.max(1, Math.floor(Math.max(0, cursorTopSvg) / pageStep) + 1);
+              const pageTopSvg = (curPage - 1) * pageStep + marginTop;
+              const pageBottomSvg = (curPage - 1) * pageStep + pageH - marginBottom;
+
+              if (cursorTopSvg < pageTopSvg) {
+                cursorTopSvg = pageTopSvg;
+              }
+              if (cursorTopSvg + targetH > pageBottomSvg) {
+                curPage += 1;
+                cursorTopSvg = (curPage - 1) * pageStep + marginTop;
+              }
+
+              maxPageUsed = Math.max(maxPageUsed, curPage);
+              const cx = Math.min(
+                pageW / 2 - marginX - targetW / 2,
+                leftX + targetW / 2
+              );
+              const cy = -(cursorTopSvg + targetH / 2);
+              cursorTopSvg += targetH + batch.gapWorld;
+
+              const created = dispatcher.dispatch({
+                type: "object.create",
+                params: {
+                  type: "Image",
+                  transform: {
+                    x: cx,
+                    y: cy,
+                    scale: 1,
+                    rotation: 0,
+                    z: 0,
+                  },
+                  style: batch.lockOnInsert ? { locked: true } : {},
+                  props: {
+                    src: item.dataUrl,
+                    w: targetW,
+                    h: targetH,
+                    locked: batch.lockOnInsert,
+                  },
+                },
+              });
+              if (created.created?.[0]) {
+                createdIds.push(created.created[0]);
+              }
+            }
+
+            const prevCurrent = currentPage;
+            let curCount = pageCount;
+            while (curCount < maxPageUsed) {
+              addYjsPage(doc);
+              curCount++;
+            }
+            if (maxPageUsed > pageCount) {
+              setYjsCurrentPage(doc, prevCurrent);
+            }
+
+            if (!batch.lockOnInsert && createdIds.length > 0) {
+              setSelectedIds(createdIds);
+            } else {
+              setSelectedIds([]);
+            }
+            setStatusHint(
+              `✓ Đã chèn ${createdIds.length} câu hỏi qua ${maxPageUsed} trang A4 (tự nhảy trang, không đè vạch cắt)`
+            );
+            return;
+          }
+
+          const pxPerWorld = Math.max(65, maxWidthPx / 10.5);
+          const maxTargetW = maxWidthPx / pxPerWorld;
+          const leftX = center.x - maxTargetW / 2;
+          let cursorTopY = center.y + 4.5;
+
+          for (const item of batch.items) {
+            const targetW = item.widthPx / pxPerWorld;
+            const targetH = item.heightPx / pxPerWorld;
+            const cx = leftX + targetW / 2;
+            const cy = cursorTopY - targetH / 2;
+            cursorTopY -= targetH + batch.gapWorld;
+
+            const created = dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                type: "Image",
+                transform: {
+                  x: cx,
+                  y: cy,
+                  scale: 1,
+                  rotation: 0,
+                  z: 0,
+                },
+                style: batch.lockOnInsert ? { locked: true } : {},
+                props: {
+                  src: item.dataUrl,
+                  w: targetW,
+                  h: targetH,
+                  locked: batch.lockOnInsert,
+                },
+              },
+            });
+            if (created.created?.[0]) {
+              createdIds.push(created.created[0]);
+            }
+          }
+
+          if (!batch.lockOnInsert && createdIds.length > 0) {
+            setSelectedIds(createdIds);
+          } else {
+            setSelectedIds([]);
+          }
+          setStatusHint(
+            `✓ Đã tự động cắt & chèn ${createdIds.length} câu hỏi lên bảng (có khoảng trống để viết lời giải)`
+          );
+        }}
       />
 
       {/* Classroom Countdown Timer & Random Student Picker */}
       <ClassroomToolsWidget
         open={classroomToolsOpen}
         onClose={() => setClassroomToolsOpen(false)}
+      />
+
+      {/* First-Launch Onboarding & Interactive Feature Guide (Cách 2 Video Demos) */}
+      <FeatureGuideModal
+        open={featureGuideOpen}
+        onClose={() => setFeatureGuideOpen(false)}
       />
 
       {/* Searchable 100-item RealWorld Drawer */}
