@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/logo.png" alt="PhysBoard Logo" width="120" height="120" />
-  <h1>PhysBoard v1.2.0</h1>
+  <h1>PhysBoard v1.3.1</h1>
   <p>
     <strong>Bảng trắng tương tác dạy Toán · Vật lý · Hoá học THPT (GDPT 2018)</strong><br />
     <em>Hoạt động mượt mà trên Windows (.exe), Android (.apk) &amp; Trình duyệt — Dữ liệu lưu 100% Offline</em>
@@ -38,6 +38,7 @@ Thay vì nhúng khung nhỏ chật hẹp lên canvas, PhysBoard chạy thí nghi
 - **Kho PhET Online (28+ bài chọn lọc & dán link bất kỳ):** Tự động chuẩn hoá sang gói đa ngôn ngữ `_all.html?locale=vi` (hiển thị tiếng Việt, tự động fallback tiếng Anh nếu bài đó chưa có bản dịch).
 - **Kho File `.html` Offline (IndexedDB + Blob URL):** Tải sẵn file HTML5 đơn lẻ từ [PhET](https://phet.colorado.edu/) về máy, kéo-thả vào app để lưu lâu dài — dạy **100% không cần Internet**, tối ưu RAM cho Android WebView.
 - **Chuyển đổi tức thì Bảng trắng ↔ Thí nghiệm:** Bấm **─ Về bảng trắng** để ghi công thức/chú thích mà thí nghiệm vẫn giữ nguyên trạng thái chạy ngầm; bấm nút nổi góc dưới phải để quay lại đúng thí nghiệm đang chạy dở.
+- **Lớp kính vẽ chú thích trên PhET (`✏ Vẽ chú thích`):** Khoanh vùng, vẽ mũi tên, ghi chú ngay trên màn hình thí nghiệm đang chạy mà không làm gián đoạn mô phỏng.
 
 > **Ví dụ tiết dạy Vật lý 11 — Dao động con lắc đơn:**
 > 1. Bấm **⚗ Thí nghiệm** → chọn **Thí nghiệm Con lắc đơn** (`pendulum-lab`) ở chế độ toàn màn hình để học sinh quan sát chu kỳ $T$ khi thay đổi chiều dài dây $l$.
@@ -73,7 +74,9 @@ Mỗi môn học có ngăn kéo riêng biệt, tìm kiếm tiếng Việt không
 ### 4. Máy tính cầm tay, Soạn đề A4, PDF & Tuỳ biến Giao diện
 - **Máy tính khoa học (`fx-580VN X` style):** Giải phương trình, tính tích phân/đạo hàm số, phân số, lượng giác, ma trận/thống kê ngay trên cửa sổ nổi.
 - **Chế độ trang linh hoạt:** Bảng vô hạn, trang A4 soạn đề in ấn, nhiều loại nền giấy (lưới chấm, ô ly, kẻ ngang, nền đen/xanh bảng phấn).
-- **Chèn & Xuất tài liệu:** Chèn nhiều trang **PDF** làm nền giảng dạy (có nút khoá cố định PDF), xuất bảng ra **PNG**, **PDF** hoặc lưu/mở file dự án `.phys.json`.
+- **Chèn, Cắt đề & Xuất tài liệu:** Chèn nhiều trang **PDF** làm nền giảng dạy; dùng **✂ Cắt đề** để cắt nhanh 1 câu hỏi từ PDF/Ảnh/Ctrl+V ghim lên bảng; xuất bảng ra **PNG**, **PDF**, hoặc **💾 Sao lưu / Khôi phục** toàn bộ sổ tay qua 1 tệp `.physbackup.json`.
+- **Công cụ Lớp học (`⏱ Lớp học`):** Đồng hồ đếm ngược làm bài kèm chuông báo & gọi tên học sinh ngẫu nhiên không trùng.
+- **Tự cập nhật & Báo lỗi trong app:** Tải ngầm + cài đặt trực tiếp bản mới trên Windows/Android; tab **🐛 Báo lỗi & Phản hồi** gửi nhanh báo cáo kèm thông số thiết bị.
 - **Khoá/Mở khoá & Tuỳ biến thanh công cụ:**
   - Chọn khối bất kỳ → bấm **🔒 Khóa vào trang** để tránh xê dịch nhầm khi viết đè lên; bấm **🔓 Mở khoá N khối** ở góc dưới trái khi cần chỉnh sửa lại.
   - Vào **Cài đặt → Ẩn/Hiện Công cụ** để bật/tắt từng nút (**Toán**, **Vật lý**, **Hoá**, **Thí nghiệm**, **Máy tính**...) theo nhu cầu từng tiết dạy.

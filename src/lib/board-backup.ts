@@ -139,12 +139,8 @@ export async function importNotebooksBackup(file: File): Promise<{
 
   const existingBoards = loadBoards();
   const boardMap = new Map(existingBoards.map((b) => [b.id, b]));
-  let importedBoards = 0;
   for (const b of parsed.boards) {
     if (b?.id && b?.name) {
-      if (!boardMap.has(b.id)) {
-        importedBoards++;
-      }
       boardMap.set(b.id, { ...boardMap.get(b.id), ...b });
     }
   }
