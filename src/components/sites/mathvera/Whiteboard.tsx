@@ -1460,12 +1460,17 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         setIsLaserPressed(false);
       }
       if (typeof next === "string" && tryApplyConstructionFromSelection(next)) {
-        setActiveTool("select");
+        if (autoSwitchTarget === "off") {
+          setSelectedIds([]);
+          setActiveTool(next);
+        } else {
+          resetToolAfterCreation();
+        }
         return;
       }
       setActiveTool(next);
     },
-    [activeTool, tryApplyConstructionFromSelection]
+    [activeTool, autoSwitchTarget, resetToolAfterCreation, tryApplyConstructionFromSelection]
   );
 
   // Style State Aggregation
@@ -2257,7 +2262,9 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         handleSelectTool(action.toolId);
         if (action.hint) setStatusHint(action.hint);
       } else {
-        handleSelectTool("select");
+        if (autoSwitchTarget !== "off") {
+          handleSelectTool("select");
+        }
         if (action.kind === "open-plot-dialog") {
           setPlotDialogOpen(true);
         } else if (action.kind === "open-conic-dialog") {
@@ -2279,7 +2286,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         }
       }
     },
-    [handleSelectTool]
+    [autoSwitchTarget, handleSelectTool]
   );
 
   const ensureAxes2D = useCallback((): string => {
@@ -2391,10 +2398,10 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       });
 
       setPlotDialogOpen(false);
-      if (createdPlotId) setSelectedIds([createdPlotId]);
-      handleSelectTool("select");
+      if (autoSwitchTarget === "select" && createdPlotId) setSelectedIds([createdPlotId]);
+      resetToolAfterCreation();
     },
-    [dispatcher, ensureAxes2D, pageElements, getViewCenter, handleSelectTool]
+    [autoSwitchTarget, dispatcher, ensureAxes2D, pageElements, getViewCenter, resetToolAfterCreation]
   );
 
   // Sync slider drag -> matching Plot.props.params
@@ -3038,12 +3045,14 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         // If clicking directly on an existing vertex or point, select it instead of creating a duplicate overlapping point
         const nearPt = findNearestPoint(worldPos, 14);
         if (nearPt) {
-          if (nearPt.id && byId.has(nearPt.id)) {
-            setSelectedIds([nearPt.id]);
-          } else if (nearPt.polygonId && byId.has(nearPt.polygonId)) {
-            setSelectedIds([nearPt.polygonId]);
+          if (autoSwitchTarget === "select") {
+            if (nearPt.id && byId.has(nearPt.id)) {
+              setSelectedIds([nearPt.id]);
+            } else if (nearPt.polygonId && byId.has(nearPt.polygonId)) {
+              setSelectedIds([nearPt.polygonId]);
+            }
           }
-          handleSelectTool("select");
+          resetToolAfterCreation();
           return;
         }
 
@@ -3138,7 +3147,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             props: triEl.props,
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3166,7 +3175,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             props: quadEl.props,
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3292,7 +3301,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
           },
         });
         const newId = res.created?.[0];
-        if (newId) {
+        if (autoSwitchTarget === "select" && newId) {
           setSelectedIds([newId]);
           setOrbitActiveId(newId);
         }
@@ -3315,7 +3324,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
           },
         });
         const newId = res.created?.[0];
-        if (newId) {
+        if (autoSwitchTarget === "select" && newId) {
           setSelectedIds([newId]);
           setOrbitActiveId(newId);
         }
@@ -3341,7 +3350,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             props: { size: 5, grid: true, ticks: "int", legend: true },
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3392,7 +3401,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             props: propsObj,
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3418,7 +3427,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             },
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3450,7 +3459,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             props: { kind, items: ["A", "B", "C", "D"], k: 2 },
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3493,7 +3502,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             },
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3514,7 +3523,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             props: { labels: ["A", "B"], universe: "U", shade: [] },
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3549,7 +3558,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             },
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3577,8 +3586,8 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             props: { cells },
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
-        handleSelectTool("select");
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
+        resetToolAfterCreation();
         return;
       }
 
@@ -3602,7 +3611,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             props: { icon: iconId, from: "", to: "", width: 1 },
           },
         });
-        if (res.created?.[0]) setSelectedIds([res.created[0]]);
+        if (autoSwitchTarget === "select" && res.created?.[0]) setSelectedIds([res.created[0]]);
         resetToolAfterCreation();
         setStatusHint(null);
         return;
@@ -3691,13 +3700,13 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       currentPage,
       fillColor,
       solved3D.p3,
-      handleSelectTool,
       handleConstructionClick,
       penOnlyMode,
       isA4Format,
       a4Opt,
       byId,
       pageCount,
+      autoSwitchTarget,
       resetToolAfterCreation,
       spenConfig,
       laserConfig,
@@ -4700,6 +4709,9 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             isSelected={isSel}
             onPointerDown={(e, id) => handleElementPointerDown(e, id)}
             onLabelPointerDown={(e, id) => {
+              if (activeTool !== null && activeTool !== "select" && activeTool !== "select:marquee") {
+                return;
+              }
               if (penOnlyMode && e.pointerType === "touch") {
                 navPointerDown(e as unknown as React.PointerEvent<SVGSVGElement>);
                 return;
@@ -5114,6 +5126,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
     [
       currentBoardTheme.isDark,
       selectedIds,
+      activeTool,
       viewport.scale,
       viewport.tx,
       viewport.ty,

@@ -111,7 +111,6 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
     pickedItems,
     setPickedItems,
     setStatusHint,
-    setActiveTool,
     resetToolAfterCreation,
     setAngleDialog,
   } = opts;
@@ -712,7 +711,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
               });
               setPickedItems([]);
               setStatusHint(null);
-              setActiveTool("select");
+              resetToolAfterCreation();
               return true;
             }
           }
@@ -771,7 +770,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         }
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -842,7 +841,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
                 });
                 setPickedItems([]);
                 setStatusHint(null);
-                setActiveTool("select");
+                resetToolAfterCreation();
                 return true;
               }
             }
@@ -890,7 +889,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
           });
           setPickedItems([]);
           setStatusHint(null);
-          setActiveTool("select");
+          resetToolAfterCreation();
           return true;
         }
 
@@ -943,7 +942,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         }
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -995,7 +994,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
             });
           }
           setStatusHint(null);
-          setActiveTool("select");
+          resetToolAfterCreation();
           return true;
         }
         const nextPicked = [
@@ -1052,7 +1051,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         }
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1080,6 +1079,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
             props: { name, constraint: snapped.constraint },
           },
         });
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1182,7 +1182,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
               });
               setPickedItems([]);
               setStatusHint(null);
-              setActiveTool("select");
+              resetToolAfterCreation();
               return true;
             }
           }
@@ -1210,7 +1210,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         }
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1285,7 +1285,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         if (skew && skew.normalizedGap > 0.04) {
           setPickedItems([]);
           setStatusHint("Hai đường thẳng chéo nhau trong không gian — không đồng phẳng!");
-          setActiveTool("select");
+          resetToolAfterCreation();
           return true;
         }
 
@@ -1325,7 +1325,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         }
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1442,7 +1442,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         }
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1475,7 +1475,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         });
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1508,7 +1508,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         }
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1532,7 +1532,6 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         });
         setPickedItems([]);
         setStatusHint(null);
-        setActiveTool("select");
         return true;
       }
 
@@ -1597,7 +1596,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
           }
           setPickedItems([]);
           setStatusHint(null);
-          setActiveTool("select");
+          resetToolAfterCreation();
           return true;
         }
 
@@ -1631,7 +1630,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
           }
           setPickedItems([]);
           setStatusHint(null);
-          setActiveTool("select");
+          resetToolAfterCreation();
           return true;
         }
         return true;
@@ -1703,7 +1702,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
         } else {
           setStatusHint("Vui lòng bấm vào một khối 3D để trải phẳng");
         }
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1724,7 +1723,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
             });
           }
         });
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1827,7 +1826,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
           }
         }
         setPickedItems([]);
-        setActiveTool("select");
+        resetToolAfterCreation();
         return true;
       }
 
@@ -1846,7 +1845,7 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
       solved3D,
       setPickedItems,
       setStatusHint,
-      setActiveTool,
+      resetToolAfterCreation,
       setAngleDialog,
     ]
   );

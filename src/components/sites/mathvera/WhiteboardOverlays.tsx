@@ -252,8 +252,8 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
         props: { latex },
       },
     });
-    if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
-    p.handleSelectTool("select");
+    if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
+    p.resetToolAfterCreation();
     if (opts?.hint) p.setStatusHint(opts.hint);
   };
 
@@ -401,9 +401,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               },
             },
           });
-          if (!p.selectedAxes2D && res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          if (p.autoSwitchTarget === "select" && !p.selectedAxes2D && res.created?.[0]) p.setSelectedIds([res.created[0]]);
           p.setAxesPointDialogOpen(false);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setAxesPointDialogOpen(false)}
       />
@@ -605,9 +605,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
             });
             vecId = vRes.created?.[0] ?? "";
           });
-          if (!p.selectedAxes2D && vecId) p.setSelectedIds([vecId]);
+          if (p.autoSwitchTarget === "select" && !p.selectedAxes2D && vecId) p.setSelectedIds([vecId]);
           p.setAxesVectorDialogOpen(false);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setAxesVectorDialogOpen(false)}
       />
@@ -632,9 +632,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               },
             },
           });
-          if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
           p.setAxes3DPointDialogOpen(false);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setAxes3DPointDialogOpen(false)}
       />
@@ -687,9 +687,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
             });
             vecId = vRes.created?.[0] ?? "";
           });
-          if (vecId) p.setSelectedIds([vecId]);
+          if (p.autoSwitchTarget === "select" && vecId) p.setSelectedIds([vecId]);
           p.setAxes3DVectorDialogOpen(false);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setAxes3DVectorDialogOpen(false)}
       />
@@ -715,9 +715,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               },
             },
           });
-          if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
           p.setAxes3DFigureDialogKind(null);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setAxes3DFigureDialogKind(null)}
       />
@@ -735,9 +735,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               props: { axes: axesId, color, def },
             },
           });
-          if (!p.selectedAxes2D && res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          if (p.autoSwitchTarget === "select" && !p.selectedAxes2D && res.created?.[0]) p.setSelectedIds([res.created[0]]);
           p.setCurve2dDialogMode(null);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setCurve2dDialogMode(null)}
       />
@@ -755,9 +755,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               props: { kind, a, b, axes: axesId },
             },
           });
-          if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
           p.setConicDialogKind(null);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setConicDialogKind(null)}
       />
@@ -781,9 +781,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               props: propsObj,
             },
           });
-          if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
           p.setVarTableDialogMode(null);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setVarTableDialogMode(null)}
       />
@@ -816,9 +816,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               props: propsObj,
             },
           });
-          if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
           p.setChartDialogOpen(false);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setChartDialogOpen(false)}
       />
@@ -858,7 +858,7 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
             });
           });
           p.setBayesDialogOpen(false);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setBayesDialogOpen(false)}
       />
@@ -881,9 +881,9 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               props: { set: setExpr },
             },
           });
-          if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
           p.setNumberLineDialogOpen(false);
-          p.handleSelectTool("select");
+          p.resetToolAfterCreation();
         }}
         onCancel={() => p.setNumberLineDialogOpen(false)}
       />
@@ -959,6 +959,7 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
                 });
               });
               p.setAngleDialog(null);
+              p.resetToolAfterCreation();
             }}
             style={{
               border: "none",
@@ -974,7 +975,10 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
           </button>
           <button
             type="button"
-            onClick={() => p.setAngleDialog(null)}
+            onClick={() => {
+              p.setAngleDialog(null);
+              p.resetToolAfterCreation();
+            }}
             style={{
               border: "1px solid #cbd5e1",
               background: "#ffffff",
@@ -1284,8 +1288,8 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               props: { icon: item.id, from: "", to: "", width: 1 },
             },
           });
-          if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
-          p.handleSelectTool("select");
+          if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          p.resetToolAfterCreation();
         }}
         onSelectPicture={({ src, ratio }) => {
           const center = p.getViewCenter();
@@ -1297,8 +1301,8 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               props: { icon: "custom", src, ratio, from: "", to: "", width: 1 },
             },
           });
-          if (res.created?.[0]) p.setSelectedIds([res.created[0]]);
-          p.handleSelectTool("select");
+          if (p.autoSwitchTarget === "select" && res.created?.[0]) p.setSelectedIds([res.created[0]]);
+          p.resetToolAfterCreation();
         }}
       />
 
