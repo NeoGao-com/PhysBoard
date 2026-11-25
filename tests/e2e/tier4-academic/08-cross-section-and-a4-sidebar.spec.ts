@@ -1,15 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { CanvasDriver } from '../helpers/canvas-driver';
-import { ToolbarDriver } from '../helpers/toolbar-driver';
 import { computePolyhedronSection, liftSolidTo3D, type Point3D, type Point2D } from '../../../src/lib/geometry3d';
 
 test.describe('Verification of 3 Core User Issues: 3D Polyhedron Cross-Section, A4 Clean Grid, and Sidebar Auto-Shrink', () => {
   let canvas: CanvasDriver;
-  let toolbar: ToolbarDriver;
 
   test.beforeEach(async ({ page }) => {
     canvas = new CanvasDriver(page);
-    toolbar = new ToolbarDriver(page);
 
     const roomId = `verify-issues-${Date.now()}`;
     await page.goto(`/?room=${roomId}`);

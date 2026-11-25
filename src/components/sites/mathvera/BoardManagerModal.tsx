@@ -33,16 +33,20 @@ import {
   X,
 } from "lucide-react";
 import {
-  type BoardCoverConfig,
-  type BoardFolder,
-  type BoardItem,
   DEFAULT_BOARD_ID,
   loadBoards,
   loadFolders,
   saveBoards,
   saveFolders,
   storePendingPdfPages,
+  type BoardCoverConfig,
+  type BoardFolder,
+  type BoardItem,
 } from "@/lib/board-manager";
+import {
+  ensureTutorialNotebooksSeeded,
+  restoreTutorialNotebooks,
+} from "@/lib/tutorial-notebooks";
 import { exportAllNotebooksBackup, importNotebooksBackup } from "@/lib/board-backup";
 import { downloadBlob } from "@/lib/export";
 import { importPdfPages, type ImportedPdfPage } from "@/lib/pdf-import";
@@ -148,6 +152,12 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
       setMoveDialogOpen(false);
       setFolderManagerOpen(false);
       setNewFolderOpen(false);
+    });
+    void ensureTutorialNotebooksSeeded().then((didSeed) => {
+      if (didSeed) {
+        setBoards(loadBoards());
+        setFolders(loadFolders());
+      }
     });
     return () => cancelAnimationFrame(id);
   }, [open]);
@@ -1477,10 +1487,25 @@ export const BoardManagerModal: React.FC<BoardManagerModalProps> = ({
                                 backupInputRef.current?.click();
                               },
                             },
+                            {
+                              label: "↺ Khôi phục 9 Sổ tay mẫu",
+                              icon: <RotateCcw size={14} />,
+                              testId: "restore-tutorial-boards-btn",
+                              onClick: async () => {
+                                setMoreMenuOpen(false);
+                                setBackupMsg("⏳ Đang khôi phục 9 Sổ tay Hướng dẫn mẫu...");
+                                await restoreTutorialNotebooks();
+                                setBoards(loadBoards());
+                                setFolders(loadFolders());
+                                setBackupMsg("✓ Đã khôi phục xong 9 Sổ tay Hướng dẫn mẫu!");
+                                setTimeout(() => setBackupMsg(null), 3500);
+                              },
+                            },
                           ].map((item) => (
                             <button
                               key={item.label}
                               type="button"
+                              data-testid={"testId" in item ? item.testId : undefined}
                               onClick={item.onClick}
                               style={{
                                 display: "flex",

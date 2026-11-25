@@ -1,5 +1,4 @@
 import {
-  TOOL_GUIDE_CATALOG,
   getToolGuide,
   getSelectionGuide,
 } from "../../../src/lib/tool-guides";

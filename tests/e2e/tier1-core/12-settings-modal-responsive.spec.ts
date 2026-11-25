@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { ToolbarDriver } from '../helpers/toolbar-driver';
 
 test.describe('SettingsModal Responsive Redesign (Desktop Master-Detail & Mobile Pill Tabs)', () => {
   let roomId: string;

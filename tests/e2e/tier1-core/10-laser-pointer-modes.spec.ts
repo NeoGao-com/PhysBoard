@@ -1,14 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { CanvasDriver } from '../helpers/canvas-driver';
-import { ToolbarDriver } from '../helpers/toolbar-driver';
 
 test.describe('Laser Pointer Modes: Dot Spot vs Light Trail', () => {
   let canvas: CanvasDriver;
-  let toolbar: ToolbarDriver;
 
   test.beforeEach(async ({ page }) => {
     canvas = new CanvasDriver(page);
-    toolbar = new ToolbarDriver(page);
 
     const roomId = `laser-mode-test-${Date.now()}`;
     await page.goto(`/?room=${roomId}`);

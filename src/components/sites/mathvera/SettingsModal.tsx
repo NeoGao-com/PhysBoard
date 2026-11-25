@@ -78,6 +78,8 @@ export interface SettingsModalProps {
   // Utilities & Export
   onOpenCommandPalette?: () => void;
   onExportPdf?: () => void;
+  onOpenFeatureGuide?: () => void;
+  onOpenPdfManual?: () => void;
   initialTab?: SettingsTab;
 }
 
@@ -209,6 +211,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeDotScale,
   onOpenCommandPalette,
   onExportPdf,
+  onOpenFeatureGuide,
+  onOpenPdfManual,
   initialTab,
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? "general");
@@ -3443,6 +3447,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         {fbCopied ? "✓ Đã copy báo cáo" : "📋 Copy báo cáo"}
                       </button>
                     </div>
+
+                    {(onOpenPdfManual || onOpenFeatureGuide) && (
+                      <div
+                        style={{
+                          marginTop: 6,
+                          padding: "11px 13px",
+                          borderRadius: 10,
+                          background: "#eff6ff",
+                          border: "1px solid #bfdbfe",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div style={{ fontSize: 12.5, color: "#1e3a8a" }}>
+                          <strong>📖 Cần xem hướng dẫn chi tiết từng công cụ?</strong>
+                          <div style={{ fontSize: 11.5, color: "#475569", marginTop: 2 }}>
+                            Mở sách PDF Cẩm nang toàn tập (100% tính năng + ảnh ①②③) hoặc 20 bài thực hành ngay.
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {onOpenFeatureGuide && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose();
+                                onOpenFeatureGuide();
+                              }}
+                              style={{
+                                padding: "7px 11px",
+                                borderRadius: 8,
+                                border: "1px solid #93c5fd",
+                                background: "#ffffff",
+                                color: "#1d4ed8",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              🎓 Mở Hướng dẫn
+                            </button>
+                          )}
+                          {onOpenPdfManual && (
+                            <button
+                              type="button"
+                              data-testid="settings-open-pdf-manual-btn"
+                              onClick={() => {
+                                onClose();
+                                onOpenPdfManual();
+                              }}
+                              style={{
+                                padding: "7px 12px",
+                                borderRadius: 8,
+                                border: "none",
+                                background: "#dc2626",
+                                color: "#ffffff",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                              }}
+                            >
+                              📄 Đọc / Tải Sách PDF
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               );

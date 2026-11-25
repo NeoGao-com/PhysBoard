@@ -135,7 +135,11 @@ import { OrbitBar } from "./OrbitBar";
 import { ensureMathLiveRegistered } from "./MathEditor";
 import { hasSeenFeatureGuide } from "./FeatureGuideModal";
 import type { ActiveSimSession } from "@/lib/sim-library";
-import { retrievePendingPdfPages } from "@/lib/board-manager";
+import { ACTIVE_BOARD_KEY, retrievePendingPdfPages } from "@/lib/board-manager";
+import {
+  ensureTutorialNotebooksSeeded,
+  restoreTutorialNotebooks,
+} from "@/lib/tutorial-notebooks";
 import { WhiteboardOverlays } from "./WhiteboardOverlays";
 import { LaserStrokesLayer, type LaserStrokesLayerHandle } from "./LaserStrokesLayer";
 import {
@@ -579,6 +583,28 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
   const [questionCropOpen, setQuestionCropOpen] = useState(false);
   const [classroomToolsOpen, setClassroomToolsOpen] = useState(false);
   const [featureGuideOpen, setFeatureGuideOpen] = useState(false);
+  const [pdfManualOpen, setPdfManualOpen] = useState(false);
+
+  const handleOpenTutorialBoard = useCallback(async (boardId: string) => {
+    await restoreTutorialNotebooks(boardId);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(ACTIVE_BOARD_KEY, boardId);
+      } catch {
+        // Ignore storage errors
+      }
+      setFeatureGuideOpen(false);
+      const url = new URL(window.location.href);
+      url.searchParams.set("room", boardId);
+      window.location.href = url.toString();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Pre-seed 9 tutorial notebooks into dedicated folder without altering active default board
+    void ensureTutorialNotebooksSeeded();
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -6915,6 +6941,10 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         setClassroomToolsOpen={setClassroomToolsOpen}
         featureGuideOpen={featureGuideOpen}
         setFeatureGuideOpen={setFeatureGuideOpen}
+        pdfManualOpen={pdfManualOpen}
+        setPdfManualOpen={setPdfManualOpen}
+        onOpenTutorialBoard={handleOpenTutorialBoard}
+        onRestoreTutorials={() => restoreTutorialNotebooks()}
         simLauncherOpen={simLauncherOpen}
         setSimLauncherOpen={setSimLauncherOpen}
         activeSim={activeSim}

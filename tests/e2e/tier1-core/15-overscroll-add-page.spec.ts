@@ -1,6 +1,4 @@
 import { test, expect } from "@playwright/test";
-import { CanvasDriver } from "../helpers/canvas-driver";
-import { ToolbarDriver } from "../helpers/toolbar-driver";
 
 test.describe("Tier 1: 15 Continuous A4 Overscroll Hold To Add Page", () => {
   let roomId: string;

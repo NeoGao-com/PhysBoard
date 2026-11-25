@@ -1,6 +1,6 @@
 {
   "name": "physboard",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "description": "PhysBoard — Bảng trắng tương tác dạy Toán & Vật lý Offline (Desktop & Android)",
   "author": "PhysBoard",
@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run lint && npm run typecheck && npm run build",
     "icons:generate": "node scripts/generate-icons.mjs",
+    "guides:build": "node scripts/build-guides-and-pdf.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "build:exe": "tauri build --bundles nsis",

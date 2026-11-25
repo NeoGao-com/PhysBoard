@@ -54,6 +54,7 @@ import {
 } from "./QuestionCropModal";
 import { ClassroomToolsWidget } from "./ClassroomToolsWidget";
 import { FeatureGuideModal } from "./FeatureGuideModal";
+import { PdfManualViewerModal } from "./PdfManualViewerModal";
 import { RealWorldDrawer } from "./RealWorldDrawer";
 import { CalculatorWidget } from "./CalculatorWidget";
 import { ExportPdfModal } from "./ExportPdfModal";
@@ -162,6 +163,10 @@ export interface WhiteboardOverlaysProps {
   setClassroomToolsOpen: (open: boolean) => void;
   featureGuideOpen: boolean;
   setFeatureGuideOpen: (open: boolean) => void;
+  pdfManualOpen: boolean;
+  setPdfManualOpen: (open: boolean) => void;
+  onOpenTutorialBoard: (boardId: string) => Promise<void>;
+  onRestoreTutorials: () => Promise<void>;
 
   // Simulations
   simLauncherOpen: boolean;
@@ -1251,6 +1256,18 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
       <FeatureGuideModal
         open={p.featureGuideOpen}
         onClose={() => p.setFeatureGuideOpen(false)}
+        onOpenPdfManual={() => {
+          p.setFeatureGuideOpen(false);
+          p.setPdfManualOpen(true);
+        }}
+        onOpenTutorialBoard={p.onOpenTutorialBoard}
+        onRestoreTutorials={p.onRestoreTutorials}
+      />
+
+      {/* Offline Complete A4 PDF Manual Viewer */}
+      <PdfManualViewerModal
+        open={p.pdfManualOpen}
+        onClose={() => p.setPdfManualOpen(false)}
       />
 
       {/* Searchable 100-item RealWorld Drawer */}
@@ -1354,6 +1371,8 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
         onChangeDotScale={p.onChangeDotScale}
         onOpenCommandPalette={() => p.setCommandPaletteOpen(true)}
         onExportPdf={() => p.setExportPdfModalOpen(true)}
+        onOpenFeatureGuide={() => p.setFeatureGuideOpen(true)}
+        onOpenPdfManual={() => p.setPdfManualOpen(true)}
       />
 
       {/* Share URL Modal */}

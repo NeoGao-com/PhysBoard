@@ -117,6 +117,20 @@ jobs:
           name: android-release
           path: release-assets
 
+      - name: Checkout PDF Manual
+        uses: actions/checkout@v4
+        with:
+          path: repo-docs
+          sparse-checkout: |
+            docs/PhysBoard-Cam-Nang-Toan-Tap.pdf
+          sparse-checkout-cone-mode: false
+
+      - name: Prepare PDF Manual Asset
+        run: |
+          if [ -f "repo-docs/docs/PhysBoard-Cam-Nang-Toan-Tap.pdf" ]; then
+            cp "repo-docs/docs/PhysBoard-Cam-Nang-Toan-Tap.pdf" "release-assets/PhysBoard-Cam-Nang-Toan-Tap.pdf"
+          fi
+
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
