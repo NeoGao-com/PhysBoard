@@ -52,7 +52,7 @@ export function PeerCursors({
           title={`${totalParticipants} người tham gia`}
           style={{
             position: "fixed",
-            bottom: 46,
+            bottom: 58,
             right: 12,
             zIndex: 55,
             display: "inline-flex",

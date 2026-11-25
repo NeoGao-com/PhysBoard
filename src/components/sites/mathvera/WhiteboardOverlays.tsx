@@ -17,7 +17,6 @@ import {
 } from "@/lib/board-themes";
 import type { ShortcutMap } from "@/lib/commands";
 import type { LaserConfig } from "@/lib/laser-config";
-import type { ModularLayoutConfig } from "@/lib/modular-toolbar";
 import type { ToolbarVisibilityConfig } from "@/lib/toolbar-config";
 import type { ActiveSimSession } from "@/lib/sim-library";
 import type { ImportedPdfPage } from "@/lib/pdf-import";
@@ -188,8 +187,6 @@ export interface WhiteboardOverlaysProps {
   settingsModalOpen: boolean;
   settingsInitialTab: SettingsTab | undefined;
   closeSettingsModal: () => void;
-  modularConfig: ModularLayoutConfig;
-  onUpdateModularConfig: (cfg: ModularLayoutConfig) => void;
   toolbarConfig: ToolbarVisibilityConfig;
   onUpdateToolbarConfig: (cfg: ToolbarVisibilityConfig) => void;
   autoSwitchTarget: "select" | "ink" | "off";
@@ -1320,8 +1317,6 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
         open={p.settingsModalOpen}
         initialTab={p.settingsInitialTab}
         onClose={p.closeSettingsModal}
-        modularConfig={p.modularConfig}
-        onChangeModularConfig={p.onUpdateModularConfig}
         toolbarConfig={p.toolbarConfig}
         onChangeToolbarConfig={p.onUpdateToolbarConfig}
         autoSwitchTarget={p.autoSwitchTarget}

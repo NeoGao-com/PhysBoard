@@ -15,12 +15,6 @@ import {
 } from "@/lib/toolbar-config";
 import { LaserConfig, DEFAULT_LASER_CONFIG } from "@/lib/laser-config";
 import {
-  ModularLayoutConfig,
-  DEFAULT_MODULAR_LAYOUT,
-  MODULAR_BLOCK_DEFS,
-  type ModularBlockId,
-} from "@/lib/modular-toolbar";
-import {
   BOARD_FORMAT_OPTIONS,
   BOARD_GRID_SIZE_OPTIONS,
   BOARD_PATTERN_OPTIONS,
@@ -42,9 +36,6 @@ import {
 export interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
-  // Modular Toolbar Config
-  modularConfig?: ModularLayoutConfig;
-  onChangeModularConfig?: (cfg: ModularLayoutConfig) => void;
   // Toolbar Visibility Config
   toolbarConfig: ToolbarVisibilityConfig;
   onChangeToolbarConfig: (cfg: ToolbarVisibilityConfig) => void;
@@ -92,7 +83,6 @@ export interface SettingsModalProps {
 
 export type SettingsTab =
   | "general"
-  | "modular"
   | "board"
   | "scale"
   | "toolbar"
@@ -123,12 +113,6 @@ const TAB_DEFS: TabMeta[] = [
     label: "Chung & Thao tác",
     icon: "⚙️",
     subtitle: "Tự động đổi công cụ, bút Stylus, dòng chỉ dẫn",
-  },
-  {
-    id: "modular",
-    label: "Bố cục Mô-đun (Lego)",
-    icon: "🧩",
-    subtitle: "Tách nhóm công cụ thành bảng con nổi (Floating Dock)",
   },
   {
     id: "board",
@@ -197,8 +181,6 @@ const CARD_TITLE_STYLE: React.CSSProperties = {
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   open,
   onClose,
-  modularConfig = DEFAULT_MODULAR_LAYOUT,
-  onChangeModularConfig,
   toolbarConfig,
   onChangeToolbarConfig,
   autoSwitchTarget,
@@ -1382,108 +1364,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     >
                       Xem phím tắt (Ctrl+K)
                     </button>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* ==================== TAB 2: BỐ CỤC MÔ-ĐUN (LEGO TOOLBAR) ==================== */}
-            {activeTab === "modular" && (
-              <>
-                <div style={CARD_BOX_STYLE}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={CARD_TITLE_STYLE}>
-                      <span>🧩</span>
-                      <span>Thanh Công Cụ Mô-đun (Lego)</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onChangeModularConfig?.(DEFAULT_MODULAR_LAYOUT);
-                      }}
-                      style={{
-                        padding: "5px 12px",
-                        fontSize: 11.5,
-                        background: "#f1f5f9",
-                        color: "#334155",
-                        border: "1px solid #cbd5e1",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        fontWeight: 600,
-                      }}
-                    >
-                      ↺ Đặt lại mặc định
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.5 }}>
-                    Cho phép tách từng nhóm công cụ ra khỏi thanh chính thành <b>bảng con nổi (Floating Dock)</b> để đặt ở bất kỳ vị trí nào trên canvas. Thanh công cụ chính sẽ tự động co gọn lại.
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
-                    {(Object.keys(MODULAR_BLOCK_DEFS) as ModularBlockId[]).map((blockId) => {
-                      const block = modularConfig.blocks[blockId];
-                      const isFloating = block?.isFloating ?? false;
-                      return (
-                        <div
-                          key={blockId}
-                          style={{
-                            display: "flex",
-                            flexDirection: isMobile ? "column" : "row",
-                            alignItems: isMobile ? "stretch" : "center",
-                            justifyContent: "space-between",
-                            gap: isMobile ? 8 : 12,
-                            padding: "12px 14px",
-                            background: isFloating ? "#eff6ff" : "#f8fafc",
-                            border: isFloating ? "1px solid #bfdbfe" : "1px solid #e2e8f0",
-                            borderRadius: 8,
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 13.5, color: "#0f172a" }}>
-                              {MODULAR_BLOCK_DEFS[blockId].name}
-                            </div>
-                            <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>
-                              Trạng thái:{" "}
-                              <span style={{ fontWeight: 600, color: isFloating ? "#2563eb" : "#059669" }}>
-                                {isFloating ? "Đang nổi (Floating Dock)" : "Đang ghim trên thanh chính"}
-                              </span>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (!onChangeModularConfig) return;
-                              const next = {
-                                ...modularConfig,
-                                blocks: {
-                                  ...modularConfig.blocks,
-                                  [blockId]: {
-                                    ...block,
-                                    isFloating: !isFloating,
-                                    position: block.position || MODULAR_BLOCK_DEFS[blockId].defaultPos,
-                                  },
-                                },
-                              };
-                              onChangeModularConfig(next);
-                            }}
-                            style={{
-                              padding: "6px 14px",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              borderRadius: 6,
-                              cursor: "pointer",
-                              border: isFloating ? "1px solid #0284c7" : "1px solid #cbd5e1",
-                              background: isFloating ? "#0284c7" : "#ffffff",
-                              color: isFloating ? "#ffffff" : "#1e293b",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {isFloating ? "⤓ Ghim lại thanh chính" : "↗ Tách ra dạng nổi"}
-                          </button>
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               </>
@@ -2994,9 +2874,96 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               const githubIssueUrl = `https://github.com/NeoGao-com/PhysBoard/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`;
               const mailtoUrl = `mailto:u.gao.com@gmail.com?subject=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`;
+              const zaloUrl = "https://zalo.me/0853769246";
 
               return (
                 <>
+                  {/* Quick Zalo Contact Banner for non-technical users */}
+                  <div
+                    style={{
+                      ...CARD_BOX_STYLE,
+                      background: "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)",
+                      border: "1px solid #bae6fd",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 10,
+                            background: "#0068ff",
+                            color: "#ffffff",
+                            fontWeight: 800,
+                            fontSize: 13,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          Zalo
+                        </span>
+                        <div>
+                          <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>
+                            Gửi nhanh qua Zalo: 0853.769.246
+                          </div>
+                          <div style={{ fontSize: 12, color: "#475569" }}>
+                            Không cần tài khoản GitHub hay Email — nhắn &amp; gửi ảnh chụp màn hình trực tiếp qua Zalo.
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText("0853769246").then(() => {
+                              showFbNotice("Đã sao chép số Zalo 0853769246 vào bộ nhớ tạm.");
+                            }).catch(() => {});
+                          }}
+                          style={{
+                            padding: "7px 11px",
+                            borderRadius: 8,
+                            border: "1px solid #93c5fd",
+                            background: "#ffffff",
+                            color: "#1d4ed8",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          📋 Copy SĐT
+                        </button>
+                        <a
+                          data-testid="feedback-zalo-link"
+                          href={zaloUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            const fullText = `${issueTitle}\n\n${issueBody}`;
+                            navigator.clipboard?.writeText(fullText).catch(() => {});
+                            showFbNotice(
+                              "Đã mở Zalo (0853769246) & tự động copy sẵn nội dung báo lỗi — sang Zalo bạn chỉ cần Dán rồi gửi nhé!"
+                            );
+                          }}
+                          style={{
+                            padding: "8px 14px",
+                            borderRadius: 8,
+                            background: "#0068ff",
+                            color: "#ffffff",
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            textDecoration: "none",
+                          }}
+                        >
+                          💬 Nhắn Zalo ngay
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
                   <div style={CARD_BOX_STYLE}>
                     <div style={CARD_TITLE_STYLE}>
                       <span>🐛</span>
@@ -3369,6 +3336,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     {/* Action buttons */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
+                      <a
+                        href={zaloUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => {
+                          const fullText = `${issueTitle}\n\n${issueBody}`;
+                          navigator.clipboard?.writeText(fullText).catch(() => {});
+                          showFbNotice(
+                            "Đã copy nội dung báo lỗi — qua Zalo (0853769246) bạn chỉ cần Dán và gửi kèm ảnh nếu có!"
+                          );
+                        }}
+                        style={{
+                          flex: "1 1 170px",
+                          padding: "9px 14px",
+                          borderRadius: 9,
+                          background: "#0068ff",
+                          color: "#ffffff",
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          textDecoration: "none",
+                          textAlign: "center",
+                          boxShadow: "0 2px 8px rgba(0,104,255,0.22)",
+                        }}
+                      >
+                        💬 Gửi qua Zalo (0853769246)
+                      </a>
+
                       <a
                         data-testid="feedback-github-link"
                         href={githubIssueUrl}

@@ -77,12 +77,12 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
         data-wb-page-sidebar-collapsed="true"
         style={{
           position: "fixed",
-          top: 0,
+          top: 42,
           left: 0,
           bottom: 0,
-          width: 26,
+          width: 32,
           background: "#f8fafc",
-          borderRight: "1px solid #cbd5e1",
+          borderRight: "1px solid #e2e8f0",
           zIndex: 80,
           display: "flex",
           flexDirection: "column",
@@ -90,7 +90,6 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
           justifyContent: "flex-start",
           paddingTop: 8,
           gap: 12,
-          boxShadow: "1px 0 6px rgba(15,23,42,0.06)",
           userSelect: "none",
         }}
       >
@@ -102,8 +101,8 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
             background: "#ffffff",
             border: "1px solid #cbd5e1",
             borderRadius: 4,
-            width: 20,
-            height: 24,
+            width: 26,
+            height: 30,
             fontSize: 10,
             color: "#475569",
             cursor: "pointer",
@@ -150,8 +149,8 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
               background: "#ffffff",
               border: "1px solid #cbd5e1",
               borderRadius: 6,
-              width: 24,
-              height: 26,
+              width: 26,
+              height: 30,
               color: "#0f172a",
               cursor: "pointer",
               display: "flex",
@@ -179,8 +178,8 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
               background: "#ffffff",
               border: "1px solid #cbd5e1",
               borderRadius: 4,
-              width: 20,
-              height: 24,
+              width: 26,
+              height: 30,
               fontSize: 11,
               color: "#2563eb",
               cursor: "pointer",
@@ -203,31 +202,29 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
       data-wb-page-sidebar="true"
       style={{
         position: "fixed",
-        top: 0,
+        top: isPortrait ? 0 : 42,
         left: 0,
         bottom: 0,
         width: 140,
-        background: "#f1f5f9",
-        borderRight: "1px solid #cbd5e1",
+        background: "#f8fafc",
+        borderRight: "1px solid #e2e8f0",
         zIndex: isPortrait ? 120 : 80,
         display: "flex",
         flexDirection: "column",
-        boxShadow: isPortrait
-          ? "4px 0 24px rgba(15,23,42,0.22)"
-          : "2px 0 12px rgba(15,23,42,0.06)",
+        boxShadow: isPortrait ? "4px 0 24px rgba(15,23,42,0.22)" : "none",
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
       {/* Sidebar Header */}
       <div
         style={{
-          height: 48,
+          height: 36,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 10px",
           borderBottom: "1px solid #e2e8f0",
-          background: "#ffffff",
+          background: "#f8fafc",
           color: "#475569",
         }}
       >
@@ -454,8 +451,8 @@ export const PageSidebar: React.FC<PageSidebarProps> = ({
                     color: "#f87171",
                     border: "none",
                     borderRadius: 999,
-                    width: 16,
-                    height: 16,
+                    width: 22,
+                    height: 22,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",

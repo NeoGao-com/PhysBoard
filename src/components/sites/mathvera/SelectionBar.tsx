@@ -1273,6 +1273,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   if ((hiddenCount > 0 && onUnhideAll) || (lockedElements.length > 0 && onUnlockElement)) {
     return (
       <div
+        data-wb-selection-bar="true"
         data-export-skip="true"
         style={{
           position: "fixed",

@@ -18,12 +18,6 @@ import { WhiteboardTool, SelectionStyleState } from "@/types/whiteboard";
 import { LaserConfig } from "@/lib/laser-config";
 import { ToolbarVisibilityConfig } from "@/lib/toolbar-config";
 import {
-  ModularLayoutConfig,
-  DEFAULT_MODULAR_LAYOUT,
-  type ModularBlockId,
-} from "@/lib/modular-toolbar";
-import { FloatingDock } from "./FloatingDock";
-import {
   IconBrush,
   IconBucket,
   IconCalculator,
@@ -37,7 +31,6 @@ import {
   IconFountain,
   IconFullscreen,
   IconFunction,
-  IconGrip,
   IconHandTouch,
   IconHighlighter,
   IconLaser,
@@ -151,8 +144,6 @@ export interface ToolbarProps {
   onChangeLaserConfig?: (cfg: LaserConfig) => void;
   onOpenLaserSettings?: () => void;
   toolbarVisibility?: ToolbarVisibilityConfig;
-  modularConfig?: ModularLayoutConfig;
-  onChangeModularConfig?: (cfg: ModularLayoutConfig) => void;
   isSidebarOpen?: boolean;
   isPortrait?: boolean;
 }
@@ -204,9 +195,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onChangeLaserConfig,
   onOpenLaserSettings,
   toolbarVisibility,
-  modularConfig = DEFAULT_MODULAR_LAYOUT,
-  onChangeModularConfig,
-  isSidebarOpen = false,
   isPortrait = false,
 }) => {
   const withShortcut = (label: string, cmdId: string): string => {
@@ -220,7 +208,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const [lastSegmentTool, setLastSegmentTool] = useState<string>("c:segment");
   const [lastPenTool, setLastPenTool] = useState<string>("ink");
   const [fillHexDraft, setFillHexDraft] = useState<string | null>(null);
-  const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null);
   const [toolbarScale, setToolbarScale] = useState<number>(1);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -245,16 +232,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         const raw = window.localStorage.getItem(TOOLBAR_LAYOUT_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw) as {
-          pos?: { x: number; y: number } | null;
           scale?: number;
         };
-        if (
-          parsed.pos &&
-          typeof parsed.pos.x === "number" &&
-          typeof parsed.pos.y === "number"
-        ) {
-          setToolbarPos(parsed.pos);
-        }
         if (
           typeof parsed.scale === "number" &&
           parsed.scale >= 0.75 &&
@@ -269,15 +248,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     return () => window.cancelAnimationFrame(raf);
   }, [embedded]);
 
-  const persistToolbarLayout = (
-    pos: { x: number; y: number } | null,
-    scale: number
-  ) => {
+  const persistToolbarLayout = (scale: number) => {
     if (embedded || typeof window === "undefined") return;
     try {
       window.localStorage.setItem(
         TOOLBAR_LAYOUT_KEY,
-        JSON.stringify({ pos, scale })
+        JSON.stringify({ scale })
       );
     } catch {
       // Ignore storage quota errors
@@ -285,7 +261,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   const resetToolbarLayout = () => {
-    setToolbarPos(null);
     setToolbarScale(1);
     setIsCollapsed(false);
     try {
@@ -296,145 +271,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     }
   };
 
-  const handleStartToolbarDrag = (e: React.PointerEvent) => {
-    if (embedded) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = headerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const initLeft = rect.left;
-    const initTop = rect.top;
-    let latestPos: { x: number; y: number } | null = toolbarPos;
-
-    const onMove = (ev: PointerEvent) => {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
-      const effectiveW = rect.width;
-      const maxX = Math.max(4, window.innerWidth - effectiveW - 8);
-      const maxY = Math.max(4, window.innerHeight - 52);
-      const next = {
-        x: Math.round(Math.max(4, Math.min(maxX, initLeft + dx))),
-        y: Math.round(Math.max(4, Math.min(maxY, initTop + dy))),
-      };
-      latestPos = next;
-      setToolbarPos(next);
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      persistToolbarLayout(latestPos, toolbarScale);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
   const updateToolbarScale = (nextScale: number) => {
     const clamped = Math.max(0.75, Math.min(1.3, Number(nextScale.toFixed(2))));
     setToolbarScale(clamped);
-    persistToolbarLayout(toolbarPos, clamped);
-  };
-
-  const handleDockBlock = (blockId: ModularBlockId) => {
-    if (!onChangeModularConfig) return;
-    const next: ModularLayoutConfig = {
-      ...modularConfig,
-      blocks: {
-        ...modularConfig.blocks,
-        [blockId]: {
-          ...modularConfig.blocks[blockId],
-          isFloating: false,
-        },
-      },
-    };
-    onChangeModularConfig(next);
-  };
-
-  const handleFloatBlock = (blockId: ModularBlockId, initialPos?: { x: number; y: number }) => {
-    if (!onChangeModularConfig) return;
-    const pos = initialPos || modularConfig.blocks[blockId]?.position || { x: 100, y: 100 };
-    const next: ModularLayoutConfig = {
-      ...modularConfig,
-      blocks: {
-        ...modularConfig.blocks,
-        [blockId]: {
-          ...modularConfig.blocks[blockId],
-          isFloating: true,
-          position: pos,
-        },
-      },
-    };
-    onChangeModularConfig(next);
-  };
-
-  const handleMoveFloatingBlock = (blockId: ModularBlockId, pos: { x: number; y: number }) => {
-    if (!onChangeModularConfig) return;
-    const next: ModularLayoutConfig = {
-      ...modularConfig,
-      blocks: {
-        ...modularConfig.blocks,
-        [blockId]: {
-          ...modularConfig.blocks[blockId],
-          position: pos,
-        },
-      },
-    };
-    onChangeModularConfig(next);
-  };
-
-  const renderModuleGrip = (blockId: ModularBlockId, title: string) => {
-    if (embedded) return null;
-    return (
-      <div
-        data-wb-module-drag={blockId}
-        onPointerDown={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const startX = e.clientX;
-          const startY = e.clientY;
-          let movedFar = false;
-
-          const onMove = (ev: PointerEvent) => {
-            const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
-            if (dist > 15 && !movedFar) {
-              movedFar = true;
-              window.removeEventListener("pointermove", onMove);
-              window.removeEventListener("pointerup", onUp);
-              handleFloatBlock(blockId, { x: Math.max(10, ev.clientX - 60), y: Math.max(10, ev.clientY - 20) });
-            }
-          };
-
-          const onUp = () => {
-            window.removeEventListener("pointermove", onMove);
-            window.removeEventListener("pointerup", onUp);
-            if (!movedFar) {
-              handleFloatBlock(blockId, { x: Math.max(10, startX - 40), y: Math.max(10, startY + 25) });
-            }
-          };
-
-          window.addEventListener("pointermove", onMove);
-          window.addEventListener("pointerup", onUp);
-        }}
-        title={`Kéo để tách "${title}" thành bảng nổi riêng (Floating Dock)`}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 9,
-          height: 22,
-          cursor: "grab",
-          color: "#94a3b8",
-          fontSize: 10,
-          userSelect: "none",
-          padding: "0 1px",
-          borderRadius: 3,
-          marginRight: 1,
-        }}
-      >
-        ⋮
-      </div>
-    );
+    persistToolbarLayout(clamped);
   };
 
   const selectBtnRef = useRef<HTMLDivElement>(null);
@@ -579,16 +419,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     'var(--font-sans, "Be Vietnam Pro", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif)';
 
   const btnBaseStyle: React.CSSProperties = {
-    height: 26,
-    padding: "0 3.5px",
+    height: 30,
+    minWidth: 28,
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingLeft: isPortrait ? 6 : 5,
+    paddingRight: isPortrait ? 6 : 5,
     display: "inline-flex",
     alignItems: "center",
-    gap: 2,
-    borderRadius: 7,
+    justifyContent: "center",
+    gap: 3,
+    borderRadius: 8,
     border: "none",
     background: "transparent",
     color: "#334155",
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 600,
     cursor: "pointer",
     userSelect: "none",
@@ -669,8 +514,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     borderRadius: 8,
   };
 
-  const sidebarOffset = !embedded && isSidebarOpen ? 148 : 28;
-
   if (isCollapsed && !embedded) {
     return (
       <header
@@ -681,52 +524,28 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         className="wb-toolbar wb-toolbar-compact"
         style={{
           position: "fixed",
-          top: toolbarPos ? toolbarPos.y : 10,
-          left: toolbarPos
-            ? `max(${sidebarOffset}px, ${toolbarPos.x}px)`
-            : isSidebarOpen
-            ? `calc(50% + 70px)`
-            : "50%",
-          transform: toolbarPos ? undefined : "translateX(-50%)",
+          top: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
           zIndex: 100,
           display: "flex",
           alignItems: "center",
           gap: 4,
-          padding: "4px 8px",
-          background: "rgba(255, 255, 255, 0.96)",
+          padding: "4px 10px",
+          background: "rgba(255, 255, 255, 0.97)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           border: "1px solid rgba(226, 232, 240, 0.95)",
-          borderRadius: 16,
-          boxShadow:
-            "0 12px 30px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(255, 255, 255, 0.7) inset",
+          borderTop: "none",
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+          borderBottomLeftRadius: 12,
+          borderBottomRightRadius: 12,
+          boxShadow: "0 4px 12px rgba(15, 23, 42, 0.08)",
           fontFamily: TOOLBAR_FONT,
           userSelect: "none",
         }}
       >
-      {/* Drag handle */}
-      <div
-        data-wb-toolbar-drag="true"
-        onPointerDown={handleStartToolbarDrag}
-        onDoubleClick={resetToolbarLayout}
-        title="Kéo di chuyển · Nhấp đúp để đặt lại vị trí giữa"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 18,
-          height: 26,
-          cursor: "grab",
-          borderRadius: 6,
-          background: "#f1f5f9",
-          border: "1px solid #e2e8f0",
-          color: "#64748b",
-          marginRight: 2,
-          flexShrink: 0,
-        }}
-      >
-        <IconGrip size={14} color="#64748b" />
-      </div>
 
         {/* Quick Select */}
         <button
@@ -770,7 +589,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             iconOnly={true}
             buttonStyle={{
               height: 24,
-              padding: "0 4px",
+              paddingLeft: 4, paddingRight: 4,
               border: "1px solid #e2e8f0",
               borderRadius: 5,
             }}
@@ -784,7 +603,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           onClick={onUndo}
           disabled={!canUndo}
           title="Hoàn tác (Ctrl+Z)"
-          style={{ ...btnBaseStyle, padding: "0 4px", color: canUndo ? "#334155" : "#cbd5e1" }}
+          style={{ ...btnBaseStyle, paddingLeft: 4, paddingRight: 4, color: canUndo ? "#334155" : "#cbd5e1" }}
         >
           <IconUndo size={14} />
         </button>
@@ -796,7 +615,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           onClick={onRedo}
           disabled={!canRedo}
           title="Làm lại (Ctrl+Y)"
-          style={{ ...btnBaseStyle, padding: "0 4px", color: canRedo ? "#334155" : "#cbd5e1" }}
+          style={{ ...btnBaseStyle, paddingLeft: 4, paddingRight: 4, color: canRedo ? "#334155" : "#cbd5e1" }}
         >
           <IconRedo size={14} />
         </button>
@@ -846,70 +665,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       className="wb-toolbar"
       style={{
         position: embedded ? "relative" : "fixed",
-        top: embedded ? undefined : (!isPortrait && toolbarPos) ? toolbarPos.y : 8,
-        left: embedded
-          ? undefined
-          : (!isPortrait && toolbarPos)
-          ? `max(${sidebarOffset}px, ${toolbarPos.x}px)`
-          : isPortrait
-          ? "50%"
-          : isSidebarOpen
-          ? `calc(50% + 70px)`
-          : "50%",
-        transform: embedded ? undefined : (!isPortrait && toolbarPos) ? undefined : "translateX(-50%)",
-        width: isPortrait && !embedded ? "calc(100vw - 32px)" : "max-content",
-        maxWidth: embedded
-          ? undefined
-          : isPortrait
-          ? "calc(100vw - 32px)"
-          : `calc(100vw - ${sidebarOffset + 16}px)`,
+        top: embedded ? undefined : 0,
+        left: embedded ? undefined : 0,
+        right: embedded ? undefined : 0,
+        width: embedded ? undefined : "100%",
+        maxWidth: embedded ? undefined : "100vw",
+        boxSizing: "border-box",
         zoom: embedded ? undefined : toolbarScale,
-        transition: "left 0.22s ease, max-width 0.22s ease",
-        minHeight: 36,
+        minHeight: 42,
         zIndex: 100,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         flexWrap: "nowrap",
         gap: isPortrait ? 2 : 4,
-        padding: isPortrait ? "4px 6px" : "4px 8px",
-        background: "rgba(255, 255, 255, 0.96)",
+        padding: isPortrait ? "4px 6px" : "4px 10px",
+        background: "rgba(255, 255, 255, 0.97)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        border: "1px solid rgba(226, 232, 240, 0.95)",
-        borderRadius: embedded ? 12 : 16,
-        boxShadow:
-          "0 12px 30px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(255, 255, 255, 0.7) inset",
+        border: embedded ? "1px solid rgba(226, 232, 240, 0.95)" : "none",
+        borderBottom: embedded ? undefined : "1px solid #e2e8f0",
+        borderRadius: embedded ? 12 : 0,
+        boxShadow: embedded
+          ? "0 8px 24px rgba(15, 23, 42, 0.1)"
+          : "none",
         fontFamily: TOOLBAR_FONT,
         overflow: "visible",
       }}
     >
-      {/* Pinned Toolbar Drag Handle (Always at the very left of the toolbar) */}
-      {!embedded && (
-        <div
-          data-wb-toolbar-drag="true"
-          onPointerDown={handleStartToolbarDrag}
-          onDoubleClick={resetToolbarLayout}
-          title="Kéo để di chuyển thanh công cụ · Nhấp đúp để đặt lại vị trí ban đầu"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 18,
-            height: 26,
-            cursor: "grab",
-            borderRadius: 6,
-            background: "#f1f5f9",
-            color: "#64748b",
-            flexShrink: 0,
-            border: "1px solid #e2e8f0",
-            marginRight: 2,
-            userSelect: "none",
-          }}
-        >
-          <IconGrip size={14} color="#64748b" />
-        </div>
-      )}
 
       {/* Left + Center Tool Groups */}
       <div
@@ -992,9 +775,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {dividerV}
 
         {/* --- GROUP 1: Chọn, Bút, Tẩy | Màu & Nét | Công thức & Chèn --- */}
-        {!modularConfig.blocks.ink.isFloating && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
-          {renderModuleGrip("ink", "Thao tác & Viết vẽ")}
         {/* Select Split */}
         {vis.groupSelection && vis.toolSelect && (
         <div
@@ -1235,7 +1016,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               disabled={!canUndo}
               title="Hoàn tác (Ctrl+Z)"
               aria-label="Hoàn tác"
-              style={{ ...btnBaseStyle, padding: "0 4px", color: canUndo ? "#334155" : "#cbd5e1" }}
+              style={{ ...btnBaseStyle, paddingLeft: 4, paddingRight: 4, color: canUndo ? "#334155" : "#cbd5e1" }}
             >
               <IconUndo size={14} />
             </button>
@@ -1246,7 +1027,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               disabled={!canRedo}
               title="Làm lại (Ctrl+Y)"
               aria-label="Làm lại"
-              style={{ ...btnBaseStyle, padding: "0 4px", color: canRedo ? "#334155" : "#cbd5e1" }}
+              style={{ ...btnBaseStyle, paddingLeft: 4, paddingRight: 4, color: canRedo ? "#334155" : "#cbd5e1" }}
             >
               <IconRedo size={14} />
             </button>
@@ -1261,7 +1042,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           iconOnly={true}
           buttonStyle={{
             height: 24,
-            padding: "0 4px",
+            paddingLeft: 4, paddingRight: 4,
             border: "1px solid #e2e8f0",
             borderRadius: 6,
             gap: 3,
@@ -1314,12 +1095,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         {dividerV}
         </div>
-        )}
 
         {/* --- GROUP 2: Hình học phẳng & Tô màu --- */}
-        {!modularConfig.blocks.geometry2d.isFloating && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
-          {renderModuleGrip("geometry2d", "Hình học phẳng")}
         {/* Point */}
         <button
           type="button"
@@ -1505,13 +1283,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         {dividerV}
         </div>
-        )}
 
         {/* --- GROUP 3: Không gian, Giải tích & Thí nghiệm --- */}
-        {!modularConfig.blocks.space3d.isFloating && vis.groupSpaceGeometry && (
+        {vis.groupSpaceGeometry && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
-          {renderModuleGrip("space3d", "Không gian & Hàm số")}
-        <>
         {vis.toolSpaceMenu && (
         <SpaceGeometryMenu
           activeTool={typeof activeTool === "string" ? activeTool : null}
@@ -1584,15 +1359,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           />
         </div>
         )}
-        </>
         </div>
         )}
 
         {/* --- GROUP 4: Vật lý & Dụng cụ --- */}
-        {!modularConfig.blocks.physics.isFloating && vis.groupPhysics && (
+        {vis.groupPhysics && (
         <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
-          {renderModuleGrip("physics", "Vật lý & Dụng cụ")}
-        <>
         {/* Real-World Menu */}
         {vis.toolRealWorld && (
         <div
@@ -1712,7 +1484,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <span>Máy tính</span>
           </button>
         )}
-        </>
         </div>
         )}
       </div>
@@ -1740,28 +1511,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             data-action="share"
             onClick={onShare}
             title="Chia sẻ"
-            style={{ ...btnBaseStyle, padding: "0 5px" }}
+            style={{ ...btnBaseStyle, paddingLeft: 5, paddingRight: 5 }}
           >
             <span aria-hidden="true">🔗</span>
             <span className="sr-only">Chia sẻ</span>
           </button>
         )}
 
-        {/* Fullscreen */}
-        {!isPortrait && (
-          <button
-            type="button"
-            data-tool="fullscreen"
-            onClick={onToggleFullscreen}
-            title={
-              isFullscreen ? "Thoát toàn màn hình (Esc)" : "Toàn màn hình"
-            }
-            aria-label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
-            style={{ ...btnBaseStyle, padding: "0 5px" }}
-          >
-            <IconFullscreen exit={isFullscreen} size={14} />
-          </button>
-        )}
+        {/* Fullscreen (always available in both Portrait & Landscape) */}
+        <button
+          type="button"
+          data-tool="fullscreen"
+          onClick={onToggleFullscreen}
+          title={
+            isFullscreen ? "Thoát toàn màn hình (Esc)" : "Toàn màn hình"
+          }
+          aria-label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+          style={{ ...btnBaseStyle, paddingLeft: 6, paddingRight: 6 }}
+        >
+          <IconFullscreen exit={isFullscreen} size={15} />
+        </button>
 
         {/* Toolbar Zoom / Size Pill */}
         {!embedded && !isPortrait && (
@@ -1858,7 +1627,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             aria-label="Thu gọn thanh công cụ"
             style={{
               ...btnBaseStyle,
-              padding: isPortrait ? "0 4px" : "0 6px",
+              paddingLeft: isPortrait ? 4 : 6,
+              paddingRight: isPortrait ? 4 : 6,
               background: "#f1f5f9",
               color: "#475569",
               borderRadius: 6,
@@ -2227,276 +1997,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           document.body
         )}
 
-      {/* Floating Docks for unpinned blocks */}
-      {modularConfig.blocks.ink.isFloating && (
-        <FloatingDock
-          id="ink"
-          title="Thao tác & Viết vẽ"
-          position={modularConfig.blocks.ink.position}
-          onMove={(pos) => handleMoveFloatingBlock("ink", pos)}
-          onDock={() => handleDockBlock("ink")}
-        >
-          {vis.groupSelection && vis.toolSelect && (
-            <div style={{ display: "inline-flex", alignItems: "center", borderRadius: 6, background: isSelectActive ? "#e8f0fe" : "transparent" }}>
-              <button
-                type="button"
-                onClick={() => onSelectTool("select")}
-                style={isSelectActive ? { ...activeStyle, background: "transparent" } : btnBaseStyle}
-                title="Chọn"
-              >
-                <IconCursor size={14} /> <span>Chọn</span>
-              </button>
-            </div>
-          )}
-
-          {vis.groupDrawing && vis.toolPen && (
-            <button
-              type="button"
-              onClick={() => onSelectTool(lastPenTool)}
-              style={isPenActive && activeTool !== "ink:fountain" ? activeStyle : btnBaseStyle}
-              title="Bút vẽ"
-            >
-              {renderPenIcon(activePenVariant.tool, 14)} <span>{activePenVariant.short}</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              if (activeTool === "ink:laser" && onChangeLaserConfig && laserConfig) {
-                const nextMode = laserConfig.mode === "dot" ? "trail" : "dot";
-                onChangeLaserConfig({ ...laserConfig, mode: nextMode });
-              } else {
-                onSelectTool("ink:laser");
-              }
-            }}
-            style={activeTool === "ink:laser" ? { ...activeStyle, background: "#fee2e2", color: "#b91c1c" } : btnBaseStyle}
-            title={laserConfig?.mode === "dot" ? "Laser (Dấu chấm)" : "Laser (Vệt sáng)"}
-          >
-            {laserConfig?.mode === "dot" ? (
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 9,
-                  height: 9,
-                  borderRadius: "50%",
-                  background: laserConfig?.color || "#ef4444",
-                  boxShadow: `0 0 5px ${laserConfig?.color || "#ef4444"}`,
-                }}
-              />
-            ) : (
-              <IconLaser size={14} color="#ef4444" />
-            )}
-            <span>Laser</span>
-          </button>
-
-          {vis.groupSelection && vis.toolEraser && (
-            <button
-              type="button"
-              onClick={() => onSelectTool(isEraserActive ? "select" : "erase")}
-              style={isEraserActive ? activeStyle : btnBaseStyle}
-              title="Tẩy"
-            >
-              <IconEraser size={14} /> <span>Tẩy</span>
-            </button>
-          )}
-
-          <StylePicker
-            current={styleState.current}
-            selection={styleState.selection}
-            onPick={onPickStyle}
-            buttonStyle={btnBaseStyle}
-          />
-        </FloatingDock>
-      )}
-
-      {modularConfig.blocks.geometry2d.isFloating && (
-        <FloatingDock
-          id="geometry2d"
-          title="Hình học phẳng"
-          position={modularConfig.blocks.geometry2d.position}
-          onMove={(pos) => handleMoveFloatingBlock("geometry2d", pos)}
-          onDock={() => handleDockBlock("geometry2d")}
-        >
-          <button
-            type="button"
-            onClick={() => onSelectTool(isPointActive ? "select" : "point")}
-            style={isPointActive ? activeStyle : btnBaseStyle}
-            title="Điểm"
-          >
-            <IconPoint size={13} /> <span>Điểm</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSelectTool(isSegmentActive ? "select" : "c:segment")}
-            style={isSegmentActive ? activeStyle : btnBaseStyle}
-            title="Đoạn thẳng"
-          >
-            <IconSegment size={14} /> <span>Đoạn</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSelectTool(isCircleActive ? "select" : "circle")}
-            style={isCircleActive ? activeStyle : btnBaseStyle}
-            title="Đường tròn"
-          >
-            <IconCircle size={14} /> <span>Tròn</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSelectTool(isPolygonActive ? "select" : "polygon")}
-            style={isPolygonActive ? activeStyle : btnBaseStyle}
-            title="Đa giác"
-          >
-            <IconPolygon size={14} /> <span>Đa giác</span>
-          </button>
-
-          <PlaneGeometryMenu
-            activeTool={typeof activeTool === "string" ? activeTool : null}
-            onSelectTool={(t) => onSelectTool(t)}
-            triggerStyle={btnBaseStyle}
-            activeTriggerStyle={activeStyle}
-          />
-        </FloatingDock>
-      )}
-
-      {modularConfig.blocks.space3d.isFloating && (
-        <FloatingDock
-          id="space3d"
-          title="Không gian & Hàm số"
-          position={modularConfig.blocks.space3d.position}
-          onMove={(pos) => handleMoveFloatingBlock("space3d", pos)}
-          onDock={() => handleDockBlock("space3d")}
-        >
-          <SpaceGeometryMenu
-            activeTool={typeof activeTool === "string" ? activeTool : null}
-            onSelectTool={(t) => onSelectTool(t)}
-            triggerStyle={btnBaseStyle}
-            activeTriggerStyle={activeStyle}
-          />
-
-          <div ref={functionsWrapRef} style={{ position: "relative", display: "inline-flex" }}>
-            <button
-              type="button"
-              onClick={() => setOpenMenu((p) => (p === "functions" ? null : "functions"))}
-              style={openMenu === "functions" ? activeStyle : btnBaseStyle}
-              title="Hàm số"
-            >
-              <IconFunction size={14} /> <span>Hàm số ▾</span>
-            </button>
-            <FunctionsMenu
-              open={openMenu === "functions"}
-              onClose={() => setOpenMenu(null)}
-              onAction={(act) => onM3Action?.(act)}
-              anchorRef={functionsWrapRef}
-            />
-          </div>
-
-          <div ref={statsWrapRef} style={{ position: "relative", display: "inline-flex" }}>
-            <button
-              type="button"
-              onClick={() => setOpenMenu((p) => (p === "statistics" ? null : "statistics"))}
-              style={openMenu === "statistics" ? activeStyle : btnBaseStyle}
-              title="Thống kê"
-            >
-              <IconChart size={14} /> <span>Thống kê ▾</span>
-            </button>
-            <StatsMenu
-              open={openMenu === "statistics"}
-              onClose={() => setOpenMenu(null)}
-              onAction={(act) => onM3Action?.(act)}
-              anchorRef={statsWrapRef}
-            />
-          </div>
-        </FloatingDock>
-      )}
-
-      {modularConfig.blocks.physics.isFloating && (
-        <FloatingDock
-          id="physics"
-          title="Vật lý & Dụng cụ"
-          position={modularConfig.blocks.physics.position}
-          onMove={(pos) => handleMoveFloatingBlock("physics", pos)}
-          onDock={() => handleDockBlock("physics")}
-        >
-          <div ref={realworldWrapRef} style={{ position: "relative", display: "inline-flex" }}>
-            <button
-              type="button"
-              onClick={() => setOpenMenu((p) => (p === "realworld" ? null : "realworld"))}
-              style={openMenu === "realworld" ? activeStyle : btnBaseStyle}
-              title="Thực tế"
-            >
-              <IconRealWorld size={14} /> <span>Thực tế ▾</span>
-            </button>
-            <RealWorldMenu
-              open={openMenu === "realworld"}
-              onClose={() => setOpenMenu(null)}
-              onSelectQuickItem={(item) => onSelectQuickRealWorld?.(item)}
-              onOpenDrawer={() => onOpenRealWorldDrawer?.()}
-              onOpenDecorHelp={() => onOpenDecorHelp?.()}
-              anchorRef={realworldWrapRef}
-            />
-          </div>
-
-          {vis.toolPhysics && onOpenPhysicsDrawer && (
-            <button
-              type="button"
-              onClick={onOpenPhysicsDrawer}
-              style={btnBaseStyle}
-              title="Bảng công thức, hằng số Vật lý & Đổi đơn vị"
-            >
-              <IconPhysics size={14} color="#7c3aed" /> <span>Vật lý</span>
-            </button>
-          )}
-
-          {vis.toolMathFormulas && onOpenMathDrawer && (
-            <button
-              type="button"
-              onClick={onOpenMathDrawer}
-              style={btnBaseStyle}
-              title="Bảng công thức Toán"
-            >
-              <IconMath size={15} /> <span>Toán</span>
-            </button>
-          )}
-
-          {vis.toolChemistryFormulas && onOpenChemistryDrawer && (
-            <button
-              type="button"
-              onClick={onOpenChemistryDrawer}
-              style={btnBaseStyle}
-              title="Bảng công thức Hoá học"
-            >
-              <IconChemistry size={15} /> <span>Hoá</span>
-            </button>
-          )}
-
-          {vis.toolSimLauncher && onOpenSimLauncher && (
-            <button
-              type="button"
-              onClick={onOpenSimLauncher}
-              style={btnBaseStyle}
-              title="Thí nghiệm mô phỏng PhET & HTML"
-            >
-              <IconSimLab size={15} /> <span>Thí nghiệm</span>
-            </button>
-          )}
-
-          {vis.toolCalculator && onOpenCalculator && (
-            <button
-              type="button"
-              onClick={onOpenCalculator}
-              style={isCalculatorOpen ? activeStyle : btnBaseStyle}
-              title="Máy tính"
-            >
-              <IconCalculator size={14} /> <span>Máy tính</span>
-            </button>
-          )}
-        </FloatingDock>
-      )}
     </header>
   );
 };

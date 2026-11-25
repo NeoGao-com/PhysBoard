@@ -34,7 +34,7 @@ export const InstructionGuideBar: React.FC<InstructionGuideBarProps> = ({
       aria-label="Chỉ dẫn sử dụng chức năng"
       style={{
         position: "fixed",
-        top: isPortrait ? 60 : 56,
+        top: 52,
         left: isPortrait ? "50%" : isSidebarOpen ? "calc(50% + 70px)" : "50%",
         transform: "translateX(-50%)",
         zIndex: 65,

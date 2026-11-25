@@ -228,7 +228,6 @@ math-field {
 .wb-selection-bar,
 .wb-pagebar,
 [data-wb-toolbar="true"],
-[data-wb-floating-dock],
 [data-wb-page-sidebar],
 .wb-anime-badge,
 [data-wb-solid-badge="true"],
@@ -236,19 +235,11 @@ math-field {
   font-family: var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif) !important;
 }
 
-/* Toolbar container anime styling */
-.wb-toolbar:not([data-embedded="true"]) {
-  border-radius: 18px !important;
-  border-color: rgba(203, 213, 225, 0.85) !important;
-  box-shadow: 0 10px 32px rgba(99, 102, 241, 0.12),
-              0 3px 12px rgba(15, 23, 42, 0.08) !important;
-  transition: box-shadow 0.25s ease, border-color 0.25s ease;
-}
-
-.wb-toolbar:not([data-embedded="true"]):hover {
-  box-shadow: 0 12px 36px rgba(99, 102, 241, 0.16),
-              0 4px 16px rgba(168, 85, 247, 0.1) !important;
-  border-color: rgba(165, 180, 252, 0.9) !important;
+/* Docked top-edge toolbar clean app-frame styling */
+.wb-toolbar:not([data-embedded="true"]):not([data-wb-toolbar-collapsed="true"]) {
+  border-radius: 0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: none !important;
 }
 
 /* Playful Anime Interactive Buttons in Toolbar, Docks, and SelectionBar */
@@ -257,8 +248,7 @@ math-field {
 .wb-toolbar [data-dropdown],
 .wb-toolbar [data-action],
 .wb-pagebar button,
-.wb-selection-bar button,
-[data-wb-floating-dock] button {
+.wb-selection-bar button {
   font-family: var(--font-anime, "Comfortaa", "Nunito", "Quicksand", system-ui, -apple-system, sans-serif) !important;
   transition: transform 0.16s ease,
               background 0.15s ease,
@@ -274,8 +264,7 @@ math-field {
 .wb-toolbar [data-dropdown]:not(:disabled):hover,
 .wb-toolbar [data-action]:not(:disabled):hover,
 .wb-pagebar button:not(:disabled):hover,
-.wb-selection-bar button:not(:disabled):hover,
-[data-wb-floating-dock] button:not(:disabled):hover {
+.wb-selection-bar button:not(:disabled):hover {
   transform: translateY(-1px) scale(1.03) !important;
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.12),
               0 1px 3px rgba(0, 0, 0, 0.05) !important;
@@ -284,8 +273,7 @@ math-field {
 
 /* SVG icon bouncy response on hover */
 .wb-toolbar button:not(:disabled):hover svg,
-.wb-selection-bar button:not(:disabled):hover svg,
-[data-wb-floating-dock] button:not(:disabled):hover svg {
+.wb-selection-bar button:not(:disabled):hover svg {
   transform: scale(1.08);
   transition: transform 0.16s ease;
 }
@@ -296,8 +284,7 @@ math-field {
 .wb-toolbar [data-dropdown]:not(:disabled):active,
 .wb-toolbar [data-action]:not(:disabled):active,
 .wb-pagebar button:not(:disabled):active,
-.wb-selection-bar button:not(:disabled):active,
-[data-wb-floating-dock] button:not(:disabled):active {
+.wb-selection-bar button:not(:disabled):active {
   transform: translateY(1px) scale(0.94) !important;
   transition: transform 0.06s ease !important;
   box-shadow: 0 1px 3px rgba(99, 102, 241, 0.2) inset !important;
@@ -429,7 +416,13 @@ svg.wb-canvas {
 /* Android / Mobile Notch & Navigation Bar Safe-Area support */
 @supports (padding-top: env(safe-area-inset-top)) {
   [data-wb-toolbar="true"]:not([data-embedded="true"]) {
-    top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+    top: 0 !important;
+    padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important;
+    padding-left: calc(8px + env(safe-area-inset-left, 0px)) !important;
+    padding-right: calc(8px + env(safe-area-inset-right, 0px)) !important;
+  }
+  [data-wb-instruction-guide="true"] {
+    top: calc(52px + env(safe-area-inset-top, 0px)) !important;
   }
   [data-wb-page-sidebar="true"],
   [data-wb-page-sidebar-collapsed="true"] {
@@ -439,6 +432,10 @@ svg.wb-canvas {
   }
   [data-wb-hud="true"] {
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+    right: calc(12px + env(safe-area-inset-right, 0px)) !important;
+  }
+  [data-wb-peer-count="true"] {
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
     right: calc(12px + env(safe-area-inset-right, 0px)) !important;
   }
   [data-wb-selection-bar="true"] {

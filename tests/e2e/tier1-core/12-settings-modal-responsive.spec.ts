@@ -30,9 +30,8 @@ test.describe('SettingsModal Responsive Redesign (Desktop Master-Detail & Mobile
     const sidebar = modal.locator('aside');
     await expect(sidebar).toBeVisible();
 
-    // Verify sidebar contains all 7 main tabs
+    // Verify sidebar contains main tabs (general, board, scale, toolbar, laser, export, update)
     const generalTab = sidebar.locator('button:has-text("Chung & Thao tác")');
-    const modularTab = sidebar.locator('button:has-text("Bố cục Mô-đun (Lego)")');
     const boardTab = sidebar.locator('button:has-text("Khổ & Nền bảng")');
     const scaleTab = sidebar.locator('button:has-text("Tỉ lệ & Cỡ chữ")');
     const toolbarTab = sidebar.locator('button:has-text("Ẩn/Hiện Công cụ")');
@@ -40,7 +39,6 @@ test.describe('SettingsModal Responsive Redesign (Desktop Master-Detail & Mobile
     const exportTab = sidebar.locator('button:has-text("Xuất file PDF & PNG")');
 
     await expect(generalTab).toBeVisible();
-    await expect(modularTab).toBeVisible();
     await expect(boardTab).toBeVisible();
     await expect(scaleTab).toBeVisible();
     await expect(toolbarTab).toBeVisible();

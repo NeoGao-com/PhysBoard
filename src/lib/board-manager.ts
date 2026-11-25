@@ -1,5 +1,13 @@
 "use client";
 
+export interface BoardCoverConfig {
+  kind: "pattern" | "illustration" | "solid";
+  presetId: string;
+  color?: string;
+  layout?: "full" | "split" | "header" | "band";
+  sticker?: string;
+}
+
 export interface BoardItem {
   id: string;
   name: string;
@@ -7,12 +15,17 @@ export interface BoardItem {
   updatedAt: number;
   folderId?: string | null;
   trashed?: boolean;
+  favorite?: boolean;
+  locked?: boolean;
+  cover?: BoardCoverConfig | null;
 }
 
 export interface BoardFolder {
   id: string;
   name: string;
   createdAt: number;
+  parentId?: string | null;
+  color?: string;
 }
 
 export const BOARDS_STORAGE_KEY = "physboard_boards_catalog";

@@ -152,7 +152,7 @@ import type {
 } from "./FunctionsAndStatsMenus";
 import { InkElement } from "./elements/InkElement";
 import { PointElement } from "./elements/PointElement";
-import { SegmentElement } from "./elements/SegmentElement";
+import { formatMeasureNumber, SegmentElement } from "./elements/SegmentElement";
 import { CircleElement } from "./elements/CircleElement";
 import { PolygonElement } from "./elements/PolygonElement";
 import { GeometryConstructionElement } from "./elements/GeometryConstructionElement";
@@ -165,11 +165,6 @@ import {
   loadToolbarVisibilityConfig,
   saveToolbarVisibilityConfig,
 } from "@/lib/toolbar-config";
-import {
-  ModularLayoutConfig,
-  loadModularLayoutConfig,
-  saveModularLayoutConfig,
-} from "@/lib/modular-toolbar";
 import {
   LaserConfig,
   loadLaserConfig,
@@ -467,12 +462,6 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined);
   const [toolbarConfig, setToolbarConfig] = useState<ToolbarVisibilityConfig>(() => loadToolbarVisibilityConfig());
-  const [modularConfig, setModularConfig] = useState<ModularLayoutConfig>(() => loadModularLayoutConfig());
-
-  const handleUpdateModularConfig = useCallback((cfg: ModularLayoutConfig) => {
-    setModularConfig(cfg);
-    saveModularLayoutConfig(cfg);
-  }, []);
 
   const handleUpdateToolbarConfig = useCallback((cfg: ToolbarVisibilityConfig) => {
     setToolbarConfig(cfg);
@@ -1796,8 +1785,22 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
     return () => cancelAnimationFrame(raf);
   }, [isAutoSpin, activeOrbitElement]);
 
-  // Fullscreen
+  // Fullscreen (supports native Android Immersive system-bar hide + Web Fullscreen API)
   const handleToggleFullscreen = useCallback(() => {
+    const androidBridge =
+      typeof window !== "undefined"
+        ? (
+            window as unknown as {
+              PhysBoardAndroid?: { setFullscreen?: (enabled: boolean) => void };
+            }
+          ).PhysBoardAndroid
+        : undefined;
+    if (androidBridge?.setFullscreen) {
+      const next = !isFullscreen;
+      androidBridge.setFullscreen(next);
+      setIsFullscreen(next);
+      return;
+    }
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
       setIsFullscreen(true);
@@ -1805,12 +1808,20 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       document.exitFullscreen().catch(() => {});
       setIsFullscreen(false);
     }
-  }, []);
+  }, [isFullscreen]);
 
   useEffect(() => {
     const onFs = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const onAndroidFs = (ev: Event) => {
+      const detail = (ev as CustomEvent<boolean>).detail;
+      setIsFullscreen(Boolean(detail));
+    };
     document.addEventListener("fullscreenchange", onFs);
-    return () => document.removeEventListener("fullscreenchange", onFs);
+    window.addEventListener("physboard-android-fullscreen", onAndroidFs);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      window.removeEventListener("physboard-android-fullscreen", onAndroidFs);
+    };
   }, []);
 
   // PageBar Handlers backed by Y.Map("pages")
@@ -5167,33 +5178,96 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
               onBoxPointerDown={handleBoxPointerDown}
             />
           )}
-          {draftPreviewLine &&
-            (draftPreviewLine.kind === "circle" ? (
-              <circle
-                cx={draftPreviewLine.from.x}
-                cy={-draftPreviewLine.from.y}
-                r={Math.max(
-                  0.05,
-                  dist2D(draftPreviewLine.from, draftPreviewLine.to)
+          {draftPreviewLine && (() => {
+            const d = dist2D(draftPreviewLine.from, draftPreviewLine.to);
+            const isCircle = draftPreviewLine.kind === "circle";
+            const showMeasure =
+              d > 0.02 &&
+              (isCircle ||
+                draftPreviewLine.kind === "c:segment" ||
+                draftPreviewLine.kind === "c:dseg" ||
+                draftPreviewLine.kind === "segment" ||
+                draftPreviewLine.kind === "c:vector");
+            const invScale = 1 / (viewport.scale || 45);
+            const midX = (draftPreviewLine.from.x + draftPreviewLine.to.x) / 2;
+            const midY = -(draftPreviewLine.from.y + draftPreviewLine.to.y) / 2;
+            const label = isCircle
+              ? `R = ${formatMeasureNumber(d)}`
+              : `d = ${formatMeasureNumber(d)}`;
+            const pillW = Math.max(58, label.length * 7.6 + 18);
+            const pillH = 22;
+
+            return (
+              <g style={{ pointerEvents: "none" }}>
+                {isCircle ? (
+                  <>
+                    <circle
+                      cx={draftPreviewLine.from.x}
+                      cy={-draftPreviewLine.from.y}
+                      r={Math.max(0.05, d)}
+                      fill="none"
+                      stroke="#2563eb"
+                      strokeDasharray="5 4"
+                      strokeWidth={1.6}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                    {d > 0.02 && (
+                      <line
+                        x1={draftPreviewLine.from.x}
+                        y1={-draftPreviewLine.from.y}
+                        x2={draftPreviewLine.to.x}
+                        y2={-draftPreviewLine.to.y}
+                        stroke="#3b82f6"
+                        strokeDasharray="3 3"
+                        strokeWidth={1.2}
+                        opacity={0.75}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <line
+                    x1={draftPreviewLine.from.x}
+                    y1={-draftPreviewLine.from.y}
+                    x2={draftPreviewLine.to.x}
+                    y2={-draftPreviewLine.to.y}
+                    stroke="#2563eb"
+                    strokeDasharray="5 4"
+                    strokeWidth={1.6}
+                    vectorEffect="non-scaling-stroke"
+                  />
                 )}
-                fill="none"
-                stroke="#2563eb"
-                strokeDasharray="5 4"
-                strokeWidth={1.6}
-                vectorEffect="non-scaling-stroke"
-              />
-            ) : (
-              <line
-                x1={draftPreviewLine.from.x}
-                y1={-draftPreviewLine.from.y}
-                x2={draftPreviewLine.to.x}
-                y2={-draftPreviewLine.to.y}
-                stroke="#2563eb"
-                strokeDasharray="5 4"
-                strokeWidth={1.6}
-                vectorEffect="non-scaling-stroke"
-              />
-            ))}
+                {showMeasure && (
+                  <g
+                    data-wb-draft-measure="true"
+                    transform={`translate(${midX}, ${midY}) scale(${invScale}) translate(0, -18)`}
+                  >
+                    <rect
+                      x={-pillW / 2}
+                      y={-pillH / 2}
+                      width={pillW}
+                      height={pillH}
+                      rx={11}
+                      fill="rgba(15, 23, 42, 0.88)"
+                      stroke="rgba(255, 255, 255, 0.25)"
+                      strokeWidth={1}
+                    />
+                    <text
+                      x={0}
+                      y={4}
+                      textAnchor="middle"
+                      fill="#ffffff"
+                      fontSize={11.5}
+                      fontWeight={700}
+                      fontFamily="system-ui, -apple-system, sans-serif"
+                    >
+                      {label}
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })()}
           {hoveredLockedBox && (
             <rect
               x={hoveredLockedBox.minX - 0.12}
@@ -5228,7 +5302,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             peers={peerCursors}
             viewport={viewport}
             peerCount={peerCount}
-            showCounter={!contained}
+            showCounter={false}
           />
           {/* Live Single Dot Laser Pointer indicator with customizable size and halo glow */}
           {activeTool === "ink:laser" && laserConfig.mode === "dot" && liveLaserScreenPos && (
@@ -5407,8 +5481,6 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       onChangeLaserConfig={handleUpdateLaserConfig}
       onOpenLaserSettings={() => setLaserSettingsOpen(true)}
       toolbarVisibility={toolbarConfig}
-      modularConfig={modularConfig}
-      onChangeModularConfig={handleUpdateModularConfig}
       isSidebarOpen={pageSidebarOpen}
       isPortrait={isPortrait}
     />
@@ -6863,8 +6935,6 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         settingsModalOpen={settingsModalOpen}
         settingsInitialTab={settingsInitialTab}
         closeSettingsModal={() => setSettingsModalOpen(false)}
-        modularConfig={modularConfig}
-        onUpdateModularConfig={handleUpdateModularConfig}
         toolbarConfig={toolbarConfig}
         onUpdateToolbarConfig={handleUpdateToolbarConfig}
         autoSwitchTarget={autoSwitchTarget}
@@ -6945,8 +7015,8 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
               type="button"
               onClick={toggleFitLock}
               style={{
-                width: 22,
-                height: 22,
+                width: 28,
+                height: 28,
                 padding: 0,
                 display: "inline-flex",
                 alignItems: "center",
@@ -6954,8 +7024,8 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
                 background: isFitLocked ? "#dbeafe" : "#f1f5f9",
                 color: isFitLocked ? "#1d4ed8" : "#475569",
                 border: `1px solid ${isFitLocked ? "#93c5fd" : "#cbd5e1"}`,
-                borderRadius: 4,
-                fontSize: 11,
+                borderRadius: 6,
+                fontSize: 13,
                 cursor: "pointer",
               }}
               title={
@@ -6969,7 +7039,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
           )}
 
           {!isFitLocked && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
               <button
                 type="button"
                 onClick={zoomOut}
@@ -6978,9 +7048,11 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
                   background: "transparent",
                   color: "#475569",
                   fontWeight: 700,
-                  fontSize: 13,
+                  fontSize: 15,
+                  minWidth: 26,
+                  minHeight: 28,
                   cursor: "pointer",
-                  padding: "0 3px",
+                  padding: "0 4px",
                 }}
                 title="Thu nhỏ"
               >
@@ -6994,7 +7066,8 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
                   background: "transparent",
                   color: "#334155",
                   fontWeight: 600,
-                  fontSize: 11,
+                  fontSize: 12,
+                  minHeight: 28,
                   cursor: "pointer",
                   fontVariantNumeric: "tabular-nums",
                 }}
@@ -7010,9 +7083,11 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
                   background: "transparent",
                   color: "#475569",
                   fontWeight: 700,
-                  fontSize: 13,
+                  fontSize: 15,
+                  minWidth: 26,
+                  minHeight: 28,
                   cursor: "pointer",
-                  padding: "0 3px",
+                  padding: "0 4px",
                 }}
                 title="Phóng to"
               >
