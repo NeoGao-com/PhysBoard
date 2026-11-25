@@ -29,6 +29,12 @@ import {
 } from "@/lib/ink";
 import { checkEraserCollision } from "@/lib/eraser";
 import {
+  isStylusTipInContact,
+  normalizeStylusEvent,
+  resolveStylusTarget,
+  StylusToolStateMachine,
+} from "@/lib/stylus-adapter";
+import {
   getSavedDrawStyle,
   saveDrawStyle,
   getCompositeBoundingBox,
@@ -431,8 +437,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
     }
     return DEFAULT_SPEN_CONFIG;
   });
-  const spenPreviousToolRef = useRef<WhiteboardTool | null>(null);
-  const spenActiveOverrideRef = useRef<boolean>(false);
+  const stylusMachineRef = useRef<StylusToolStateMachine>(new StylusToolStateMachine());
   const [autoSwitchTarget, setAutoSwitchTarget] = useState<"select" | "ink" | "off">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("physboard_auto_switch_target");
@@ -815,6 +820,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
     handlePointerUp: navPointerUp,
     handlePointerCancel: navPointerCancel,
     handlePointerLeave: navPointerLeave,
+    stopPan: navStopPan,
     zoomIn,
     zoomOut,
     resetView,
@@ -1445,6 +1451,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
   // Select tool helper clearing transient multi-step drafts
   const handleSelectTool = useCallback(
     (rawTool: WhiteboardTool) => {
+      stylusMachineRef.current.forceReset();
       const next = normalizeToolId(rawTool);
       if (next === "erase" && activeTool !== "erase") {
         previousToolBeforeEraserRef.current = activeTool;
@@ -2743,6 +2750,12 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         navPointerDown(e as unknown as React.PointerEvent<SVGSVGElement>);
         return;
       }
+      if (e.pointerType === "pen") {
+        const stylusSig = normalizeStylusEvent(e, "down");
+        if (stylusSig && resolveStylusTarget(stylusSig, spenConfig).tool !== null) {
+          return;
+        }
+      }
       if (activeTool === "erase") return;
 
       // Locked element: ignore single taps so writing/drawing passes through,
@@ -2876,6 +2889,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       hydratedPts,
       solved3D,
       penOnlyMode,
+      spenConfig,
       navPointerDown,
       buildDragTransformMap,
       handleUnlockElement,
@@ -2922,6 +2936,333 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
     }
   }, [liveStroke, buildLiveStrokePathData]);
 
+  // Anti-stuck Stylus safety guard: reset override if window loses focus or tab becomes hidden
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const resetStylusOverride = () => {
+      const restore = stylusMachineRef.current.forceReset();
+      if (restore !== null) {
+        navStopPan();
+        setActiveTool(restore);
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) resetStylusOverride();
+    };
+    window.addEventListener("blur", resetStylusOverride);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("blur", resetStylusOverride);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [navStopPan]);
+
+  const finishActiveMarquee = useCallback(() => {
+    if (!marqueeRectRef.current) return;
+    const m = marqueeRectRef.current;
+    const dragDist = Math.hypot(
+      (m.x - m.sx) * (viewport.scale || 45),
+      (m.y - m.sy) * (viewport.scale || 45)
+    );
+    if (dragDist > 4) {
+      setSelectedIds(testMarqueeIntersection(m, pageElements));
+    } else {
+      setSelectedIds([]);
+    }
+    marqueeRectRef.current = null;
+    setMarqueeRect(null);
+  }, [viewport.scale, pageElements]);
+
+  const startInkStrokeAt = useCallback(
+    (
+      penTool: WhiteboardTool,
+      worldPos: Point2D,
+      timeStamp: number,
+      pressure: number,
+      rect: DOMRect | undefined,
+      clientX: number,
+      clientY: number
+    ) => {
+      if (penTool === "ink:laser") {
+        setLiveLaserScreenPos({
+          x: clientX - (rect?.left ?? 0),
+          y: clientY - (rect?.top ?? 0),
+        });
+        if (laserConfig.mode === "dot") {
+          setIsLaserPressed(true);
+          return;
+        }
+      }
+      dispatcher.gesture(true);
+      const nib = resolvePenNib(penTool) ?? undefined;
+      const smooth = nib === "fountain" || nib === "brush";
+      filterXRef.current.reset();
+      filterYRef.current.reset();
+      const x = smooth ? filterXRef.current.filter(worldPos.x, timeStamp) : worldPos.x;
+      const y = smooth ? filterYRef.current.filter(worldPos.y, timeStamp) : worldPos.y;
+      const effectiveStyle: Style =
+        nib === "laser"
+          ? { stroke: laserConfig.color || "#ef4444", width: laserConfig.trailWidth || 4.5 }
+          : nib === "highlighter" &&
+            (!currentStyle.stroke || currentStyle.stroke.toLowerCase() === "#111827")
+          ? { ...currentStyle, stroke: "#facc15" }
+          : nib === "dashed"
+          ? { ...currentStyle, dash: true }
+          : currentStyle;
+      const p = pressure || 0.5;
+      liveStrokePointsRef.current = [x, y];
+      liveStrokePressuresRef.current = [p];
+      liveStrokeTipRef.current = null;
+      liveStrokeStyleRef.current = effectiveStyle;
+      liveStrokeNibRef.current = nib;
+      liveStrokeSnappedRef.current = null;
+      if (dwellTimerRef.current) {
+        clearTimeout(dwellTimerRef.current);
+        dwellTimerRef.current = null;
+      }
+      setLastInkSnap(null);
+      setLiveStroke({
+        points: [x, y],
+        pressures: [p],
+        nib,
+        style: effectiveStyle,
+      });
+    },
+    [dispatcher, currentStyle, laserConfig]
+  );
+
+  const commitLiveInkStroke = useCallback(() => {
+    const activeLive =
+      liveStroke ??
+      (liveStrokeStyleRef.current
+        ? {
+            points: liveStrokePointsRef.current,
+            pressures: liveStrokePressuresRef.current,
+            nib: liveStrokeNibRef.current,
+            style: liveStrokeStyleRef.current,
+          }
+        : null);
+    if (!activeLive) return false;
+
+    const pts = liveStrokePointsRef.current;
+    const pressures = liveStrokePressuresRef.current;
+    if (pts.length === 2 && liveStrokeTipRef.current) {
+      pts.push(liveStrokeTipRef.current.x, liveStrokeTipRef.current.y);
+      pressures.push(liveStrokeTipRef.current.pressure);
+      liveStrokeTipRef.current = null;
+    }
+    if (pts.length >= 4) {
+      if (activeLive.nib === "laser") {
+        const strokeId = newElId("laser");
+        laserLayerRef.current?.addStroke({
+          id: strokeId,
+          points: [...pts],
+          createdAt: performance.now(),
+          color: laserConfig.color,
+          width: laserConfig.trailWidth,
+        });
+      } else if (
+        inkToShape &&
+        (activeLive.nib === undefined || activeLive.nib === "pencil")
+      ) {
+        const recognized = liveStrokeSnappedRef.current ?? recognizeStrokeShape(pts);
+        const targetPage = isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage;
+        const showSnapPill = (
+          elementId: string,
+          shapeType: RecognizedShape["type"],
+          extra?: { center?: Point2D; rx?: number; ry?: number; rotation?: number }
+        ) => {
+          if (lastInkSnapTimerRef.current) clearTimeout(lastInkSnapTimerRef.current);
+          setLastInkSnap({
+            elementId,
+            shapeType,
+            rawPoints: [...pts],
+            rawPressures: [...pressures],
+            nib: activeLive.nib,
+            style: { ...activeLive.style },
+            page: targetPage,
+            ...extra,
+          });
+          lastInkSnapTimerRef.current = setTimeout(() => {
+            setLastInkSnap(null);
+            lastInkSnapTimerRef.current = null;
+          }, 5500);
+        };
+        if (recognized) {
+          if (recognized.type === "circle") {
+            const circId = newElId("circ");
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: circId,
+                type: "GeomCircle",
+                page: targetPage,
+                style: {
+                  stroke: activeLive.style.stroke ?? "#0891b2",
+                  width: activeLive.style.width ?? 2,
+                  dash: activeLive.style.dash ?? false,
+                },
+                props: {
+                  center: `${circId}_c`,
+                  centerPt: recognized.center,
+                  radius: { kind: "value", v: recognized.radius },
+                },
+              },
+            });
+            showSnapPill(circId, "circle", {
+              center: recognized.center,
+              rx: recognized.radius,
+              ry: recognized.radius,
+              rotation: 0,
+            });
+          } else if (recognized.type === "ellipse") {
+            const ellId = newElId("circ");
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: ellId,
+                type: "GeomCircle",
+                page: targetPage,
+                style: {
+                  stroke: activeLive.style.stroke ?? "#0891b2",
+                  width: activeLive.style.width ?? 2,
+                  dash: activeLive.style.dash ?? false,
+                },
+                props: {
+                  center: `${ellId}_c`,
+                  centerPt: recognized.center,
+                  radius: { kind: "value", v: Number(((recognized.rx + recognized.ry) / 2).toFixed(3)) },
+                  rx: Number(recognized.rx.toFixed(3)),
+                  ry: Number(recognized.ry.toFixed(3)),
+                  rotation: Number(recognized.rotation.toFixed(4)),
+                },
+              },
+            });
+            showSnapPill(ellId, "ellipse", {
+              center: recognized.center,
+              rx: recognized.rx,
+              ry: recognized.ry,
+              rotation: recognized.rotation,
+            });
+          } else if (recognized.type === "segment") {
+            const segId = newElId("seg");
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: segId,
+                type: "GeomSegment",
+                page: targetPage,
+                style: {
+                  stroke: activeLive.style.stroke ?? "#334155",
+                  width: activeLive.style.width ?? 2,
+                  dash: activeLive.style.dash ?? false,
+                },
+                props: {
+                  from: `${segId}_a`,
+                  to: `${segId}_b`,
+                  fromPt: recognized.start,
+                  toPt: recognized.end,
+                },
+              },
+            });
+            showSnapPill(segId, "segment");
+          } else if (recognized.type === "arrow") {
+            const vecId = newElId("vec");
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: vecId,
+                type: "GeomVector",
+                page: targetPage,
+                style: {
+                  stroke: activeLive.style.stroke ?? "#334155",
+                  width: activeLive.style.width ?? 2,
+                  dash: activeLive.style.dash ?? false,
+                },
+                props: {
+                  from: `${vecId}_a`,
+                  to: `${vecId}_b`,
+                  fromPt: recognized.start,
+                  toPt: recognized.end,
+                },
+              },
+            });
+            showSnapPill(vecId, "arrow");
+          } else if (recognized.type === "triangle" || recognized.type === "rectangle") {
+            const polyId = newElId("poly");
+            const verts = recognized.vertices;
+            const embedded: EmbeddedVertex[] = verts.map((pt, i) => ({
+              id: `${polyId}_v${i}`,
+              name: "",
+              x: pt.x,
+              y: pt.y,
+            }));
+            dispatcher.dispatch({
+              type: "object.create",
+              params: {
+                id: polyId,
+                type: "GeomPolygon",
+                page: targetPage,
+                style: {
+                  stroke: activeLive.style.stroke ?? "#334155",
+                  fill: "none",
+                  width: activeLive.style.width ?? 2,
+                  dash: activeLive.style.dash ?? false,
+                },
+                props: {
+                  vertices: embedded.map((v) => v.id),
+                  points: embedded,
+                  bareShape: true,
+                },
+              },
+            });
+            showSnapPill(polyId, recognized.type);
+          }
+        } else {
+          dispatcher.dispatch({
+            type: "ink.stroke",
+            params: {
+              points: pts,
+              pressures,
+              nib: activeLive.nib,
+              style: activeLive.style,
+              page: targetPage,
+            },
+          });
+        }
+      } else {
+        dispatcher.dispatch({
+          type: "ink.stroke",
+          params: {
+            points: pts,
+            pressures,
+            nib: activeLive.nib,
+            style: activeLive.style,
+            page: isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage,
+          },
+        });
+      }
+    }
+    if (dwellTimerRef.current) {
+      clearTimeout(dwellTimerRef.current);
+      dwellTimerRef.current = null;
+    }
+    liveStrokeSnappedRef.current = null;
+    if (liveStrokeRafRef.current) {
+      cancelAnimationFrame(liveStrokeRafRef.current);
+      liveStrokeRafRef.current = null;
+    }
+    dispatcher.gesture(false);
+    liveStrokePointsRef.current = [];
+    liveStrokePressuresRef.current = [];
+    liveStrokeTipRef.current = null;
+    liveStrokeStyleRef.current = undefined;
+    liveStrokeNibRef.current = undefined;
+    containerRectRef.current = null;
+    setLiveStroke(null);
+    return true;
+  }, [liveStroke, laserConfig, inkToShape, isA4Format, currentPage, dispatcher]);
+
   // --- Root Canvas Pointer Down ---
   const handleCanvasPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
@@ -2931,34 +3272,13 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         return;
       }
 
-      // Check S Pen / Stylus side button (button === 2 or 5, or buttons & 2, or buttons & 32)
+      // Universal Stylus Adapter: hardware eraser tail, primary/secondary barrel button normalization
       let currentActiveTool = activeTool;
-      if (
-        e.pointerType === "pen" &&
-        spenConfig.action !== "none" &&
-        (e.button === 2 || e.button === 5 || (e.buttons & 2) !== 0 || (e.buttons & 32) !== 0)
-      ) {
-        if (spenConfig.behavior === "hold") {
-          if (!spenActiveOverrideRef.current) {
-            spenPreviousToolRef.current = activeTool;
-            spenActiveOverrideRef.current = true;
-          }
-          currentActiveTool = spenConfig.action as WhiteboardTool;
-          setActiveTool(currentActiveTool);
-        } else if (spenConfig.behavior === "toggle") {
-          if (activeTool !== spenConfig.action) {
-            spenPreviousToolRef.current = activeTool;
-            currentActiveTool = spenConfig.action as WhiteboardTool;
-            setActiveTool(currentActiveTool);
-            if (spenConfig.returnAfterAction) {
-              spenActiveOverrideRef.current = true;
-            }
-          } else if (spenPreviousToolRef.current) {
-            currentActiveTool = spenPreviousToolRef.current;
-            setActiveTool(currentActiveTool);
-            spenPreviousToolRef.current = null;
-            spenActiveOverrideRef.current = false;
-          }
+      if (e.pointerType === "pen") {
+        const stylusTr = stylusMachineRef.current.processEvent(e, "down", activeTool, spenConfig);
+        currentActiveTool = stylusTr.effectiveTool;
+        if (stylusTr.nextActiveTool !== null) {
+          setActiveTool(stylusTr.nextActiveTool);
         }
       }
 
@@ -2975,10 +3295,10 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         rect
       );
 
-      const isMiddleClick = e.button === 1;
+      const isMiddleClick = e.pointerType !== "pen" && e.button === 1;
       const isPan = isSpacePressed || isMiddleClick || currentActiveTool === "pan";
       if (isPan) {
-        navPointerDown(e);
+        navPointerDown(e, currentActiveTool === "pan");
         return;
       }
 
@@ -3022,7 +3342,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // Contact Eraser
-      if (activeTool === "erase") {
+      if (currentActiveTool === "erase") {
         eraserDidEraseRef.current = true;
         checkEraserCollision(worldPos, pageElements, viewport.scale, (id) => {
           dispatcher.deleteObjects([id]);
@@ -3031,7 +3351,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // Formula Tool (`formula` / `text.write`)
-      if (activeTool === "formula" || activeTool === "text.write") {
+      if (currentActiveTool === "formula" || currentActiveTool === "text.write") {
         e.stopPropagation();
         setMathSession({
           worldPos,
@@ -3041,7 +3361,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // Point Tool (`point` / `geometry.point`)
-      if (activeTool === "point" || activeTool === "geometry.point") {
+      if (currentActiveTool === "point" || currentActiveTool === "geometry.point") {
         // If clicking directly on an existing vertex or point, select it instead of creating a duplicate overlapping point
         const nearPt = findNearestPoint(worldPos, 14);
         if (nearPt) {
@@ -3082,15 +3402,15 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
 
       // Segment / Dashed / Line / Ray / Vector / Circle (drag or 2-click)
       if (
-        (typeof activeTool === "string" &&
-          SEGMENT_LIKE_TOOLS.has(activeTool)) ||
-        activeTool === "circle"
+        (typeof currentActiveTool === "string" &&
+          SEGMENT_LIKE_TOOLS.has(currentActiveTool)) ||
+        currentActiveTool === "circle"
       ) {
         const snap = findNearestPoint(worldPos, 24);
         const startPt = snap?.pos ?? worldPos;
         if (draftTwoPtRef.current && !draftTwoPtRef.current.dragging) {
           commitTwoPointShape(
-            activeTool,
+            currentActiveTool,
             draftTwoPtRef.current.start,
             startPt,
             draftTwoPtRef.current.startId,
@@ -3101,17 +3421,17 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
           return;
         }
         draftTwoPtRef.current = {
-          tool: activeTool,
+          tool: currentActiveTool,
           start: startPt,
           startId: snap?.id,
           dragging: true,
         };
-        setDraftPreviewLine({ from: startPt, to: startPt, kind: activeTool });
+        setDraftPreviewLine({ from: startPt, to: startPt, kind: currentActiveTool });
         return;
       }
 
       // Arbitrary Polygon (`polygon`)
-      if (activeTool === "polygon") {
+      if (currentActiveTool === "polygon") {
         const snap = findNearestPoint(worldPos, 22);
         const clickPt = snap?.pos ?? worldPos;
         if (draftPolygonPts.length >= 3) {
@@ -3126,9 +3446,9 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // Special Triangles
-      if (typeof activeTool === "string" && TRIANGLE_TOOL_KINDS[activeTool]) {
+      if (typeof currentActiveTool === "string" && TRIANGLE_TOOL_KINDS[currentActiveTool]) {
         const triEl = createSpecialTrianglePreset(
-          TRIANGLE_TOOL_KINDS[activeTool],
+          TRIANGLE_TOOL_KINDS[currentActiveTool],
           worldPos,
           pageElements,
           {
@@ -3154,9 +3474,9 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // Special Quadrilaterals
-      if (typeof activeTool === "string" && QUAD_TOOL_KINDS[activeTool]) {
+      if (typeof currentActiveTool === "string" && QUAD_TOOL_KINDS[currentActiveTool]) {
         const quadEl = createSpecialQuadPreset(
-          QUAD_TOOL_KINDS[activeTool],
+          QUAD_TOOL_KINDS[currentActiveTool],
           worldPos,
           pageElements,
           {
@@ -3183,12 +3503,12 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
 
       // Flood Fill (`Tô màu`)
       if (
-        activeTool === "floodFill" ||
-        (typeof activeTool === "string" && activeTool.startsWith("fill:"))
+        currentActiveTool === "floodFill" ||
+        (typeof currentActiveTool === "string" && currentActiveTool.startsWith("fill:"))
       ) {
         const activeFill =
-          typeof activeTool === "string" && activeTool.startsWith("fill:")
-            ? activeTool.slice(5)
+          typeof currentActiveTool === "string" && currentActiveTool.startsWith("fill:")
+            ? currentActiveTool.slice(5)
             : fillColor;
         const fillStyleValue =
           activeFill === "none" ? "transparent" : activeFill;
@@ -3282,8 +3602,8 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // 3D Solids
-      if (typeof activeTool === "string" && SOLID_TOOL_SPECS[activeTool]) {
-        const spec = SOLID_TOOL_SPECS[activeTool];
+      if (typeof currentActiveTool === "string" && SOLID_TOOL_SPECS[currentActiveTool]) {
+        const spec = SOLID_TOOL_SPECS[currentActiveTool];
         const solidEl = createSolid3DElement(
           spec.kind,
           worldPos,
@@ -3311,7 +3631,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // Oxyz 3D Coordinate Axes
-      if (activeTool === "p3:axes") {
+      if (currentActiveTool === "p3:axes") {
         const axesEl = createOxyzElement(worldPos, { page: currentPage });
         const res = dispatcher.dispatch({
           type: "object.create",
@@ -3334,7 +3654,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // 2D Oxy Axes
-      if (activeTool === "p3:oxy") {
+      if (currentActiveTool === "p3:oxy") {
         const res = dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -3358,14 +3678,14 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
 
       // Variation Table / Sign Table / Empty VarTable
       if (
-        activeTool === "bang-bien-thien" ||
-        activeTool === "bang-xet-dau" ||
-        activeTool === "bang-trong"
+        currentActiveTool === "bang-bien-thien" ||
+        currentActiveTool === "bang-xet-dau" ||
+        currentActiveTool === "bang-trong"
       ) {
         const tableData =
-          activeTool === "bang-bien-thien"
+          currentActiveTool === "bang-bien-thien"
             ? buildVarTableFromExpr("x^3 - 3x + 1")
-            : activeTool === "bang-xet-dau"
+            : currentActiveTool === "bang-xet-dau"
               ? buildSignTableFromExpr("x^2 - 4")
               : {
                   xs: ["-\\infty", "x_1", "x_2", "+\\infty"],
@@ -3408,7 +3728,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // Trigonometric Circle
-      if (activeTool === "trig-circle") {
+      if (currentActiveTool === "trig-circle") {
         const res = dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -3435,14 +3755,14 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
 
       // Combinatorics / Probability / Venn / Network
       if (
-        activeTool === "count-perm" ||
-        activeTool === "count-arr" ||
-        activeTool === "count-comb"
+        currentActiveTool === "count-perm" ||
+        currentActiveTool === "count-arr" ||
+        currentActiveTool === "count-comb"
       ) {
         const kind =
-          activeTool === "count-perm"
+          currentActiveTool === "count-perm"
             ? "perm"
-            : activeTool === "count-arr"
+            : currentActiveTool === "count-arr"
               ? "arr"
               : "comb";
         const res = dispatcher.dispatch({
@@ -3465,7 +3785,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         return;
       }
 
-      if (activeTool === "tree") {
+      if (currentActiveTool === "tree") {
         const res = dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -3508,7 +3828,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         return;
       }
 
-      if (activeTool === "venn") {
+      if (currentActiveTool === "venn") {
         const res = dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -3529,7 +3849,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         return;
       }
 
-      if (activeTool === "network") {
+      if (currentActiveTool === "network") {
         const res = dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -3565,8 +3885,8 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // Table Tool (`table:RxC`)
-      if (typeof activeTool === "string" && activeTool.startsWith("table:")) {
-        const [rStr, cStr] = activeTool.slice(6).split("x");
+      if (typeof currentActiveTool === "string" && currentActiveTool.startsWith("table:")) {
+        const [rStr, cStr] = currentActiveTool.slice(6).split("x");
         const rows = Math.max(1, Math.min(8, Number(rStr) || 3));
         const cols = Math.max(1, Math.min(8, Number(cStr) || 3));
         const cells = Array.from({ length: rows }, () =>
@@ -3593,10 +3913,10 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
 
       // Real-World Object Placement (`realworld:<iconId>`)
       if (
-        typeof activeTool === "string" &&
-        activeTool.startsWith("realworld:")
+        typeof currentActiveTool === "string" &&
+        currentActiveTool.startsWith("realworld:")
       ) {
-        const iconId = activeTool.slice(10);
+        const iconId = currentActiveTool.slice(10);
         const res = dispatcher.dispatch({
           type: "object.create",
           params: {
@@ -3618,68 +3938,23 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       }
 
       // 2D & 3D Constructions
-      if (typeof activeTool === "string") {
-        if (handleConstructionClick(activeTool, worldPos)) {
+      if (typeof currentActiveTool === "string") {
+        if (handleConstructionClick(currentActiveTool, worldPos)) {
           return;
         }
       }
 
       // Ink / Multi-nib Pens
-      if (isPenTool(activeTool)) {
-        if (activeTool === "ink:laser") {
-          const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
-      if (!containerRectRef.current && rect) {
-        containerRectRef.current = rect;
-      }
-          setLiveLaserScreenPos({
-            x: e.clientX - (rect?.left ?? 0),
-            y: e.clientY - (rect?.top ?? 0),
-          });
-          if (laserConfig.mode === "dot") {
-            setIsLaserPressed(true);
-            return;
-          }
-        }
-        dispatcher.gesture(true);
-        const drawPt = worldPos;
-
-        const nib = resolvePenNib(activeTool) ?? undefined;
-        const smooth = nib === "fountain" || nib === "brush";
-        filterXRef.current.reset();
-        filterYRef.current.reset();
-        const ts = e.nativeEvent.timeStamp || performance.now();
-        const x = smooth
-          ? filterXRef.current.filter(drawPt.x, ts)
-          : drawPt.x;
-        const y = smooth
-          ? filterYRef.current.filter(drawPt.y, ts)
-          : drawPt.y;
-        const effectiveStyle: Style =
-          nib === "laser"
-            ? { stroke: laserConfig.color || "#ef4444", width: laserConfig.trailWidth || 4.5 }
-            : nib === "highlighter" &&
-              (!currentStyle.stroke || currentStyle.stroke.toLowerCase() === "#111827")
-            ? { ...currentStyle, stroke: "#facc15" }
-            : nib === "dashed"
-            ? { ...currentStyle, dash: true }
-            : currentStyle;
-        liveStrokePointsRef.current = [x, y];
-        liveStrokePressuresRef.current = [e.pressure || 0.5];
-        liveStrokeTipRef.current = null;
-        liveStrokeStyleRef.current = effectiveStyle;
-        liveStrokeNibRef.current = nib;
-        liveStrokeSnappedRef.current = null;
-        if (dwellTimerRef.current) {
-          clearTimeout(dwellTimerRef.current);
-          dwellTimerRef.current = null;
-        }
-        setLastInkSnap(null);
-        setLiveStroke({
-          points: [x, y],
-          pressures: [e.pressure || 0.5],
-          nib,
-          style: effectiveStyle,
-        });
+      if (isPenTool(currentActiveTool)) {
+        startInkStrokeAt(
+          currentActiveTool,
+          worldPos,
+          e.nativeEvent.timeStamp || performance.now(),
+          e.pressure || 0.5,
+          rect,
+          e.clientX,
+          e.clientY
+        );
       }
     },
     [
@@ -3709,22 +3984,81 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       autoSwitchTarget,
       resetToolAfterCreation,
       spenConfig,
-      laserConfig,
+      startInkStrokeAt,
     ]
   );
 
   // --- Root Canvas Pointer Move ---
   const handleCanvasPointerMove = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
-      navPointerMove(e);
-
       const rect = containerRectRef.current || containerRef.current?.getBoundingClientRect();
       if (!containerRectRef.current && rect) {
         containerRectRef.current = rect;
       }
+      const worldPos = screenToWorld(
+        e.clientX,
+        e.clientY,
+        viewport.tx,
+        viewport.ty,
+        viewport.scale,
+        rect
+      );
+
+      // Universal Stylus Adapter mid-stroke / hover transition handling
+      let currentActiveTool = activeTool;
+      if (e.pointerType === "pen") {
+        const stylusTr = stylusMachineRef.current.processEvent(e, "move", activeTool, spenConfig);
+        currentActiveTool = stylusTr.effectiveTool;
+        if (stylusTr.nextActiveTool !== null) {
+          setActiveTool(stylusTr.nextActiveTool);
+        }
+        if (stylusTr.enteredTemporary || stylusTr.exitedTemporary) {
+          if (liveStrokeStyleRef.current || liveStroke) {
+            commitLiveInkStroke();
+          }
+          if (marqueeRectRef.current) {
+            finishActiveMarquee();
+          }
+          navStopPan();
+
+          if (isStylusTipInContact(e)) {
+            if (currentActiveTool === "pan") {
+              navPointerDown(e, true);
+              return;
+            }
+            if (currentActiveTool === "select" || currentActiveTool === "select:marquee") {
+              const m = { sx: worldPos.x, sy: worldPos.y, x: worldPos.x, y: worldPos.y };
+              marqueeRectRef.current = m;
+              setMarqueeRect(m);
+              return;
+            }
+            if (currentActiveTool === "erase") {
+              eraserDidEraseRef.current = true;
+              checkEraserCollision(worldPos, pageElements, viewport.scale, (id) => {
+                dispatcher.deleteObjects([id]);
+              });
+              return;
+            }
+            if (isPenTool(currentActiveTool)) {
+              startInkStrokeAt(
+                currentActiveTool,
+                worldPos,
+                e.nativeEvent.timeStamp || performance.now(),
+                e.pressure || 0.5,
+                rect,
+                e.clientX,
+                e.clientY
+              );
+              return;
+            }
+          }
+        }
+      }
+
+      navPointerMove(e);
 
       // Track laser screen position when active
-      if (activeTool === "ink:laser") {
+      if (currentActiveTool === "ink:laser") {
         setLiveLaserScreenPos({
           x: e.clientX - (rect?.left ?? 0),
           y: e.clientY - (rect?.top ?? 0),
@@ -3735,15 +4069,6 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       } else if (liveLaserScreenPos !== null) {
         setLiveLaserScreenPos(null);
       }
-
-      const worldPos = screenToWorld(
-        e.clientX,
-        e.clientY,
-        viewport.tx,
-        viewport.ty,
-        viewport.scale,
-        rect
-      );
 
       // 0. Label Drag (Point name offset)
       if (labelDragRef.current) {
@@ -4066,8 +4391,9 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         return;
       }
 
-      // 5. Eraser Sweep
-      if (activeTool === "erase" && e.buttons === 1) {
+      // 5. Eraser Sweep (supports stylus hardware contact bitmasks e.g. buttons=2/3/32/33)
+      const isTipContact = e.pointerType === "pen" ? isStylusTipInContact(e) : (e.buttons & 1) !== 0;
+      if (currentActiveTool === "erase" && isTipContact) {
         eraserDidEraseRef.current = true;
         checkEraserCollision(worldPos, pageElements, viewport.scale, (id) => {
           dispatcher.deleteObjects([id]);
@@ -4077,11 +4403,11 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
 
       // 6. Ink / Multi-nib Pens (Coalesced High-Refresh Input + Direct DOM rAF Path Update)
       if (
-        isPenTool(activeTool) &&
-        e.buttons === 1 &&
+        isPenTool(currentActiveTool) &&
+        isTipContact &&
         liveStrokePointsRef.current.length > 0
       ) {
-        const nib = liveStrokeNibRef.current ?? resolvePenNib(activeTool) ?? undefined;
+        const nib = liveStrokeNibRef.current ?? resolvePenNib(currentActiveTool) ?? undefined;
         const smooth = nib === "fountain" || nib === "brush";
         const coalesced =
           typeof e.nativeEvent.getCoalescedEvents === "function"
@@ -4175,10 +4501,17 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
     },
     [
       navPointerMove,
+      navPointerDown,
+      navStopPan,
       containerRef,
       viewport,
       dispatcher,
       activeTool,
+      spenConfig,
+      liveStroke,
+      commitLiveInkStroke,
+      finishActiveMarquee,
+      startInkStrokeAt,
       pageElements,
       buildLiveStrokePathData,
       laserConfig,
@@ -4192,39 +4525,42 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
     (e: React.PointerEvent<SVGSVGElement>) => {
       navPointerUp(e);
 
+      const finishStylusUp = () => {
+        if (e.pointerType !== "pen") return null;
+        const tr = stylusMachineRef.current.processEvent(e, "up", activeTool, spenConfig);
+        if (tr.nextActiveTool !== null) {
+          setActiveTool(tr.nextActiveTool);
+        }
+        return tr;
+      };
+
       if (labelDragRef.current) {
         labelDragRef.current = null;
         dispatcher.gesture(false);
+        finishStylusUp();
         return;
       }
       if (axesResizeRef.current) {
         axesResizeRef.current = null;
         dispatcher.gesture(false);
+        finishStylusUp();
         return;
       }
       if (resizeStartRef.current) {
         resizeStartRef.current = null;
         dispatcher.gesture(false);
+        finishStylusUp();
         return;
       }
       if (dragBoxStartRef.current) {
         dragBoxStartRef.current = null;
         dispatcher.gesture(false);
+        finishStylusUp();
         return;
       }
       if (marqueeRectRef.current) {
-        const m = marqueeRectRef.current;
-        const dragDist = Math.hypot(
-          (m.x - m.sx) * (viewport.scale || 45),
-          (m.y - m.sy) * (viewport.scale || 45)
-        );
-        if (dragDist > 4) {
-          setSelectedIds(testMarqueeIntersection(m, pageElements));
-        } else {
-          setSelectedIds([]);
-        }
-        marqueeRectRef.current = null;
-        setMarqueeRect(null);
+        finishActiveMarquee();
+        finishStylusUp();
         return;
       }
 
@@ -4259,6 +4595,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
           // Keep anchor for 2-click placement
           draftTwoPtRef.current.dragging = false;
         }
+        finishStylusUp();
         return;
       }
 
@@ -4266,278 +4603,40 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         setIsLaserPressed(false);
       }
 
-      const activeLive =
-        liveStroke ??
-        (liveStrokeStyleRef.current
-          ? {
-              points: liveStrokePointsRef.current,
-              pressures: liveStrokePressuresRef.current,
-              nib: liveStrokeNibRef.current,
-              style: liveStrokeStyleRef.current,
-            }
-          : null);
+      commitLiveInkStroke();
 
-      if (activeLive) {
-        const pts = liveStrokePointsRef.current;
-        const pressures = liveStrokePressuresRef.current;
-        if (pts.length === 2 && liveStrokeTipRef.current) {
-          pts.push(liveStrokeTipRef.current.x, liveStrokeTipRef.current.y);
-          pressures.push(liveStrokeTipRef.current.pressure);
-          liveStrokeTipRef.current = null;
-        }
-        if (pts.length >= 4) {
-          if (activeLive.nib === "laser") {
-            // Dedicated laser pointer: fade out completely after 1.5s, not persisting in Yjs
-            const strokeId = newElId("laser");
-            laserLayerRef.current?.addStroke({
-              id: strokeId,
-              points: [...pts],
-              createdAt: performance.now(),
-              color: laserConfig.color,
-              width: laserConfig.trailWidth,
-            });
-          } else if (
-            inkToShape &&
-            (activeLive.nib === undefined ||
-              activeLive.nib === "pencil")
-          ) {
-            // Ink-to-shape intelligence: use cached dwell snap or classify stroke via ShortStraw + PaleoSketch
-            const recognized = liveStrokeSnappedRef.current ?? recognizeStrokeShape(pts);
-            const targetPage = isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage;
-            const showSnapPill = (
-              elementId: string,
-              shapeType: RecognizedShape["type"],
-              extra?: { center?: Point2D; rx?: number; ry?: number; rotation?: number }
-            ) => {
-              if (lastInkSnapTimerRef.current) clearTimeout(lastInkSnapTimerRef.current);
-              setLastInkSnap({
-                elementId,
-                shapeType,
-                rawPoints: [...pts],
-                rawPressures: [...pressures],
-                nib: activeLive.nib,
-                style: { ...activeLive.style },
-                page: targetPage,
-                ...extra,
-              });
-              lastInkSnapTimerRef.current = setTimeout(() => {
-                setLastInkSnap(null);
-                lastInkSnapTimerRef.current = null;
-              }, 5500);
-            };
-            if (recognized) {
-              if (recognized.type === "circle") {
-                const circId = newElId("circ");
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: circId,
-                    type: "GeomCircle",
-                    page: targetPage,
-                    style: {
-                      stroke: activeLive.style.stroke ?? "#0891b2",
-                      width: activeLive.style.width ?? 2,
-                      dash: activeLive.style.dash ?? false,
-                    },
-                    props: {
-                      center: `${circId}_c`,
-                      centerPt: recognized.center,
-                      radius: { kind: "value", v: recognized.radius },
-                    },
-                  },
-                });
-                showSnapPill(circId, "circle", {
-                  center: recognized.center,
-                  rx: recognized.radius,
-                  ry: recognized.radius,
-                  rotation: 0,
-                });
-              } else if (recognized.type === "ellipse") {
-                const ellId = newElId("circ");
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: ellId,
-                    type: "GeomCircle",
-                    page: targetPage,
-                    style: {
-                      stroke: activeLive.style.stroke ?? "#0891b2",
-                      width: activeLive.style.width ?? 2,
-                      dash: activeLive.style.dash ?? false,
-                    },
-                    props: {
-                      center: `${ellId}_c`,
-                      centerPt: recognized.center,
-                      radius: { kind: "value", v: Number(((recognized.rx + recognized.ry) / 2).toFixed(3)) },
-                      rx: Number(recognized.rx.toFixed(3)),
-                      ry: Number(recognized.ry.toFixed(3)),
-                      rotation: Number(recognized.rotation.toFixed(4)),
-                    },
-                  },
-                });
-                showSnapPill(ellId, "ellipse", {
-                  center: recognized.center,
-                  rx: recognized.rx,
-                  ry: recognized.ry,
-                  rotation: recognized.rotation,
-                });
-              } else if (recognized.type === "segment") {
-                const segId = newElId("seg");
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: segId,
-                    type: "GeomSegment",
-                    page: targetPage,
-                    style: {
-                      stroke: activeLive.style.stroke ?? "#334155",
-                      width: activeLive.style.width ?? 2,
-                      dash: activeLive.style.dash ?? false,
-                    },
-                    props: {
-                      from: `${segId}_a`,
-                      to: `${segId}_b`,
-                      fromPt: recognized.start,
-                      toPt: recognized.end,
-                    },
-                  },
-                });
-                showSnapPill(segId, "segment");
-              } else if (recognized.type === "arrow") {
-                const vecId = newElId("vec");
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: vecId,
-                    type: "GeomVector",
-                    page: targetPage,
-                    style: {
-                      stroke: activeLive.style.stroke ?? "#334155",
-                      width: activeLive.style.width ?? 2,
-                      dash: activeLive.style.dash ?? false,
-                    },
-                    props: {
-                      from: `${vecId}_a`,
-                      to: `${vecId}_b`,
-                      fromPt: recognized.start,
-                      toPt: recognized.end,
-                    },
-                  },
-                });
-                showSnapPill(vecId, "arrow");
-              } else if (recognized.type === "triangle" || recognized.type === "rectangle") {
-                const polyId = newElId("poly");
-                const verts = recognized.vertices;
-                const embedded: EmbeddedVertex[] = verts.map((pt, i) => ({
-                  id: `${polyId}_v${i}`,
-                  name: "",
-                  x: pt.x,
-                  y: pt.y,
-                }));
-                dispatcher.dispatch({
-                  type: "object.create",
-                  params: {
-                    id: polyId,
-                    type: "GeomPolygon",
-                    page: targetPage,
-                    style: {
-                      stroke: activeLive.style.stroke ?? "#334155",
-                      fill: "none",
-                      width: activeLive.style.width ?? 2,
-                      dash: activeLive.style.dash ?? false,
-                    },
-                    props: {
-                      vertices: embedded.map((v) => v.id),
-                      points: embedded,
-                      bareShape: true,
-                    },
-                  },
-                });
-                showSnapPill(polyId, recognized.type);
-              }
-            } else {
-              // Normal ink stroke
-              dispatcher.dispatch({
-                type: "ink.stroke",
-                params: {
-                  points: pts,
-                  pressures,
-                  nib: activeLive.nib,
-                  style: activeLive.style,
-                  page: targetPage,
-                },
-              });
-            }
-          } else {
-            dispatcher.dispatch({
-              type: "ink.stroke",
-              params: {
-                points: pts,
-                pressures,
-                nib: activeLive.nib,
-                style: activeLive.style,
-                page: isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage,
-              },
-            });
-          }
-        }
-        if (dwellTimerRef.current) {
-          clearTimeout(dwellTimerRef.current);
-          dwellTimerRef.current = null;
-        }
-        liveStrokeSnappedRef.current = null;
-        if (liveStrokeRafRef.current) {
-          cancelAnimationFrame(liveStrokeRafRef.current);
-          liveStrokeRafRef.current = null;
-        }
-        dispatcher.gesture(false);
-        liveStrokePointsRef.current = [];
-        liveStrokePressuresRef.current = [];
-        liveStrokeTipRef.current = null;
-        liveStrokeStyleRef.current = undefined;
-        liveStrokeNibRef.current = undefined;
-        containerRectRef.current = null;
-        setLiveStroke(null);
-      }
+      const stylusTr = finishStylusUp();
+      const exitedStylusOverride = Boolean(stylusTr && stylusTr.exitedTemporary);
 
-      if (activeTool === "erase") {
+      if (activeTool === "erase" && !exitedStylusOverride) {
         if (eraserDidEraseRef.current) {
           eraserDidEraseRef.current = false;
           resetToolAfterEraser();
         }
-      }
-
-      // Check S Pen auto-return: if stylus button was held or configured to return after action
-      if (spenActiveOverrideRef.current && spenPreviousToolRef.current) {
-        if (spenConfig.behavior === "hold" || spenConfig.returnAfterAction) {
-          setActiveTool(spenPreviousToolRef.current);
-          spenPreviousToolRef.current = null;
-          spenActiveOverrideRef.current = false;
-        }
+      } else {
+        eraserDidEraseRef.current = false;
       }
     },
     [
       navPointerUp,
       dispatcher,
       viewport,
-      pageElements,
-      isA4Format,
-      currentPage,
       containerRef,
       findNearestPoint,
       commitTwoPointShape,
-      liveStroke,
-      inkToShape,
+      commitLiveInkStroke,
+      finishActiveMarquee,
       activeTool,
       resetToolAfterEraser,
       spenConfig,
-      laserConfig,
+      laserConfig.mode,
     ]
   );
 
   const handleCanvasPointerCancel = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
       navPointerCancel(e);
+      navStopPan();
       if (labelDragRef.current) {
         labelDragRef.current = null;
         dispatcher.gesture(false);
@@ -4562,34 +4661,17 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         setIsLaserPressed(false);
       }
 
-      if (liveStroke) {
-        if (dwellTimerRef.current) {
-          clearTimeout(dwellTimerRef.current);
-          dwellTimerRef.current = null;
-        }
-        liveStrokeSnappedRef.current = null;
-        if (liveStrokeRafRef.current) {
-          cancelAnimationFrame(liveStrokeRafRef.current);
-          liveStrokeRafRef.current = null;
-        }
-        dispatcher.gesture(false);
-        liveStrokePointsRef.current = [];
-        liveStrokePressuresRef.current = [];
-        liveStrokeTipRef.current = null;
-        liveStrokeStyleRef.current = undefined;
-        liveStrokeNibRef.current = undefined;
-        containerRectRef.current = null;
-        setLiveStroke(null);
-      }
-      if (spenActiveOverrideRef.current && spenPreviousToolRef.current) {
-        if (spenConfig.behavior === "hold" || spenConfig.returnAfterAction) {
-          setActiveTool(spenPreviousToolRef.current);
-          spenPreviousToolRef.current = null;
-          spenActiveOverrideRef.current = false;
+      commitLiveInkStroke();
+      eraserDidEraseRef.current = false;
+
+      if (e.pointerType === "pen") {
+        const tr = stylusMachineRef.current.processEvent(e, "cancel", activeTool, spenConfig);
+        if (tr.nextActiveTool !== null) {
+          setActiveTool(tr.nextActiveTool);
         }
       }
     },
-    [navPointerCancel, dispatcher, liveStroke, spenConfig, activeTool, laserConfig.mode]
+    [navPointerCancel, navStopPan, dispatcher, commitLiveInkStroke, spenConfig, activeTool, laserConfig.mode]
   );
 
   // Drag-and-drop image or PDF file onto canvas
@@ -5179,10 +5261,17 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       onPointerMove={handleCanvasPointerMove}
       onPointerUp={handleCanvasPointerUp}
       onPointerCancel={handleCanvasPointerCancel}
-      onPointerLeave={() => {
+      onPointerLeave={(e) => {
         navPointerLeave();
         setLiveLaserScreenPos(null);
         setIsLaserPressed(false);
+        if (e.pointerType === "pen" && !isStylusTipInContact(e)) {
+          navStopPan();
+          const tr = stylusMachineRef.current.processEvent(e, "leave", activeTool, spenConfig);
+          if (tr.nextActiveTool !== null) {
+            setActiveTool(tr.nextActiveTool);
+          }
+        }
       }}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDropOnCanvas}

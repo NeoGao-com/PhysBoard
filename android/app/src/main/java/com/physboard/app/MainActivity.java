@@ -3,6 +3,7 @@ package com.physboard.app;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -19,6 +20,50 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     private long lastBackPressMs = 0L;
     private boolean isImmersiveFullscreen = false;
+    private int lastNativeStylusMask = 0;
+
+    private void syncNativeStylusState(MotionEvent ev) {
+        if (ev == null || ev.getPointerCount() == 0) return;
+        int toolType = ev.getToolType(0);
+        if (toolType != MotionEvent.TOOL_TYPE_STYLUS && toolType != MotionEvent.TOOL_TYPE_ERASER) {
+            return;
+        }
+        int action = ev.getActionMasked();
+        boolean ended = action == MotionEvent.ACTION_UP
+            || action == MotionEvent.ACTION_CANCEL
+            || action == MotionEvent.ACTION_HOVER_EXIT
+            || action == MotionEvent.ACTION_POINTER_UP;
+        boolean isEraserTail = !ended && toolType == MotionEvent.TOOL_TYPE_ERASER;
+        int btnState = ended ? 0 : ev.getButtonState();
+        boolean isPrimaryBarrel = (btnState & MotionEvent.BUTTON_STYLUS_PRIMARY) != 0;
+        boolean isSecondaryBarrel = (btnState & MotionEvent.BUTTON_STYLUS_SECONDARY) != 0;
+        int mask = (isEraserTail ? 1 : 0) | (isPrimaryBarrel ? 2 : 0) | (isSecondaryBarrel ? 4 : 0);
+        if (mask == lastNativeStylusMask) return;
+        lastNativeStylusMask = mask;
+
+        WebView wv = getBridge() != null ? getBridge().getWebView() : null;
+        if (wv == null) return;
+        final String js = "window.__physboardNativeStylusState={isEraserTail:"
+            + isEraserTail
+            + ",isPrimaryBarrel:"
+            + isPrimaryBarrel
+            + ",isSecondaryBarrel:"
+            + isSecondaryBarrel
+            + ",ts:Date.now()};";
+        wv.post(() -> wv.evaluateJavascript(js, null));
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        syncNativeStylusState(ev);
+        return super.dispatchTouchEvent(ev);
+    }
+
+    @Override
+    public boolean dispatchGenericMotionEvent(MotionEvent ev) {
+        syncNativeStylusState(ev);
+        return super.dispatchGenericMotionEvent(ev);
+    }
 
     private void handleDoubleBackExit() {
         long now = System.currentTimeMillis();

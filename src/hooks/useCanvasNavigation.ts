@@ -53,11 +53,12 @@ export interface UseCanvasNavigationReturn {
   setFitLocked: (locked: boolean) => void;
   fitToScreen: () => void;
   overscrollState: OverscrollAddPageState;
-  handlePointerDown: (e: React.PointerEvent<SVGSVGElement>) => void;
+  handlePointerDown: (e: React.PointerEvent<SVGSVGElement>, forcePan?: boolean) => void;
   handlePointerMove: (e: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerUp: (e: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerCancel: (e: React.PointerEvent<SVGSVGElement>) => void;
   handlePointerLeave: () => void;
+  stopPan: () => void;
   resetView: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -583,7 +584,7 @@ export function useCanvasNavigation(
 
   // Pointer Down
   const handlePointerDown = useCallback(
-    (e: React.PointerEvent<SVGSVGElement>) => {
+    (e: React.PointerEvent<SVGSVGElement>, forcePan = false) => {
       activePointersRef.current.set(e.pointerId, {
         x: e.clientX,
         y: e.clientY,
@@ -605,14 +606,14 @@ export function useCanvasNavigation(
         return;
       }
 
-      // Check whether pan should initiate
-      const isMiddleClick = e.button === 1;
+      // Check whether pan should initiate (only treat button===1 as middle-click for mouse, not 2-button stylus)
+      const isMiddleClick = e.pointerType !== "pen" && e.button === 1;
       const isTouchPan = penOnlyMode && e.pointerType === "touch";
       const isPanTool = currentTool === null || currentTool === "pan";
       const isShiftSelect =
         currentTool === "select" && (e.shiftKey || isMiddleClick);
       const shouldPan =
-        isTouchPan || isPanTool || isMiddleClick || isSpacePressed || isShiftSelect;
+        forcePan || isTouchPan || isPanTool || isMiddleClick || isSpacePressed || isShiftSelect;
 
       if (shouldPan) {
         try {
@@ -788,6 +789,11 @@ export function useCanvasNavigation(
     setCursorWorld(null);
   }, []);
 
+  const stopPan = useCallback(() => {
+    panStartRef.current = null;
+    setIsPanning(false);
+  }, []);
+
   const resetView = useCallback(() => {
     const sidebarW = isSidebarOpen ? 140 : 26;
     const defaultW = typeof window !== "undefined" ? window.innerWidth - sidebarW : 1000;
@@ -917,6 +923,7 @@ export function useCanvasNavigation(
     handlePointerUp,
     handlePointerCancel,
     handlePointerLeave,
+    stopPan,
     resetView,
     zoomIn,
     zoomOut,

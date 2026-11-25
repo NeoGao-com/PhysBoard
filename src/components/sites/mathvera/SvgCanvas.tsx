@@ -122,6 +122,7 @@ export function SvgCanvas({
     <div
       onDragOver={onDragOver}
       onDrop={onDrop}
+      onContextMenu={(e) => e.preventDefault()}
       data-board-surface={boardConfig.surface}
       data-board-pattern={boardConfig.pattern}
       data-board-dark={theme.isDark ? "true" : "false"}
@@ -151,6 +152,7 @@ export function SvgCanvas({
         className="wb-canvas"
         width="100%"
         height="100%"
+        onContextMenu={(e) => e.preventDefault()}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

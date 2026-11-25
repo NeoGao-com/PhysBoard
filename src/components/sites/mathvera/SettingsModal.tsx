@@ -1136,24 +1136,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </label>
                 </div>
 
-                {/* Cài đặt nút bấm S Pen / Stylus */}
+                {/* Cài đặt Bút cảm ứng đa thiết bị (Universal Stylus Settings) */}
                 <div style={CARD_BOX_STYLE}>
                   <div style={CARD_TITLE_STYLE}>
                     <span>🖊️</span>
-                    <span>Nút bấm trên bút S Pen / Stylus (Samsung Tab & Wacom)</span>
+                    <span>Cài đặt Bút cảm ứng (S Pen · Wacom · Surface Pen · Huion / USI)</span>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 2 }}>
                     <div style={{ fontSize: 12.5, color: "#64748b" }}>
-                      Tùy chỉnh hành vi khi ấn nút bên hông thân bút S Pen trên màn hình:
+                      Tự động nhận diện nút bấm và đầu tẩy vật lý trên mọi dòng bút cảm ứng (không ảnh hưởng ngón tay và chuột thường):
                     </div>
 
-                    {/* 1. Chọn chức năng */}
+                    {/* 1. Nút bên hông chính (Primary Barrel) */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155" }}>
-                        Chức năng gán cho nút bút:
+                        Hành động khi nhấn giữ nút bên hông chính:
                       </label>
                       <select
+                        data-testid="stylus-primary-action"
                         value={spenConfig.action}
                         onChange={(e) =>
                           onChangeSPenConfig?.({
@@ -1169,17 +1170,88 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           background: "#fff",
                           color: "#0f172a",
                           cursor: "pointer",
-                          maxWidth: isMobile ? "100%" : 320,
+                          maxWidth: isMobile ? "100%" : 340,
                         }}
                       >
-                        <option value="erase">Tẩy xoá (Gôm nhanh)</option>
+                        <option value="erase">Tẩy tạm thời (Temporary Eraser — Mặc định)</option>
+                        <option value="select:marquee">Vùng chọn Lasso tạm thời (Temporary Lasso)</option>
+                        <option value="pan">Kéo/Di chuyển bảng tạm thời (Temporary Pan)</option>
                         <option value="select">Công cụ Chọn / Di chuyển (Select)</option>
                         <option value="ink:laser">Bút Laze chỉ điểm (Laser Pointer)</option>
                         <option value="ink:highlighter">Bút Dạ quang (Highlighter)</option>
-                        <option value="pan">Kéo trượt bảng (Pan Canvas)</option>
-                        <option value="none">Không làm gì (Tắt phím bút)</option>
+                        <option value="none">Tắt (Disabled)</option>
                       </select>
                     </div>
+
+                    {/* 1b. Nút bên hông phụ (Secondary Barrel - Wacom / Huion 2 nút) */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={{ fontSize: 12.5, fontWeight: 600, color: "#334155" }}>
+                        Hành động nút bên hông thứ hai (Bút Wacom / Huion 2 nút):
+                      </label>
+                      <select
+                        data-testid="stylus-secondary-action"
+                        value={spenConfig.secondaryAction ?? "pan"}
+                        onChange={(e) =>
+                          onChangeSPenConfig?.({
+                            ...spenConfig,
+                            secondaryAction: e.target.value as SPenButtonAction,
+                          })
+                        }
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          border: "1px solid #cbd5e1",
+                          fontSize: 13,
+                          background: "#fff",
+                          color: "#0f172a",
+                          cursor: "pointer",
+                          maxWidth: isMobile ? "100%" : 340,
+                        }}
+                      >
+                        <option value="pan">Kéo/Di chuyển bảng tạm thời (Temporary Pan — Mặc định)</option>
+                        <option value="erase">Tẩy tạm thời (Temporary Eraser)</option>
+                        <option value="select:marquee">Vùng chọn Lasso tạm thời (Temporary Lasso)</option>
+                        <option value="select">Công cụ Chọn / Di chuyển (Select)</option>
+                        <option value="ink:laser">Bút Laze chỉ điểm (Laser Pointer)</option>
+                        <option value="ink:highlighter">Bút Dạ quang (Highlighter)</option>
+                        <option value="none">Tắt (Disabled)</option>
+                      </select>
+                    </div>
+
+                    {/* 1c. Đầu tẩy vật lý (Hardware Eraser Tail) */}
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        cursor: "pointer",
+                        padding: "6px 8px",
+                        borderRadius: 6,
+                        background: spenConfig.hardwareEraserEnabled !== false ? "#f0fdf4" : "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        data-testid="stylus-hardware-eraser"
+                        checked={spenConfig.hardwareEraserEnabled !== false}
+                        onChange={(e) =>
+                          onChangeSPenConfig?.({
+                            ...spenConfig,
+                            hardwareEraserEnabled: e.target.checked,
+                          })
+                        }
+                        style={{ accentColor: "#16a34a", width: 18, height: 18 }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 12.5, fontWeight: 600, color: "#0f172a" }}>
+                          Tự động nhận diện đầu tẩy vật lý (lật đuôi bút Wacom / Surface Pen)
+                        </div>
+                        <div style={{ fontSize: 11.5, color: "#64748b" }}>
+                          Lật ngược đầu tẩy phần cứng là tự chuyển sang Tẩy và trả về bút vẽ ngay khi nhấc đuôi bút.
+                        </div>
+                      </div>
+                    </label>
 
                     {/* 2. Cách thức hoạt động */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
