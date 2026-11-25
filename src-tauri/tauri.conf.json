@@ -1,6 +1,6 @@
 {
   "productName": "PhysBoard",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "identifier": "com.physboard.app",
   "build": {
     "frontendDist": "../out",

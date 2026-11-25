@@ -2024,6 +2024,10 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
           setSettingsInitialTab("feedback");
           setSettingsModalOpen(true);
           break;
+        case "action:donate":
+          setSettingsInitialTab("donate");
+          setSettingsModalOpen(true);
+          break;
       }
     },
     [

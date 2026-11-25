@@ -743,6 +743,15 @@ export const WHITEBOARD_COMMANDS: CommandDescriptor[] = [
     description: "Mở biểu mẫu báo lỗi / góp ý kèm thông số phiên bản thiết bị",
     keywords: "bao loi phan hoi bug feedback gop y",
   },
+  {
+    id: "action:donate",
+    label: "Ủng hộ tác giả (Donate QR BIDV)",
+    category: "actions",
+    icon: "☕",
+    defaultShortcut: null,
+    description: "Mở mã VietQR BIDV ủng hộ tác giả phát triển PhysBoard miễn phí",
+    keywords: "ung ho donate qr bidv chuyen khoan tac gia",
+  },
 ];
 
 export type ShortcutMap = Record<string, string | null>;

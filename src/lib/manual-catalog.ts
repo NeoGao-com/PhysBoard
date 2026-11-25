@@ -66,11 +66,18 @@ export interface FeatureCatalogEntry {
 
 export const SUPPORT_INFO = {
   appName: "PhysBoard",
-  version: "1.4.4",
+  version: "1.4.5",
   zaloPhone: "0853769246",
   zaloDisplay: "0853 769 246",
   email: "ngocgao2024@gmail.com",
   githubRepo: "https://github.com/NeoGao-com/PhysBoard",
+  donate: {
+    bank: "BIDV",
+    branch: "BIDV - CN QUANG TRI PGD VINH LINH",
+    accountName: "NGUYEN PHUONG DAT",
+    accountNumber: "8823225739",
+    qrImagePath: "/images/donate-bidv-qr.jpg",
+  },
 };
 
 // ============================================================================

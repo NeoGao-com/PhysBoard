@@ -91,7 +91,8 @@ export type SettingsTab =
   | "laser"
   | "export"
   | "update"
-  | "feedback";
+  | "feedback"
+  | "donate";
 
 interface FeedbackAttachment {
   id: string;
@@ -157,6 +158,12 @@ const TAB_DEFS: TabMeta[] = [
     label: "Báo lỗi & Phản hồi",
     icon: "🐛",
     subtitle: "Gửi báo cáo lỗi hoặc góp ý tính năng trực tiếp cho tác giả",
+  },
+  {
+    id: "donate",
+    label: "Ủng hộ tác giả",
+    icon: "☕",
+    subtitle: "Quét mã VietQR BIDV ủng hộ phát triển PhysBoard miễn phí",
   },
 ];
 
@@ -230,6 +237,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [fbDesc, setFbDesc] = useState("");
   const [fbIncludeDiag, setFbIncludeDiag] = useState(true);
   const [fbCopied, setFbCopied] = useState(false);
+  const [donateCopied, setDonateCopied] = useState(false);
   const [fbImages, setFbImages] = useState<FeedbackAttachment[]>([]);
   const [fbCapturingBoard, setFbCapturingBoard] = useState(false);
   const [fbNotice, setFbNotice] = useState<string | null>(null);
@@ -3588,10 +3596,208 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
                       </div>
                     )}
+                    {/* Quick Donate Callout */}
+                    <div
+                      style={{
+                        marginTop: 4,
+                        padding: "11px 13px",
+                        borderRadius: 10,
+                        background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+                        border: "1px solid #fde68a",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ fontSize: 12.5, color: "#78350f" }}>
+                        <strong>☕ PhysBoard hữu ích cho bài giảng của bạn?</strong>
+                        <div style={{ fontSize: 11.5, color: "#92400e", marginTop: 2 }}>
+                          Bạn có thể mời tác giả một ly cà phê qua mã VietQR BIDV để duy trì cập nhật miễn phí.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("donate")}
+                        style={{
+                          padding: "7px 12px",
+                          borderRadius: 8,
+                          border: "1px solid #f59e0b",
+                          background: "#ffffff",
+                          color: "#b45309",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        ☕ Mở mã QR ủng hộ
+                      </button>
+                    </div>
                   </div>
                 </>
               );
             })()}
+
+            {/* ==================== TAB 9: DONATE QR ==================== */}
+            {activeTab === "donate" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div
+                  style={{
+                    ...CARD_BOX_STYLE,
+                    background: "linear-gradient(135deg, #fffbeb 0%, #fef9c3 55%, #fff7ed 100%)",
+                    border: "1px solid #fde68a",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ ...CARD_TITLE_STYLE, color: "#78350f" }}>
+                    <span>☕</span>
+                    <span>Ủng hộ tác giả phát triển PhysBoard</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "#713f12", lineHeight: 1.55 }}>
+                    PhysBoard được xây dựng hoàn toàn miễn phí và chạy offline để phục vụ thầy cô và học sinh giảng dạy Toán – Vật lý.
+                    Mọi sự đóng góp dù nhỏ đều là nguồn động lực lớn giúp mình duy trì và phát triển thêm nhiều tính năng mới!
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    ...CARD_BOX_STYLE,
+                    display: "flex",
+                    flexDirection: isMobile ? "column" : "row",
+                    alignItems: "center",
+                    gap: 20,
+                    padding: isMobile ? "16px" : "20px 22px",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: 10,
+                      borderRadius: 16,
+                      background: "#ffffff",
+                      border: "1px solid #cbd5e1",
+                      boxShadow: "0 4px 16px rgba(15, 23, 42, 0.08)",
+                      flexShrink: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                    }}
+                  >
+                    <img
+                      data-testid="donate-qr-image"
+                      src="/images/donate-bidv-qr.jpg"
+                      alt="Mã VietQR BIDV ủng hộ tác giả Nguyễn Phương Đạt - 8823225739"
+                      style={{
+                        width: isMobile ? 210 : 230,
+                        height: "auto",
+                        borderRadius: 10,
+                        display: "block",
+                        objectFit: "contain",
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10, width: "100%" }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a" }}>
+                      Thông tin chuyển khoản VietQR
+                    </div>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "auto 1fr",
+                        gap: "8px 12px",
+                        fontSize: 13,
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 10,
+                        padding: "12px 14px",
+                      }}
+                    >
+                      <span style={{ color: "#64748b", fontWeight: 500 }}>Ngân hàng:</span>
+                      <span style={{ color: "#0f172a", fontWeight: 700 }}>BIDV</span>
+
+                      <span style={{ color: "#64748b", fontWeight: 500 }}>Chi nhánh:</span>
+                      <span style={{ color: "#334155", fontWeight: 600 }}>CN QUANG TRI PGD VINH LINH</span>
+
+                      <span style={{ color: "#64748b", fontWeight: 500 }}>Chủ tài khoản:</span>
+                      <span style={{ color: "#0f172a", fontWeight: 700 }}>NGUYEN PHUONG DAT</span>
+
+                      <span style={{ color: "#64748b", fontWeight: 500 }}>Số tài khoản:</span>
+                      <span
+                        data-testid="donate-account-number"
+                        style={{ color: "#1d4ed8", fontWeight: 800, fontFamily: "monospace", fontSize: 15 }}
+                      >
+                        8823225739
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 2 }}>
+                      <button
+                        type="button"
+                        data-testid="donate-copy-account"
+                        onClick={() => {
+                          navigator.clipboard?.writeText("8823225739").then(() => {
+                            setDonateCopied(true);
+                            setTimeout(() => setDonateCopied(false), 2200);
+                          }).catch(() => {});
+                        }}
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 9,
+                          border: "1px solid #93c5fd",
+                          background: donateCopied ? "#dcfce7" : "#eff6ff",
+                          color: donateCopied ? "#15803d" : "#1d4ed8",
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {donateCopied ? "✓ Đã copy STK 8823225739" : "📋 Copy số tài khoản"}
+                      </button>
+
+                      <a
+                        href="/images/donate-bidv-qr.jpg"
+                        download="PhysBoard-BIDV-Donate-QR.jpg"
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 9,
+                          border: "1px solid #cbd5e1",
+                          background: "#ffffff",
+                          color: "#334155",
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          textDecoration: "none",
+                        }}
+                      >
+                        💾 Tải ảnh QR
+                      </a>
+
+                      <a
+                        href="https://zalo.me/0853769246"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          padding: "8px 14px",
+                          borderRadius: 9,
+                          background: "#0068ff",
+                          color: "#ffffff",
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          textDecoration: "none",
+                        }}
+                      >
+                        💬 Nhắn Zalo (0853.769.246)
+                      </a>
+                    </div>
+
+                    <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.45 }}>
+                      Mẹo: Mở app ngân hàng bất kỳ hoặc MoMo/ZaloPay, chọn quét mã QR và hướng camera vào mã trên (hoặc tải ảnh QR xuống để quét từ thư viện ảnh).
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ===================== FOOTER ===================== */}

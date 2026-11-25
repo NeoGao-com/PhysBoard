@@ -129,4 +129,30 @@ test.describe('SettingsModal Responsive Redesign (Desktop Master-Detail & Mobile
     await doneBtn.click();
     await expect(modal).not.toBeVisible();
   });
+
+  test('Donate tab: Opens inside SettingsModal and displays BIDV VietQR image & account info', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // Sidebar should NOT contain a third crowded donate button
+    await expect(page.locator('button[data-action="open-donate"]')).toHaveCount(0);
+
+    // Open SettingsModal and click the Donate tab
+    await page.locator('button[data-action-open-settings="true"]').first().click();
+    const modal = page.locator('[data-testid="settings-modal"]');
+    await expect(modal).toBeVisible();
+
+    const donateTab = modal.locator('button:has-text("Ủng hộ tác giả")');
+    await expect(donateTab).toBeVisible();
+    await donateTab.click();
+
+    const qrImg = page.getByTestId('donate-qr-image');
+    await expect(qrImg).toBeVisible();
+    await expect
+      .poll(async () => qrImg.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0))
+      .toBe(true);
+
+    await expect(page.getByTestId('donate-account-number')).toHaveText('8823225739');
+    await expect(page.getByTestId('donate-copy-account')).toBeVisible();
+    await expect(modal.locator('text=NGUYEN PHUONG DAT')).toBeVisible();
+  });
 });
