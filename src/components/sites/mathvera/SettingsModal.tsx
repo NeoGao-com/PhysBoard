@@ -238,6 +238,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [fbIncludeDiag, setFbIncludeDiag] = useState(true);
   const [fbCopied, setFbCopied] = useState(false);
   const [donateCopied, setDonateCopied] = useState(false);
+  const [donateSaving, setDonateSaving] = useState(false);
+  const [donateNotice, setDonateNotice] = useState<string | null>(null);
   const [fbImages, setFbImages] = useState<FeedbackAttachment[]>([]);
   const [fbCapturingBoard, setFbCapturingBoard] = useState(false);
   const [fbNotice, setFbNotice] = useState<string | null>(null);
@@ -3756,9 +3758,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         {donateCopied ? "✓ Đã copy STK 8823225739" : "📋 Copy số tài khoản"}
                       </button>
 
-                      <a
-                        href="/images/donate-bidv-qr.jpg"
-                        download="PhysBoard-BIDV-Donate-QR.jpg"
+                      <button
+                        type="button"
+                        data-testid="donate-download-qr"
+                        disabled={donateSaving}
+                        onClick={async () => {
+                          setDonateSaving(true);
+                          setDonateNotice(null);
+                          try {
+                            const res = await fetch("/images/donate-bidv-qr.jpg");
+                            if (!res.ok) throw new Error("fetch_failed");
+                            const blob = await res.blob();
+                            const file = new File([blob], "PhysBoard-BIDV-Donate-QR.jpg", {
+                              type: blob.type || "image/jpeg",
+                            });
+                            if (
+                              isMobile &&
+                              typeof navigator !== "undefined" &&
+                              typeof navigator.share === "function" &&
+                              typeof navigator.canShare === "function" &&
+                              navigator.canShare({ files: [file] })
+                            ) {
+                              await navigator.share({
+                                files: [file],
+                                title: "Mã VietQR BIDV - Ủng hộ PhysBoard",
+                              });
+                              setDonateNotice("✓ Đã mở chia sẻ / lưu ảnh mã QR.");
+                            } else {
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = "PhysBoard-BIDV-Donate-QR.jpg";
+                              document.body.appendChild(a);
+                              a.click();
+                              a.remove();
+                              setTimeout(() => URL.revokeObjectURL(url), 4000);
+                              setDonateNotice("✓ Đã tải ảnh mã QR về thiết bị.");
+                            }
+                          } catch {
+                            setDonateNotice("Bạn có thể chụp ảnh màn hình mã QR hoặc dùng nút Copy STK ở bên cạnh.");
+                          } finally {
+                            setDonateSaving(false);
+                          }
+                        }}
                         style={{
                           padding: "8px 14px",
                           borderRadius: 9,
@@ -3767,11 +3809,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           color: "#334155",
                           fontSize: 12.5,
                           fontWeight: 600,
-                          textDecoration: "none",
+                          cursor: donateSaving ? "wait" : "pointer",
                         }}
                       >
-                        💾 Tải ảnh QR
-                      </a>
+                        {donateSaving ? "⏳ Đang lưu QR..." : "💾 Tải / Lưu ảnh QR"}
+                      </button>
 
                       <a
                         href="https://zalo.me/0853769246"
@@ -3790,6 +3832,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         💬 Nhắn Zalo (0853.769.246)
                       </a>
                     </div>
+
+                    {donateNotice && (
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "#15803d",
+                          background: "#f0fdf4",
+                          border: "1px solid #bbf7d0",
+                          borderRadius: 8,
+                          padding: "6px 10px",
+                        }}
+                      >
+                        {donateNotice}
+                      </div>
+                    )}
 
                     <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.45 }}>
                       Mẹo: Mở app ngân hàng bất kỳ hoặc MoMo/ZaloPay, chọn quét mã QR và hướng camera vào mã trên (hoặc tải ảnh QR xuống để quét từ thư viện ảnh).
