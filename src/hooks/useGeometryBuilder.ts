@@ -434,17 +434,21 @@ export function useGeometryBuilder(opts: UseGeometryBuilderOptions) {
       const rawResolvedP1 = startSnap && startSnap.constraint.kind !== "free" ? startSnap.point : p1;
       const rawResolvedP2 = endSnap && endSnap.constraint.kind !== "free" ? endSnap.point : p2;
 
-      const clampA4 = (pt: Point2D): Point2D => {
+      const clampA4 = (pt: Point2D, anchorPt: Point2D): Point2D => {
         if (!a4Opt) return pt;
         const hw = a4Opt.widthWorld / 2;
-        const hh = a4Opt.heightWorld / 2;
+        const pageStep = a4Opt.heightWorld + 0.8;
+        const pageIndex = Math.max(0, Math.floor(Math.max(0, -anchorPt.y) / pageStep));
+        const pageTopSvg = pageIndex * pageStep;
+        const pageBottomSvg = pageTopSvg + a4Opt.heightWorld;
         return {
           x: Math.max(-hw, Math.min(hw, pt.x)),
-          y: Math.max(-hh, Math.min(hh, pt.y)),
+          y: Math.max(-pageBottomSvg, Math.min(-pageTopSvg, pt.y)),
         };
       };
-      const resolvedP1 = clampA4(rawResolvedP1);
-      const resolvedP2 = clampA4(rawResolvedP2);
+      const resolvedP1 = clampA4(rawResolvedP1, rawResolvedP1);
+      const resolvedP2 = clampA4(rawResolvedP2, resolvedP1);
+      if (dist2D(resolvedP1, resolvedP2) < 4 / (viewport.scale || 45)) return;
 
       const createSnappedEndpoints = (needStart: boolean, needEnd: boolean) => {
         let sId = startSnapId;

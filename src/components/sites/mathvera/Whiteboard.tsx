@@ -4718,9 +4718,12 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         );
         if (a4Opt) {
           const hw = a4Opt.widthWorld / 2;
-          const hh = a4Opt.heightWorld / 2;
+          const pageStep = a4Opt.heightWorld + 0.8;
+          const pageIndex = Math.max(0, Math.floor(Math.max(0, -pt.y) / pageStep));
+          const pageTopSvg = pageIndex * pageStep;
+          const pageBottomSvg = pageTopSvg + a4Opt.heightWorld;
           pt.x = Math.max(-hw, Math.min(hw, pt.x));
-          pt.y = Math.max(-hh, Math.min(hh, pt.y));
+          pt.y = Math.max(-pageBottomSvg, Math.min(-pageTopSvg, pt.y));
         }
       }
 
