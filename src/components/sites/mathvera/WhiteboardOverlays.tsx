@@ -198,6 +198,8 @@ export interface WhiteboardOverlaysProps {
   onChangeAutoSwitchTarget: (target: "select" | "ink" | "off") => void;
   inkToShape: boolean;
   onChangeInkToShape: (val: boolean) => void;
+  inkToShapeHoldMs?: number;
+  onChangeInkToShapeHoldMs?: (ms: number) => void;
   penOnlyMode: boolean;
   onChangePenOnlyMode: (val: boolean) => void;
   spenConfig: SPenConfig;
@@ -1344,6 +1346,8 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
         onChangeAutoSwitchTarget={p.onChangeAutoSwitchTarget}
         inkToShape={p.inkToShape}
         onChangeInkToShape={p.onChangeInkToShape}
+        inkToShapeHoldMs={p.inkToShapeHoldMs}
+        onChangeInkToShapeHoldMs={p.onChangeInkToShapeHoldMs}
         penOnlyMode={p.penOnlyMode}
         onChangePenOnlyMode={p.onChangePenOnlyMode}
         spenConfig={p.spenConfig}

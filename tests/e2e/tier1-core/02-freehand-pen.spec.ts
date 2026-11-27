@@ -357,15 +357,25 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     await expect(laserStroke).toHaveCount(0);
   });
 
-  test('TC-02-11: Ink-to-Shape automatically snaps rough drawn strokes to geometric primitives', async ({ page }) => {
+  test('TC-02-11: Ink-to-Shape automatically snaps rough drawn strokes to geometric primitives on hold', async ({ page }) => {
     const canvas = new CanvasDriver(page);
     const toolbar = new ToolbarDriver(page);
     await toolbar.selectTool('ink');
 
+    const drawAndHold = async (pts: Array<{ x: number; y: number }>, holdMs = 420) => {
+      await page.mouse.move(pts[0].x, pts[0].y);
+      await page.mouse.down({ button: 'left' });
+      for (let i = 1; i < pts.length; i++) {
+        await page.mouse.move(pts[i].x, pts[i].y, { steps: 3 });
+      }
+      await page.waitForTimeout(holdMs);
+      await page.mouse.up({ button: 'left' });
+    };
+
     const initialCount = await canvas.getObjectCount();
 
-    // 1. Draw a rough straight line segment -> snaps to GeomSegment
-    await canvas.drawStroke([
+    // 1. Draw a rough straight line segment + hold -> snaps to GeomSegment
+    await drawAndHold([
       { x: 200, y: 200 },
       { x: 250, y: 201 },
       { x: 300, y: 200 },
@@ -376,7 +386,7 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     const latestSegment = canvas.getLatestObject();
     await expect(latestSegment).toHaveAttribute('data-element-type', 'GeomSegment');
 
-    // 2. Draw a rough circle -> snaps to GeomCircle
+    // 2. Draw a rough circle + hold -> snaps to GeomCircle
     const center = { x: 500, y: 300 };
     const radius = 60;
     const circlePoints: Array<{ x: number; y: number }> = [];
@@ -388,13 +398,13 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
         y: center.y + radius * Math.sin(angle) + (Math.random() * 4 - 2),
       });
     }
-    await canvas.drawStroke(circlePoints);
+    await drawAndHold(circlePoints);
     await canvas.waitForObjectCount(initialCount + 2);
     const latestCircle = canvas.getLatestObject();
     await expect(latestCircle).toHaveAttribute('data-element-type', 'GeomCircle');
 
-    // 3. Draw a rough triangle -> snaps to GeomPolygon
-    await canvas.drawStroke([
+    // 3. Draw a rough triangle + hold -> snaps to GeomPolygon
+    await drawAndHold([
       { x: 250, y: 400 },
       { x: 350, y: 400 },
       { x: 300, y: 480 },
@@ -405,14 +415,14 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     await expect(latestPoly).toHaveAttribute('data-element-type', 'GeomPolygon');
   });
 
-  test('TC-02-12: Recognizes ellipses smoothly and preserves open curved edges without flattening', async ({ page }) => {
+  test('TC-02-12: Recognizes ellipses smoothly on hold and preserves open curved edges without flattening', async ({ page }) => {
     const canvas = new CanvasDriver(page);
     const toolbar = new ToolbarDriver(page);
     await toolbar.selectTool('ink');
 
     const initialCount = await canvas.getObjectCount();
 
-    // 1. Draw an elongated ellipse (rx = 95, ry = 40) -> snaps to ellipse instead of polygon
+    // 1. Draw an elongated ellipse (rx = 95, ry = 40) + hold -> snaps to ellipse instead of polygon
     const ellCenter = { x: 620, y: 260 };
     const ellPoints: Array<{ x: number; y: number }> = [];
     for (let i = 0; i <= 24; i++) {
@@ -422,7 +432,13 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
         y: ellCenter.y + 40 * Math.sin(angle),
       });
     }
-    await canvas.drawStroke(ellPoints);
+    await page.mouse.move(ellPoints[0].x, ellPoints[0].y);
+    await page.mouse.down({ button: 'left' });
+    for (let i = 1; i < ellPoints.length; i++) {
+      await page.mouse.move(ellPoints[i].x, ellPoints[i].y, { steps: 2 });
+    }
+    await page.waitForTimeout(420);
+    await page.mouse.up({ button: 'left' });
     await canvas.waitForObjectCount(initialCount + 1);
     const latestEllipse = canvas.getLatestObject();
     await expect(latestEllipse).toHaveAttribute('data-element-type', 'GeomCircle');
@@ -443,15 +459,25 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     await expect(latestCurve).toHaveAttribute('data-element-type', 'Ink');
   });
 
-  test('TC-02-13: ShortStraw mid-edge rectangle beautification + quick Circle/Ellipse toggle & Revert pill', async ({ page }) => {
+  test('TC-02-13: ShortStraw mid-edge rectangle beautification on hold + quick Circle/Ellipse toggle & Revert pill', async ({ page }) => {
     const canvas = new CanvasDriver(page);
     const toolbar = new ToolbarDriver(page);
     await toolbar.selectTool('ink');
 
+    const drawAndHold = async (pts: Array<{ x: number; y: number }>, holdMs = 420) => {
+      await page.mouse.move(pts[0].x, pts[0].y);
+      await page.mouse.down({ button: 'left' });
+      for (let i = 1; i < pts.length; i++) {
+        await page.mouse.move(pts[i].x, pts[i].y, { steps: 2 });
+      }
+      await page.waitForTimeout(holdMs);
+      await page.mouse.up({ button: 'left' });
+    };
+
     const initialCount = await canvas.getObjectCount();
 
-    // 1. Draw a rough rectangle starting from the middle of the top edge
-    await canvas.drawStroke([
+    // 1. Draw a rough rectangle starting from the middle of the top edge + hold
+    await drawAndHold([
       { x: 350, y: 200 },
       { x: 450, y: 202 },
       { x: 452, y: 310 },
@@ -465,7 +491,7 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     // Bare shape must not draw auto A/B/C/D vertex labels
     await expect(rectEl.locator('[data-wb-vertex="true"]')).toHaveCount(0);
 
-    // 2. Draw an oval and test the floating post-snap pill (toggle Circle <-> Ellipse & Revert)
+    // 2. Draw an oval + hold and test the floating post-snap pill (toggle Circle <-> Ellipse & Revert)
     const ovalPts: Array<{ x: number; y: number }> = [];
     for (let i = 0; i <= 24; i++) {
       const angle = (i / 24) * 2 * Math.PI;
@@ -474,7 +500,7 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
         y: 350 + 45 * Math.sin(angle),
       });
     }
-    await canvas.drawStroke(ovalPts);
+    await drawAndHold(ovalPts);
     await canvas.waitForObjectCount(initialCount + 2);
 
     const pill = page.locator('[data-wb-ink-snap-pill="true"]');
@@ -491,5 +517,70 @@ test.describe('Tier 1: 02 Freehand & Fountain Pen Tools with Styling', () => {
     await revertBtn.click();
     await expect(pill).not.toBeVisible();
     await expect(canvas.getLatestObject()).toHaveAttribute('data-element-type', 'Ink');
+  });
+
+  test('TC-02-14: Normal fast handwriting (letter o, horizontal dash) without holding stays Ink and does NOT snap to shape', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+    await toolbar.selectTool('ink');
+
+    const initialCount = await canvas.getObjectCount();
+
+    // Fast horizontal stroke (like writing a fraction bar or minus sign) without holding
+    await canvas.drawStroke([
+      { x: 220, y: 220 },
+      { x: 260, y: 220 },
+      { x: 300, y: 220 },
+      { x: 340, y: 220 },
+    ], { steps: 1 });
+    await canvas.waitForObjectCount(initialCount + 1);
+    await expect(canvas.getLatestObject()).toHaveAttribute('data-element-type', 'Ink');
+
+    // Fast circle-like stroke (like writing letter "o" or "0") without holding
+    const oPts: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= 16; i++) {
+      const angle = (i / 16) * 2 * Math.PI;
+      oPts.push({ x: 450 + 30 * Math.cos(angle), y: 240 + 30 * Math.sin(angle) });
+    }
+    await canvas.drawStroke(oPts, { steps: 1 });
+    await canvas.waitForObjectCount(initialCount + 2);
+    await expect(canvas.getLatestObject()).toHaveAttribute('data-element-type', 'Ink');
+  });
+
+  test('TC-02-15: Custom Ink-to-Shape hold duration slider in Settings controls hold delay and persists', async ({ page }) => {
+    const canvas = new CanvasDriver(page);
+    const toolbar = new ToolbarDriver(page);
+
+    // Open Settings -> adjust hold duration slider to 750ms (0,75 giây)
+    await page.locator('button[data-action-open-settings="true"]').first().click();
+    const slider = page.getByTestId('ink-hold-delay-slider');
+    await expect(slider).toBeVisible();
+    await slider.fill('750');
+    await expect(page.getByTestId('ink-hold-delay-value')).toContainText('0,75');
+    await page.keyboard.press('Escape');
+
+    const savedDelay = await page.evaluate(() => window.localStorage.getItem('physboard_ink_hold_delay_ms'));
+    expect(savedDelay).toBe('750');
+
+    await toolbar.selectTool('ink');
+    const initialCount = await canvas.getObjectCount();
+
+    // Hold 400ms (< 750ms) -> stays Ink
+    await page.mouse.move(220, 260);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.move(380, 260, { steps: 4 });
+    await page.waitForTimeout(400);
+    await page.mouse.up({ button: 'left' });
+    await canvas.waitForObjectCount(initialCount + 1);
+    await expect(canvas.getLatestObject()).toHaveAttribute('data-element-type', 'Ink');
+
+    // Hold 840ms (> 750ms) -> snaps to GeomSegment
+    await page.mouse.move(220, 340);
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.move(380, 340, { steps: 4 });
+    await page.waitForTimeout(840);
+    await page.mouse.up({ button: 'left' });
+    await canvas.waitForObjectCount(initialCount + 2);
+    await expect(canvas.getLatestObject()).toHaveAttribute('data-element-type', 'GeomSegment');
   });
 });

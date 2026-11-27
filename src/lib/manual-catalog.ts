@@ -66,7 +66,7 @@ export interface FeatureCatalogEntry {
 
 export const SUPPORT_INFO = {
   appName: "PhysBoard",
-  version: "1.4.7",
+  version: "1.4.8",
   zaloPhone: "0853769246",
   zaloDisplay: "0853 769 246",
   email: "ngocgao2024@gmail.com",

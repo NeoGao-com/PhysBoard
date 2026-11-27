@@ -45,6 +45,8 @@ export interface SettingsModalProps {
   // Ink recognizer & Pen only
   inkToShape: boolean;
   onChangeInkToShape: (val: boolean) => void;
+  inkToShapeHoldMs?: number;
+  onChangeInkToShapeHoldMs?: (ms: number) => void;
   penOnlyMode: boolean;
   onChangePenOnlyMode: (val: boolean) => void;
   // SPen / Stylus Button Config
@@ -196,6 +198,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onChangeAutoSwitchTarget,
   inkToShape,
   onChangeInkToShape,
+  inkToShapeHoldMs = 340,
+  onChangeInkToShapeHoldMs,
   penOnlyMode,
   onChangePenOnlyMode,
   spenConfig = DEFAULT_SPEN_CONFIG,
@@ -1393,7 +1397,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         Tự động nắn thẳng nét vẽ hình học
                       </div>
                       <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                        Tự động chuyển nét vẽ tự do thành hình tròn, đoạn thẳng, tam giác hoặc hình chữ nhật chuẩn mực.
+                        Vẽ phác nét rồi giữ yên đầu bút để chuyển thành hình chuẩn; viết nhanh sẽ giữ nguyên nét chữ.
                       </div>
                     </div>
                     <input
@@ -1409,6 +1413,73 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       }}
                     />
                   </label>
+
+                  {inkToShape && onChangeInkToShapeHoldMs && (
+                    <div
+                      style={{
+                        marginTop: 6,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: "#334155" }}>
+                          Thời gian giữ bút để chuyển thành hình
+                        </span>
+                        <span
+                          data-testid="ink-hold-delay-value"
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            color: "#1d4ed8",
+                            background: "#eff6ff",
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 6,
+                            padding: "2px 8px",
+                          }}
+                        >
+                          {(inkToShapeHoldMs / 1000).toFixed(2).replace(".", ",")} giây
+                        </span>
+                      </div>
+
+                      <input
+                        type="range"
+                        data-testid="ink-hold-delay-slider"
+                        min={150}
+                        max={1000}
+                        step={20}
+                        value={Math.min(1000, Math.max(150, inkToShapeHoldMs))}
+                        onChange={(e) => onChangeInkToShapeHoldMs(Number(e.target.value))}
+                        style={{ width: "100%", accentColor: "#2563eb", cursor: "pointer" }}
+                      />
+
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11.5, color: "#64748b" }}>
+                        <span>Nhanh (0,15s)</span>
+                        <button
+                          type="button"
+                          onClick={() => onChangeInkToShapeHoldMs(340)}
+                          style={{
+                            border: "1px solid #cbd5e1",
+                            background: "#ffffff",
+                            color: "#475569",
+                            borderRadius: 6,
+                            padding: "2px 8px",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Mặc định (0,34s)
+                        </button>
+                        <span>Chậm (1,00s)</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Phím tắt */}

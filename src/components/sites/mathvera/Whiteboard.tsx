@@ -423,6 +423,15 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       return true;
     }
   });
+  const [inkToShapeHoldMs, setInkToShapeHoldMs] = useState<number>(() => {
+    if (typeof window === "undefined") return 340;
+    try {
+      const saved = Number(window.localStorage.getItem("physboard_ink_hold_delay_ms"));
+      return Number.isFinite(saved) && saved >= 150 && saved <= 1200 ? saved : 340;
+    } catch {
+      return 340;
+    }
+  });
   const [spenConfig, setSpenConfig] = useState<SPenConfig>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -489,6 +498,18 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
     if (typeof window !== "undefined") {
       try {
         window.localStorage.setItem(INK_TO_SHAPE_STORAGE_KEY, enabled ? "true" : "false");
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const handleChangeInkToShapeHoldMs = useCallback((ms: number) => {
+    const clamped = Math.max(150, Math.min(1200, Math.round(ms)));
+    setInkToShapeHoldMs(clamped);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem("physboard_ink_hold_delay_ms", String(clamped));
       } catch {
         // ignore
       }
@@ -3069,7 +3090,8 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         inkToShape &&
         (activeLive.nib === undefined || activeLive.nib === "pencil")
       ) {
-        const recognized = liveStrokeSnappedRef.current ?? recognizeStrokeShape(pts);
+        // Chỉ tự nắn thành hình khi người dùng viết xong và giữ yên đầu bút đủ 340ms (tránh viết chữ bình thường bị tự biến thành hình)
+        const recognized = liveStrokeSnappedRef.current;
         const targetPage = isA4Format ? (activeDrawPageRef.current || currentPage) : currentPage;
         const showSnapPill = (
           elementId: string,
@@ -4422,6 +4444,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         const ptsArr = liveStrokePointsRef.current;
         const pressArr = liveStrokePressuresRef.current;
 
+        let movedBeyondThreshold = false;
         for (const ev of events) {
           const evWorld = screenToWorld(
             ev.clientX,
@@ -4447,21 +4470,24 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
             ptsArr.push(x, y);
             pressArr.push(p);
             liveStrokeTipRef.current = null;
+            movedBeyondThreshold = true;
           } else {
             liveStrokeTipRef.current = { x, y, pressure: p };
           }
         }
-        liveStrokeSnappedRef.current = null;
-
-        // Draw-and-Hold dwell preview (340ms stationary pause snaps preview smoothly like GoodNotes/Samsung Notes)
-        if (dwellTimerRef.current) {
-          clearTimeout(dwellTimerRef.current);
-          dwellTimerRef.current = null;
+        if (movedBeyondThreshold) {
+          liveStrokeSnappedRef.current = null;
+          if (dwellTimerRef.current) {
+            clearTimeout(dwellTimerRef.current);
+            dwellTimerRef.current = null;
+          }
         }
         if (
           inkToShape &&
           (nib === undefined || nib === "pencil") &&
-          liveStrokePointsRef.current.length >= 8
+          liveStrokePointsRef.current.length >= 8 &&
+          !liveStrokeSnappedRef.current &&
+          !dwellTimerRef.current
         ) {
           dwellTimerRef.current = setTimeout(() => {
             dwellTimerRef.current = null;
@@ -4482,7 +4508,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
                 }
               }
             }
-          }, 340);
+          }, inkToShapeHoldMs);
         }
 
         // Update live SVG <path d="..."> directly on requestAnimationFrame with zero React re-renders
@@ -4521,6 +4547,7 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
       laserConfig,
       liveLaserScreenPos,
       inkToShape,
+      inkToShapeHoldMs,
     ]
   );
 
@@ -7089,6 +7116,8 @@ export function Whiteboard({ roomId, initialRoomId }: WhiteboardProps) {
         }}
         inkToShape={inkToShape}
         onChangeInkToShape={handleToggleInkToShape}
+        inkToShapeHoldMs={inkToShapeHoldMs}
+        onChangeInkToShapeHoldMs={handleChangeInkToShapeHoldMs}
         penOnlyMode={penOnlyMode}
         onChangePenOnlyMode={handleTogglePenOnly}
         spenConfig={spenConfig}
