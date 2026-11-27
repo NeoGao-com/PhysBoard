@@ -1150,8 +1150,17 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
             const leftX = Math.max(-pageW / 2 + marginX, -maxTargetW / 2);
 
             const startPage = Math.max(1, Math.floor(Math.max(0, -center.y) / pageStep) + 1);
+            let curPage = startPage;
             let cursorTopSvg = Math.max((startPage - 1) * pageStep + marginTop, -center.y - 6.0);
-            let maxPageUsed = startPage;
+            const startPageTop = (curPage - 1) * pageStep + marginTop;
+            const startPageBottom = (curPage - 1) * pageStep + pageH - marginBottom;
+            if (cursorTopSvg < startPageTop) {
+              cursorTopSvg = startPageTop;
+            } else if (cursorTopSvg > startPageBottom) {
+              curPage += 1;
+              cursorTopSvg = (curPage - 1) * pageStep + marginTop;
+            }
+            let maxPageUsed = curPage;
 
             for (const item of batch.items) {
               let targetW = item.widthPx / pxPerWorld;
@@ -1167,12 +1176,10 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
                 targetH = maxPrintableH;
               }
 
-              let curPage = Math.max(1, Math.floor(Math.max(0, cursorTopSvg) / pageStep) + 1);
-              const pageTopSvg = (curPage - 1) * pageStep + marginTop;
               const pageBottomSvg = (curPage - 1) * pageStep + pageH - marginBottom;
-
-              if (cursorTopSvg < pageTopSvg) cursorTopSvg = pageTopSvg;
-              if (cursorTopSvg + targetH > pageBottomSvg) {
+              // Tuyệt đối không để một câu bị cắt ngang qua 2 trang A4:
+              // nếu không đủ chỗ trên trang hiện tại, đẩy trọn vẹn câu sang đầu trang kế tiếp
+              if (cursorTopSvg + targetH > pageBottomSvg + 1e-6) {
                 curPage += 1;
                 cursorTopSvg = (curPage - 1) * pageStep + marginTop;
               }
@@ -1180,7 +1187,15 @@ export const WhiteboardOverlays: React.FC<WhiteboardOverlaysProps> = (p) => {
               maxPageUsed = Math.max(maxPageUsed, curPage);
               const cx = Math.min(pageW / 2 - marginX - targetW / 2, leftX + targetW / 2);
               const cy = -(cursorTopSvg + targetH / 2);
-              cursorTopSvg += targetH + batch.gapWorld;
+
+              const nextCursor = cursorTopSvg + targetH + batch.gapWorld;
+              const curPageBottom = (curPage - 1) * pageStep + pageH - marginBottom;
+              if (nextCursor > curPageBottom) {
+                curPage += 1;
+                cursorTopSvg = (curPage - 1) * pageStep + marginTop;
+              } else {
+                cursorTopSvg = nextCursor;
+              }
 
               const created = p.dispatcher.dispatch({
                 type: "object.create",

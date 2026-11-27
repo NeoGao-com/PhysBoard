@@ -1,6 +1,6 @@
 [package]
 name = "physboard"
-version = "1.4.8"
+version = "1.4.9"
 description = "PhysBoard — Bảng trắng tương tác dạy Toán & Vật lý Offline"
 authors = ["PhysBoard"]
 license = "MIT"

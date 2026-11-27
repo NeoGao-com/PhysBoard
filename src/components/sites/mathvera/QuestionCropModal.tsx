@@ -57,11 +57,15 @@ export interface QuestionCropModalProps {
 }
 
 const GAP_PRESETS: Array<{ label: string; value: number }> = [
+  { label: "Sát", value: 1.2 },
   { label: "Hẹp", value: 2.5 },
   { label: "Vừa", value: 4.5 },
   { label: "Rộng", value: 7 },
   { label: "Rất rộng", value: 10 },
+  { label: "Nửa trang", value: 13 },
 ];
+
+const CROP_GAP_STORAGE_KEY = "physboard_crop_gap_world";
 
 const BOX_COLORS = [
   "#2563eb",
@@ -116,7 +120,26 @@ export const QuestionCropModal: React.FC<QuestionCropModalProps> = ({
   const [detecting, setDetecting] = useState(false);
   const [detectProgress, setDetectProgress] = useState<string | null>(null);
   const [detectInfo, setDetectInfo] = useState<string | null>(null);
-  const [gapWorld, setGapWorld] = useState<number>(4.5);
+  const [gapWorld, setGapWorld] = useState<number>(() => {
+    if (typeof window === "undefined") return 4.5;
+    try {
+      const saved = Number(window.localStorage.getItem(CROP_GAP_STORAGE_KEY));
+      return Number.isFinite(saved) && saved >= 0.5 && saved <= 16 ? saved : 4.5;
+    } catch {
+      return 4.5;
+    }
+  });
+  const handleChangeGapWorld = useCallback((val: number) => {
+    const clamped = Math.max(0.5, Math.min(16, Math.round(val * 2) / 2));
+    setGapWorld(clamped);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(CROP_GAP_STORAGE_KEY, String(clamped));
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
   const [sourceName, setSourceName] = useState<string>("");
   const [scanFromPage, setScanFromPage] = useState<number>(1);
   const [scanToPage, setScanToPage] = useState<number>(2);
@@ -1709,7 +1732,7 @@ export const QuestionCropModal: React.FC<QuestionCropModalProps> = ({
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
-                  Khoảng trống lời giải:
+                  Khoảng cách giữa các câu:
                 </span>
                 <div
                   style={{
@@ -1719,17 +1742,20 @@ export const QuestionCropModal: React.FC<QuestionCropModalProps> = ({
                     borderRadius: 8,
                     background: "#f1f5f9",
                     border: "1px solid #e2e8f0",
+                    flexWrap: "wrap",
+                    gap: 2,
                   }}
                 >
                   {GAP_PRESETS.map((preset) => {
-                    const active = gapWorld === preset.value;
+                    const active = Math.abs(gapWorld - preset.value) < 0.05;
                     return (
                       <button
                         key={preset.label}
                         type="button"
-                        onClick={() => setGapWorld(preset.value)}
+                        data-testid={`crop-gap-preset-${preset.value}`}
+                        onClick={() => handleChangeGapWorld(preset.value)}
                         style={{
-                          padding: "4px 10px",
+                          padding: "4px 9px",
                           borderRadius: 6,
                           border: "none",
                           background: active ? "#ffffff" : "transparent",
@@ -1744,6 +1770,35 @@ export const QuestionCropModal: React.FC<QuestionCropModalProps> = ({
                       </button>
                     );
                   })}
+                </div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <input
+                    type="range"
+                    data-testid="crop-gap-slider"
+                    min={0.5}
+                    max={16}
+                    step={0.5}
+                    value={gapWorld}
+                    onChange={(e) => handleChangeGapWorld(Number(e.target.value))}
+                    style={{ width: 88, accentColor: "#2563eb", cursor: "pointer" }}
+                    title="Tùy chỉnh khoảng cách lời giải giữa các câu"
+                  />
+                  <span
+                    data-testid="crop-gap-value"
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      color: "#1d4ed8",
+                      background: "#eff6ff",
+                      border: "1px solid #bfdbfe",
+                      borderRadius: 6,
+                      padding: "2px 7px",
+                      minWidth: 44,
+                      textAlign: "center",
+                    }}
+                  >
+                    {gapWorld.toFixed(1)}
+                  </span>
                 </div>
               </div>
 
